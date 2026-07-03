@@ -1,0 +1,196 @@
+# AGENTS.md — goldseam agent instructions
+
+Canonical instructions for all coding agents working in this repo.
+Agent-specific entry points (e.g. [CLAUDE.md](CLAUDE.md)) reference this
+file. Shared agent resources (skills, reference docs) live under
+[.agents/](.agents/).
+
+## Language (mandatory)
+
+Do not use "kill" except for the Unix `kill` command. Use stop / end /
+halt / exit / close / shut down / cancel / interrupt / terminate / abort.
+Prose style: [.agents/reference/anti-slop.md](.agents/reference/anti-slop.md).
+
+## What this is
+
+Self-healing for existing Cypress suites: a failure becomes a rich capture
+(redacted DOM + aria tree + error), a self-hosted/BYO model proposes a
+minimal selector fix, the suite verifies it through a stage ladder, and it
+arrives as a reviewed commit. Plugin (`goldseam/support` +
+`goldseam/plugin`) + CLI (`goldseam heal|pr|report`) in
+[packages/goldseam/](packages/goldseam/); design inputs in
+[docs/plugins/](docs/plugins/README.md); execution order in
+[docs/plan.md](docs/plan.md). **This repo is a public portfolio artifact —
+every file is held to the open-source bar.**
+
+## The iteration process
+
+1. **Plan first.** Work maps to a milestone in [docs/plan.md](docs/plan.md);
+   each has a "done when" gate. Don't start roadmap items Adam hasn't asked
+   for.
+2. **Probe before fixing.** When behavior is uncertain (Cypress internals
+   especially), write an empirical probe and observe — the specs in
+   [cypress/hardening/](cypress/hardening/) exist because probing found two
+   real bugs that reasoning missed. Facts, then fixes.
+3. **Pin what you fix.** Every fixed behavior gets a test that would catch
+   its regression (unit + a system check where observable).
+4. **Red-team at checkpoints.** After a milestone or a large batch of new
+   code, run the skills below — review the prod code, review the tests,
+   then mutate to see if the suite actually bites.
+5. **Record, generalized.** Accepted tradeoffs go in "Known deferred
+   findings" here; instructions added to this file or the skills must
+   generalize — if you can name the specific failing instance in the rule,
+   rewrite it as a principle. Specifics rot.
+
+## Hard rules
+
+The product invariants. Breaking any of these is a regression regardless
+of what else improves:
+
+- **Heals never weaken assertions.** A heal is a selector-only,
+  exact-string, single-site minimal edit.
+- **The model sees runtime snapshots and the failing spec — never
+  application source.**
+- **Every heal is a reviewed commit.** No runtime selector substitution,
+  ever. That's the incumbent's model; ours is the opposite on purpose.
+- **Give-up is a first-class outcome** (page never loaded, degraded
+  capture, low confidence, model judgment) — reported, not hidden.
+- **Capture can never mask a test failure**, and green runs stay silent.
+- **The plugin is transparent:** a suite must behave identically with and
+  without goldseam installed (fail-handler semantics, retries, timing).
+
+## Load-bearing invariants
+
+- **`finally { throw err }` + `shouldRethrow()`** in
+  [packages/goldseam/src/support/index.ts](packages/goldseam/src/support/index.ts)
+  — re-throw only as the *sole* `fail` listener. With zero listeners
+  Cypress fails tests normally; with any listener, only a throw fails the
+  test. Users rely on non-throwing handlers to swallow expected failures;
+  our probe showed we were overriding them.
+- **Final-attempt check in `afterEach`** (same file) — the fail event and
+  `afterEach` fire per retry attempt; shipping a capture on a non-final
+  attempt poisons the healer with a stale artifact from a flaky-then-green
+  test.
+- **Redaction runs on a clone, never the live DOM**
+  ([support/redact.ts](packages/goldseam/src/support/redact.ts)), and
+  `maskText` also runs on the aria YAML. The capture is the model's input;
+  redaction is a capture concern, not polish.
+- **`CAPTURE_TASK` is namespaced** (`goldseam:capture`,
+  [shared/types.ts](packages/goldseam/src/shared/types.ts)) and every
+  artifact carries `schemaVersion` — the artifact schema is a public API;
+  additive changes bump minor, breaking bump major.
+- **`validateEdit`**
+  ([heal/validate.ts](packages/goldseam/src/heal/validate.ts)) enforces the
+  heal invariants mechanically: exactly one edit, failing spec only,
+  unique verbatim `oldString`, the change confined to a quoted string, no
+  assertion-shaped changes, no line-count changes. The model is asked to
+  follow the rules and never trusted to.
+- **Stages are config, verdicts are artifacts.** The ladder is the
+  `STAGES` registry in
+  [heal/stages.ts](packages/goldseam/src/heal/stages.ts) + a `stages:
+  [...]` list; new rungs (oracle, mutation-guard, adversary) are new
+  registry entries, never engine refactors. Every rung's verdict lands in
+  the heal artifact.
+- **The engine reverts on any non-healed outcome** and `apply()` is
+  idempotent (also called on healed, for propose-only ladders) —
+  [heal/engine.ts](packages/goldseam/src/heal/engine.ts).
+- **The demo shop's selector texture is deliberate**
+  ([demo/js/shop.js](demo/js/shop.js)) — ids, classes, `data-testid`, and
+  hook-free elements mixed on purpose; specs and future mutation branches
+  rely on that mix. Don't "clean it up".
+
+## Tests + build
+
+- `npm run build:packages` — **required after ANY edit to
+  `packages/*/src/`**: the dogfood suite, CLI, and unit tests all consume
+  `dist/`. Passing type-check is not the same as dist reflecting the edit.
+- `npm run test:unit` — vitest, ~0.5s. Capture-rule invariants, redaction,
+  artifact writer, heal parse/validate/engine (stub runner).
+- `npm run test:system` — green run stays quiet; broken selector produces
+  a schema-valid artifact. Starts its own demo server.
+- `npm run test:hardening` — pinned probe results: retries, hook failures,
+  user fail-handler transparency.
+- `npm run test:heal` — full heal loop with the deterministic `cmd:` stub
+  ([scripts/stub-model.mjs](scripts/stub-model.mjs)). No model calls.
+- `npm run demo` + `npm run cy:run` — the dogfood suite (17 tests) against
+  the demo shop on port 4173.
+- Real-model heal: `goldseam heal --model claude` (Sonnet). Costs money;
+  never in CI.
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): build → unit
+  → system → hardening → heal-with-stub. Remote:
+  `github.com/adam-s/goldseam` (private).
+
+Gotchas that will burn you:
+
+- VS Code terminals export `ELECTRON_RUN_AS_NODE=1`, which breaks the
+  Cypress binary. npm scripts strip it (`env -u`); a raw `npx cypress run`
+  does not.
+- Cypress loads `cypress.config.ts` once at startup — restart after
+  editing it.
+- A completed `cypress.run()` (Module API) result has **no `status` key**;
+  only failed-to-launch results do. Check the totals.
+- Stray demo servers hold port 4173: `lsof -ti:4173 | xargs kill`.
+- Packages use `moduleResolution: node16` (TS 6 removed `"node"`).
+
+## Skills
+
+Reusable agent playbooks at `.agents/skills/<name>/SKILL.md`.
+`.claude/skills` is a **symlink** to `.agents/skills` — it exists solely
+for Claude Code auto-discovery. Never replace it with a real directory;
+add new skills under `.agents/skills/` only, so the canon stays in one
+place. Format conventions:
+[.agents/reference/anthropic-conventions.md](.agents/reference/anthropic-conventions.md).
+
+- [red-team-review](.agents/skills/red-team-review/SKILL.md) — adversarial
+  bug hunt of the plugin/engine code.
+- [test-red-team](.agents/skills/test-red-team/SKILL.md) — adversarial
+  audit of the test suite (tautologies, stub lies, coverage gaps).
+- [mutation-red-team](.agents/skills/mutation-red-team/SKILL.md) — inject
+  regressions against named invariants; report which mutations the suite
+  misses. Also the seed of the Phase-2 `mutation-guard` ladder rung.
+
+## Known deferred findings
+
+Tradeoffs, not oversights:
+
+- **Shadow DOM isn't serialized** by `outerHTML`; captures of
+  shadow-root-heavy apps are incomplete. Documented in the package README.
+- **`cy.origin` blocks degrade** — the support file can't reach
+  cross-origin documents; capture falls back to error + URL.
+- **Dual failure-hooking plugins can mutually defer.** Our sole-listener
+  re-throw rule means goldseam + another non-throwing `fail`-listener
+  plugin could swallow real failures. Documented; audit support files.
+- **Redaction scope is narrower than "no secrets".** Emails and long
+  digit runs are masked; JWTs, tokens in query strings, and API keys in
+  `data-*` attributes are not. The README states exactly what is
+  guaranteed; widening is tracked work, not an accident.
+- **`rerun-test` without `@cypress/grep` reruns the whole spec** — a
+  superset, valid but slower. Grep integration is optional by design.
+- **No negative-path rerun test yet:** no automated case where `propose`
+  passes but the rerun rungs catch a bad edit — the ladder's teeth are
+  proven only by unit tests + the give-up path. A `cmd:` stub emitting a
+  plausible-but-wrong edit would close this; expected SURVIVED in
+  mutation-red-team until then.
+- **Heal `tier` is always `'model'` today.** The cache tier
+  (heal memory) is Phase-2 backlog; the schema field exists so adding it
+  won't bump the schema.
+- **The name is not locked** (goldseam vs regraft). Rename cost:
+  `git grep -l goldseam` + npm scope; blocks publishing only.
+- **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
+  model; not worth an HTML-aware slicer yet.
+
+## Noise
+
+- Cypress 15 prints an `allowCypressEnv` deprecation warning on every
+  Module-API run — upstream, cosmetic.
+- Markdown table-pipe lints (MD060) in docs — cosmetic.
+- jsdom lacks pseudo-element `getComputedStyle`; unit tests shim it (see
+  [support-invariants.test.ts](packages/goldseam/test/support-invariants.test.ts)).
+
+## Naming
+
+**goldseam**, always lowercase (npm name, task prefix `goldseam:`,
+artifact dir `.goldseam/`). Named for kintsugi: the repair is visible,
+reviewed, and part of the object's story — never hidden magic. The aria
+package is `@goldseam/aria-snapshot` (Apache-2.0, NOTICE required — the
+lift carries attribution obligations).
