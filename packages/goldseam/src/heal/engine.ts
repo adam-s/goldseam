@@ -1,0 +1,122 @@
+// The heal engine: run the configured ladder over one capture artifact,
+// retry propose with feedback under a hard attempt cap, and record every
+// verdict — healed, failed, or gave-up — as a heal artifact.
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { basename, join } from 'path';
+import { FailureArtifact } from '../shared/types';
+import { STAGES } from './stages';
+import {
+  HEAL_SCHEMA_VERSION,
+  HealArtifact,
+  HealAttempt,
+  HealContext,
+  HealOptions,
+  RepairRunner,
+} from './types';
+
+export const DEFAULT_HEAL_OPTIONS: Omit<HealOptions, 'projectRoot' | 'healsDir'> = {
+  stages: ['propose', 'rerun-test', 'rerun-spec'],
+  maxAttempts: 3,
+  minConfidence: 0.5,
+  selectorPriority: ['data-cy', 'data-testid', 'role', 'text', 'css'],
+  dryRun: false,
+};
+
+export async function healArtifactFile(
+  artifactPath: string,
+  runner: RepairRunner,
+  options: HealOptions,
+): Promise<HealArtifact> {
+  const startedAt = Date.now();
+  const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as FailureArtifact;
+  const specAbs = join(options.projectRoot, artifact.specPath);
+  const originalSpec = existsSync(specAbs) ? readFileSync(specAbs, 'utf8') : null;
+  if (originalSpec === null) {
+    throw new Error(`spec named by the capture does not exist: ${artifact.specPath}`);
+  }
+
+  const stages = options.stages.map((name) => {
+    const stage = STAGES[name];
+    if (!stage) throw new Error(`unknown heal stage "${name}" (available: ${Object.keys(STAGES).join(', ')})`);
+    return stage;
+  });
+
+  let applied = false;
+  const ctx: HealContext = {
+    artifact,
+    artifactPath,
+    options,
+    runner,
+    apply() {
+      const edit = ctx.proposal?.edits?.[0];
+      if (!edit || applied || options.dryRun) return;
+      writeFileSync(specAbs, originalSpec.replace(edit.oldString, edit.newString));
+      applied = true;
+    },
+    revert() {
+      if (!applied) return;
+      writeFileSync(specAbs, originalSpec);
+      applied = false;
+    },
+  };
+
+  const attempts: HealAttempt[] = [];
+  let outcome: HealArtifact['verdict'] = 'failed';
+
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    const record: HealAttempt = { attempt, ladder: [] };
+    attempts.push(record);
+    ctx.proposal = undefined;
+
+    let attemptFailed = false;
+    for (const stage of stages) {
+      const v = await stage.run(ctx);
+      record.ladder.push(v);
+      if (v.verdict === 'gave-up') {
+        outcome = 'gave-up';
+        break;
+      }
+      if (v.verdict === 'fail') {
+        ctx.feedback = `Attempt ${attempt} was rejected at stage "${v.stage}": ${v.evidence}`;
+        attemptFailed = true;
+        break;
+      }
+    }
+    record.proposal = ctx.proposal;
+
+    if (outcome === 'gave-up') {
+      ctx.revert();
+      break;
+    }
+    if (!attemptFailed) {
+      outcome = 'healed';
+      ctx.apply(); // idempotent: ensures the edit is on disk even when no
+      break; //       rerun stage ran (propose-only ladders, custom configs)
+    }
+    ctx.revert();
+  }
+  if (outcome !== 'healed') ctx.revert();
+
+  const heal: HealArtifact = {
+    schemaVersion: HEAL_SCHEMA_VERSION,
+    captureRef: basename(artifactPath),
+    specPath: artifact.specPath,
+    title: artifact.title,
+    model: runner.id,
+    tier: 'model',
+    verdict: outcome,
+    attempts,
+    finalEdit: outcome === 'healed' ? ctx.proposal?.edits?.[0] : undefined,
+    confidence: outcome === 'healed' ? ctx.proposal?.confidence : undefined,
+    reasoning: ctx.proposal?.reasoning,
+    durationMs: Date.now() - startedAt,
+  };
+
+  mkdirSync(options.healsDir, { recursive: true });
+  writeFileSync(
+    join(options.healsDir, basename(artifactPath).replace(/\.json$/, '-heal.json')),
+    JSON.stringify(heal, null, 2),
+  );
+  return heal;
+}

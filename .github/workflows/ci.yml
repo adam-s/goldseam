@@ -32,3 +32,8 @@ jobs:
       # capture, user fail-handlers keep their semantics.
       - name: Hardening tests
         run: npm run test:hardening
+
+      # Full heal loop (capture → propose → verify → artifact) with the
+      # deterministic cmd: stub model — no API calls in CI.
+      - name: Heal end-to-end
+        run: npm run test:heal

@@ -12,6 +12,7 @@
     "test:unit": "npm test --workspaces --if-present",
     "test:system": "node scripts/system-test.mjs",
     "test:hardening": "node scripts/hardening-test.mjs",
+    "test:heal": "node scripts/heal-e2e-test.mjs",
     "cy:open": "env -u ELECTRON_RUN_AS_NODE cypress open",
     "cy:run": "env -u ELECTRON_RUN_AS_NODE cypress run",
     "cy:run:broken": "env -u ELECTRON_RUN_AS_NODE cypress run --config specPattern=cypress/system/broken-selector.cy.ts",

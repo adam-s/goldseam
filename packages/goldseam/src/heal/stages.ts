@@ -1,0 +1,128 @@
+// The Phase-1 ladder rungs. Each stage reads the context and returns a
+// verdict artifact; any failing rung stops the attempt. Later rungs
+// (oracle, mutation-guard, adversary…) register here without touching the
+// engine.
+
+import { createRequire } from 'module';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { buildRepairPrompt } from './prompt';
+import { parseRepairReply, ReplyParseError } from './parse';
+import { EditRejected, validateEdit } from './validate';
+import { HealContext, HealStage, StageVerdict } from './types';
+
+const verdict = (
+  stage: string,
+  v: StageVerdict['verdict'],
+  evidence: string,
+  started: number,
+): StageVerdict => ({ stage, verdict: v, evidence, durationMs: Date.now() - started });
+
+export const proposeStage: HealStage = {
+  name: 'propose',
+  async run(ctx: HealContext): Promise<StageVerdict> {
+    const started = Date.now();
+    const { artifact, options } = ctx;
+
+    // Give-up signals are checked before any model call.
+    if (artifact.url === 'about:blank') {
+      return verdict('propose', 'gave-up', 'url is about:blank — the visit never loaded', started);
+    }
+    if (artifact.captureError) {
+      return verdict('propose', 'gave-up', `capture degraded: ${artifact.captureError}`, started);
+    }
+
+    const specAbs = join(options.projectRoot, artifact.specPath);
+    const specSource = readFileSync(specAbs, 'utf8');
+    const prompt = buildRepairPrompt({
+      artifact,
+      specSource,
+      selectorPriority: options.selectorPriority,
+      feedback: ctx.feedback,
+    });
+
+    let raw: string;
+    try {
+      raw = await ctx.runner.repair(prompt);
+    } catch (e) {
+      return verdict('propose', 'fail', `runner error: ${e instanceof Error ? e.message : e}`, started);
+    }
+
+    try {
+      const reply = parseRepairReply(raw);
+      if (reply.giveUp) {
+        return verdict('propose', 'gave-up', `model gave up: ${reply.giveUp.reason}`, started);
+      }
+      if ((reply.confidence ?? 0) < options.minConfidence) {
+        return verdict(
+          'propose',
+          'gave-up',
+          `confidence ${reply.confidence} below floor ${options.minConfidence}`,
+          started,
+        );
+      }
+      const edit = validateEdit(reply, artifact.specPath, specSource);
+      ctx.proposal = { ...reply, edits: [edit] };
+      return verdict(
+        'propose',
+        'pass',
+        `edit: "${edit.oldString.trim()}" → "${edit.newString.trim()}" (confidence ${reply.confidence})`,
+        started,
+      );
+    } catch (e) {
+      if (e instanceof ReplyParseError || e instanceof EditRejected) {
+        return verdict('propose', 'fail', e.message, started);
+      }
+      throw e;
+    }
+  },
+};
+
+// The rerun rungs drive Cypress through the Module API from the target
+// project. `cypress` is a peer dependency resolved from the project.
+type CypressModule = { run(opts: Record<string, unknown>): Promise<{ totalFailed?: number; totalTests?: number; status?: string; message?: string }> };
+
+function loadCypress(projectRoot: string): CypressModule {
+  const req = createRequire(join(projectRoot, 'noop.js'));
+  return req('cypress') as CypressModule;
+}
+
+async function rerun(ctx: HealContext, stageName: string, grepTitle?: string): Promise<StageVerdict> {
+  const started = Date.now();
+  if (ctx.options.dryRun) {
+    return verdict(stageName, 'pass', 'dry-run: rerun skipped', started);
+  }
+  ctx.apply();
+  const cypress = loadCypress(ctx.options.projectRoot);
+  const result = await cypress.run({
+    quiet: true,
+    config: { specPattern: ctx.artifact.specPath },
+    // Single-test isolation via @cypress/grep when the project has it
+    // registered; without it the env is inert and the whole spec runs (a
+    // superset — still a valid, if slower, verdict).
+    ...(grepTitle ? { env: { grep: grepTitle } } : {}),
+  });
+  if (result.status === 'failed') {
+    return verdict(stageName, 'fail', `cypress could not run: ${result.message}`, started);
+  }
+  const failed = result.totalFailed ?? -1;
+  return failed === 0
+    ? verdict(stageName, 'pass', `${result.totalTests} test(s), 0 failures`, started)
+    : verdict(stageName, 'fail', `${failed} failure(s) after applying the heal`, started);
+}
+
+export const rerunTestStage: HealStage = {
+  name: 'rerun-test',
+  run: (ctx) => rerun(ctx, 'rerun-test', ctx.artifact.title),
+};
+
+export const rerunSpecStage: HealStage = {
+  name: 'rerun-spec',
+  run: (ctx) => rerun(ctx, 'rerun-spec'),
+};
+
+export const STAGES: Record<string, HealStage> = {
+  propose: proposeStage,
+  'rerun-test': rerunTestStage,
+  'rerun-spec': rerunSpecStage,
+};

@@ -5,8 +5,9 @@ breaks, the failure becomes a rich capture (DOM + accessibility tree +
 error); your model — local or API, never a vendor cloud — proposes a
 minimal fix; the suite verifies it; the repair arrives as a pull request.
 
-> Status: capture pipeline. `goldseam heal` / `pr` / `report` are under
-> construction — see the [build plan](../../docs/plan.md).
+> Status: capture + the Phase-1 heal ladder (`propose → rerun-test →
+> rerun-spec`) work end to end. `goldseam pr` / `report` and the oracle
+> rung are next — see the [build plan](../../docs/plan.md).
 
 ## Install
 
@@ -96,6 +97,37 @@ major.
 - Captures are best-effort: a degraded capture records `captureError` and
   the run behaves exactly as without the plugin.
 - Quiet on green: passing runs produce no artifacts, no logs, no tasks.
+
+## Healing
+
+```bash
+npx goldseam heal                 # propose + verify fixes for every capture
+npx goldseam heal --dry-run       # propose + validate only; touch nothing
+npx goldseam heal --model claude:opus
+npx goldseam heal --model "cmd:./my-model.sh"   # any executable: prompt on stdin, JSON reply on stdout
+```
+
+The app under test must be reachable (same requirement as `cypress run`).
+Each capture runs the ladder — `propose → rerun-test → rerun-spec` — under
+a hard attempt cap (default 3, retrying `propose` with feedback). Every
+rung's verdict lands in `.goldseam/heals/<capture>-heal.json`; verdicts
+are `healed`, `gave-up`, or `failed`, and give-up is a first-class,
+reported outcome (page never loaded, degraded capture, low confidence, or
+the model's own judgment).
+
+Proposals are validated mechanically before touching disk: exactly one
+edit, in the failing spec only, `oldString` unique and verbatim, the
+change confined to a quoted selector string, no line-count changes, and
+nothing that resembles an assertion edit — heals never weaken assertions.
+The model sees the capture and the spec source, never application source.
+
+Model runners: `claude` (the Claude Code CLI in print mode; defaults to
+Sonnet), `claude:<model>`, or `cmd:<executable>`. `openai:` / `anthropic:`
+/ `ollama:` HTTP runners are planned behind the same interface.
+
+Single-test isolation in `rerun-test` uses `@cypress/grep` when your
+project registers it; without it the whole spec reruns (a superset — a
+valid but slower verdict).
 
 ## Compatibility
 

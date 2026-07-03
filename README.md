@@ -12,15 +12,18 @@ object's story — never hidden magic.
 
 ## Status
 
-**M1 (capture) complete** — execution order lives in
+**M1–M4 complete: the heal loop works end to end** (real heal verified
+with Sonnet 5 via `claude -p`). Execution order lives in
 [docs/plan.md](docs/plan.md). This repo holds:
 
-- `packages/goldseam/` — the plugin: `goldseam/support` (fail-event stash,
-  redaction, aria snapshot, never-mask re-throw) + `goldseam/plugin`
-  (capture task → versioned artifacts in `.goldseam/failures/`) + the
-  `goldseam` CLI shell (`heal`/`pr`/`report` land in M3+). Unit-tested
-  (redaction, writer, capture-rule invariants) and system-tested (green
-  runs stay quiet; a broken selector produces a schema-valid artifact).
+- `packages/goldseam/` — the plugin + CLI: `goldseam/support` (fail-event
+  stash, redaction, aria snapshot, never-mask re-throw, retry-aware,
+  transparent to user fail handlers) + `goldseam/plugin` (capture task →
+  versioned artifacts in `.goldseam/failures/`) + `goldseam heal` (the
+  Phase-1 ladder: `propose → rerun-test → rerun-spec` behind a pluggable
+  RepairRunner, hard attempt cap, mechanical edit validation, first-class
+  give-up; `pr`/`report` land in M5). 37 unit tests + three system suites
+  (capture, hardening, heal E2E with a stub model).
 - `packages/aria-snapshot/` — Playwright's aria snapshot (pure-DOM tree
   walk + YAML renderer) as a standalone package. Apache-2.0, attribution
   in NOTICE.
