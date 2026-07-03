@@ -1,0 +1,45 @@
+{
+  "model": "claude",
+  "results": [
+    {
+      "id": "testid-rename",
+      "style": "data-testid",
+      "expect": "healed",
+      "outcome": "healed",
+      "ok": true,
+      "attempts": 1,
+      "tier": "model",
+      "seconds": 22
+    },
+    {
+      "id": "id-rename-multi-occurrence",
+      "style": "id",
+      "expect": "healed",
+      "outcome": "healed",
+      "ok": true,
+      "attempts": 2,
+      "tier": "model",
+      "seconds": 30
+    },
+    {
+      "id": "class-rename",
+      "style": "css-class",
+      "expect": "healed",
+      "outcome": "healed",
+      "ok": true,
+      "attempts": 1,
+      "tier": "model",
+      "seconds": 23
+    },
+    {
+      "id": "copy-change-not-a-selector-break",
+      "style": "text-assertion",
+      "expect": "gave-up",
+      "outcome": "gave-up",
+      "ok": true,
+      "attempts": 1,
+      "tier": "model",
+      "seconds": 22
+    }
+  ]
+}

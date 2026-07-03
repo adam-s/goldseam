@@ -1,0 +1,64 @@
+[
+  {
+    "id": "testid-rename",
+    "style": "data-testid",
+    "expect": "healed",
+    "spec": "cypress/e2e/stepper.cy.ts",
+    "changes": [
+      {
+        "file": "demo/js/shop.js",
+        "before": "data-testid=\"qty-increment\"",
+        "after": "data-testid=\"qty-plus\""
+      }
+    ]
+  },
+  {
+    "id": "id-rename-multi-occurrence",
+    "style": "id",
+    "expect": "healed",
+    "spec": "cypress/e2e/stepper.cy.ts",
+    "changes": [
+      {
+        "file": "demo/js/shop.js",
+        "before": "<span id=\"qty-value\">1</span>",
+        "after": "<span id=\"qty-num\">1</span>"
+      },
+      {
+        "file": "demo/js/shop.js",
+        "before": "document.getElementById('qty-value')",
+        "after": "document.getElementById('qty-num')"
+      }
+    ]
+  },
+  {
+    "id": "class-rename",
+    "style": "css-class",
+    "expect": "healed",
+    "spec": "cypress/e2e/stepper.cy.ts",
+    "changes": [
+      {
+        "file": "demo/js/shop.js",
+        "before": "class=\"qty-decrement\"",
+        "after": "class=\"qty-minus\""
+      },
+      {
+        "file": "demo/js/shop.js",
+        "before": "el.querySelector('.qty-decrement')",
+        "after": "el.querySelector('.qty-minus')"
+      }
+    ]
+  },
+  {
+    "id": "copy-change-not-a-selector-break",
+    "style": "text-assertion",
+    "expect": "gave-up",
+    "spec": "cypress/e2e/modal.cy.ts",
+    "changes": [
+      {
+        "file": "demo/js/shop.js",
+        "before": "No refunds on figments.",
+        "after": "All sales of figments are final."
+      }
+    ]
+  }
+]

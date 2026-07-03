@@ -130,6 +130,25 @@ describe('validateEdits', () => {
     ).toThrow(/never weaken assertions/);
   });
 
+  it('accepts a selector rename whose diff fragment is an assertion-like word (context wins)', () => {
+    // '#cart-count' → '#cart-value': the changed core is "value", but the
+    // change lives inside cy.get() — a legitimate selector edit. This was
+    // a real benchmark false positive.
+    const edits = validateEdits(
+      reply(`cy.get('#cart-count').should('have.text', '1');`, `cy.get('#cart-value').should('have.text', '1');`),
+      SPEC_PATH,
+      SPEC,
+    );
+    expect(edits[0].newString).toContain('#cart-value');
+  });
+
+  it('rejects assertion-word changes when the snippet has no call context', () => {
+    const spec = `cy.get('#a').should('have.text', 'x');\n`;
+    expect(() =>
+      validateEdits(reply(`'have.text'`, `'have.value'`), SPEC_PATH, spec),
+    ).toThrow(/never weaken assertions/);
+  });
+
   it('rejects line-count changes', () => {
     expect(() =>
       validateEdits(

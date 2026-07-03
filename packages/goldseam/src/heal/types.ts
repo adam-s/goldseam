@@ -50,6 +50,9 @@ export interface HealOptions {
   healsDir: string;
   /** Heal-memory file; null disables the cache tier. */
   cacheFile: string | null;
+  /** Titles of OTHER captures still awaiting heals in the same spec —
+   * rerun-spec tolerates exactly these failures and nothing else. */
+  knownBrokenTitles?: string[];
 }
 
 export interface HealAttempt {
@@ -67,8 +70,10 @@ export interface HealArtifact {
   specPath: string;
   title: string;
   model: string;
-  /** 'cache' = healed from heal memory, zero model calls (still verified). */
-  tier: 'cache' | 'model';
+  /** 'cache' = healed from heal memory (zero model calls); 'sibling' = an
+   * earlier heal in the same run already fixed this break (verified by
+   * rerun, zero model calls). */
+  tier: 'cache' | 'model' | 'sibling';
   verdict: 'healed' | 'gave-up' | 'failed';
   attempts: HealAttempt[];
   finalEdits?: RepairEdit[];

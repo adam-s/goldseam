@@ -66,8 +66,25 @@ export async function healArtifactFile(
 
   const attempts: HealAttempt[] = [];
   let outcome: HealArtifact['verdict'] = 'failed';
+  let siblingHealed = false;
 
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+  // A multi-edit heal earlier in this run may have already fixed this
+  // capture's break (shared selector across tests). Verify — never assume:
+  // the test must actually pass before we call it healed.
+  if (!options.dryRun && artifact.failedSelector && !originalSpec.includes(artifact.failedSelector)) {
+    try {
+      const probe = await STAGES['rerun-test'].run(ctx); // no proposal ⇒ nothing applied
+      attempts.push({ attempt: 0, ladder: [probe], source: undefined });
+      if (probe.verdict === 'pass') {
+        outcome = 'healed';
+        siblingHealed = true;
+      }
+    } catch {
+      // Probe unavailable (no cypress resolvable, etc.) — heal normally.
+    }
+  }
+
+  for (let attempt = 1; !siblingHealed && attempt <= options.maxAttempts; attempt++) {
     const record: HealAttempt = { attempt, ladder: [] };
     attempts.push(record);
     ctx.proposal = undefined;
@@ -103,7 +120,7 @@ export async function healArtifactFile(
   }
   if (outcome !== 'healed') ctx.revert();
 
-  const tier = ctx.proposalSource === 'cache' ? 'cache' : 'model';
+  const tier = siblingHealed ? 'sibling' : ctx.proposalSource === 'cache' ? 'cache' : 'model';
   const finalEdits = outcome === 'healed' ? ctx.proposal?.edits : undefined;
 
   // A verified MODEL heal feeds heal memory; cache heals just proved the

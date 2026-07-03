@@ -109,11 +109,54 @@ export const proposeStage: HealStage = {
 
 // The rerun rungs drive Cypress through the Module API from the target
 // project. `cypress` is a peer dependency resolved from the project.
-type CypressModule = { run(opts: Record<string, unknown>): Promise<{ totalFailed?: number; totalTests?: number; status?: string; message?: string }> };
+interface CypressRunResult {
+  totalFailed?: number;
+  totalTests?: number;
+  status?: string;
+  message?: string;
+  runs?: Array<{ tests?: Array<{ title: string[]; state: string }> }>;
+}
+type CypressModule = { run(opts: Record<string, unknown>): Promise<CypressRunResult> };
 
 function loadCypress(projectRoot: string): CypressModule {
   const req = createRequire(join(projectRoot, 'noop.js'));
   return req('cypress') as CypressModule;
+}
+
+/**
+ * Test-level rerun verdict (pure; unit-tested). Multiple tests in one spec
+ * can break together, so a rung must judge THE healed test, not the run:
+ * - rerun-test: the healed test ran and passed.
+ * - rerun-spec: the healed test passed AND every remaining failure is a
+ *   known pending break (another capture awaiting its own heal).
+ */
+export function rerunVerdictFor(
+  stageName: string,
+  result: CypressRunResult,
+  healedTitle: string,
+  knownBrokenTitles: string[],
+): { pass: boolean; evidence: string } {
+  const tests = result.runs?.flatMap((r) => r.tests ?? []) ?? [];
+  const byTitle = (t: { title: string[] }) => t.title.join(' ');
+  const healed = tests.find((t) => byTitle(t) === healedTitle);
+  if (!healed) {
+    return { pass: false, evidence: `healed test "${healedTitle}" did not run (${tests.length} ran)` };
+  }
+  if (healed.state !== 'passed') {
+    return { pass: false, evidence: `healed test still ${healed.state} after applying the heal` };
+  }
+  const unexpected = tests
+    .filter((t) => t.state === 'failed')
+    .map(byTitle)
+    .filter((title) => !knownBrokenTitles.includes(title));
+  if (stageName === 'rerun-spec' && unexpected.length > 0) {
+    return { pass: false, evidence: `heal broke other test(s): ${unexpected.join('; ')}` };
+  }
+  const known = tests.filter((t) => t.state === 'failed').length;
+  return {
+    pass: true,
+    evidence: `healed test passed${known > 0 ? ` (${known} other failure(s) are known pending breaks)` : ''}`,
+  };
 }
 
 async function rerun(ctx: HealContext, stageName: string, grepTitle?: string): Promise<StageVerdict> {
@@ -127,17 +170,20 @@ async function rerun(ctx: HealContext, stageName: string, grepTitle?: string): P
     quiet: true,
     config: { specPattern: ctx.artifact.specPath },
     // Single-test isolation via @cypress/grep when the project has it
-    // registered; without it the env is inert and the whole spec runs (a
-    // superset — still a valid, if slower, verdict).
+    // registered; without it the env is inert and the whole spec runs —
+    // the verdict below is test-level either way, grep only buys speed.
     ...(grepTitle ? { env: { grep: grepTitle } } : {}),
   });
   if (result.status === 'failed') {
     return verdict(stageName, 'fail', `cypress could not run: ${result.message}`, started);
   }
-  const failed = result.totalFailed ?? -1;
-  return failed === 0
-    ? verdict(stageName, 'pass', `${result.totalTests} test(s), 0 failures`, started)
-    : verdict(stageName, 'fail', `${failed} failure(s) after applying the heal`, started);
+  const { pass, evidence } = rerunVerdictFor(
+    stageName,
+    result,
+    ctx.artifact.title,
+    ctx.options.knownBrokenTitles ?? [],
+  );
+  return verdict(stageName, pass ? 'pass' : 'fail', evidence, started);
 }
 
 export const rerunTestStage: HealStage = {

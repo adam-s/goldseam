@@ -125,9 +125,22 @@ async function heal(): Promise<number> {
   }
 
   console.log(`goldseam heal: ${selected.length} capture(s), model ${runner.id}${options.dryRun ? ', dry-run' : ''}\n`);
+  // Several tests in one spec can break together; each heal's rerun must
+  // tolerate the OTHER still-pending breaks (and nothing else).
+  const pending = new Map(
+    selected.map((file) => {
+      const a = JSON.parse(readFileSync(join(failuresDir, file), 'utf8')) as FailureArtifact;
+      return [file, { specPath: a.specPath, title: a.title }];
+    }),
+  );
   let healed = 0;
   for (const file of selected) {
-    const result = await healArtifactFile(join(failuresDir, file), runner, options);
+    const me = pending.get(file)!;
+    const knownBrokenTitles = [...pending.entries()]
+      .filter(([f, p]) => f !== file && p.specPath === me.specPath)
+      .map(([, p]) => p.title);
+    const result = await healArtifactFile(join(failuresDir, file), runner, { ...options, knownBrokenTitles });
+    if (result.verdict === 'healed') pending.delete(file);
     const mark = { healed: '✔', 'gave-up': '∅', failed: '✖' }[result.verdict];
     console.log(`${mark} [${result.verdict}] ${result.title}`);
     for (const attempt of result.attempts) {

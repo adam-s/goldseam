@@ -40,6 +40,30 @@ function insideQuotes(code: string, index: number): boolean {
   return quote !== null;
 }
 
+/** Name of the innermost call whose parentheses enclose `index` — e.g. in
+ * `cy.get('#x').should('have.text', '1')` position of `have.text` returns
+ * "should". Undefined when the snippet carries no call context. */
+function enclosingCallName(code: string, index: number): string | undefined {
+  const stack: string[] = [];
+  let quote: string | null = null;
+  for (let i = 0; i < index; i++) {
+    const ch = code[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    else if (ch === '(') {
+      const name = code.slice(0, i).match(/([\w$]+)\s*$/);
+      stack.push(name ? name[1] : '?');
+    } else if (ch === ')') stack.pop();
+  }
+  return stack[stack.length - 1];
+}
+
+const ASSERTION_CALLS = new Set(['should', 'and', 'expect', 'assert']);
+
 /** Real specs reference a selector several times; each occurrence needs its
  * own exact-string edit. The cap is a minimality guard, not a feature. */
 const MAX_EDITS = 8;
@@ -81,7 +105,15 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
   if (!insideQuotes(edit.oldString, prefix.length) || !insideQuotes(edit.newString, prefix.length)) {
     throw new EditRejected('the change must be confined to a quoted selector string');
   }
-  if (ASSERTION_CORE.test(oldCore) || ASSERTION_CORE.test(newCore)) {
+  // Context beats fragments: a change inside .should()/.and()/expect() is
+  // an assertion edit no matter what it says; a change inside cy.get() is
+  // a selector edit even when the diff fragment is a word like "value".
+  const call = enclosingCallName(edit.oldString, prefix.length);
+  if (call && ASSERTION_CALLS.has(call)) {
+    throw new EditRejected(`the change is inside ${call}(…); heals never weaken assertions`);
+  }
+  if (!call && (ASSERTION_CORE.test(oldCore) || ASSERTION_CORE.test(newCore))) {
+    // No call context in the snippet — fall back to the fragment check.
     throw new EditRejected(`the change looks like an assertion edit ("${oldCore}" → "${newCore}"); heals never weaken assertions`);
   }
   if (edit.newString.split('\n').length !== edit.oldString.split('\n').length) {
