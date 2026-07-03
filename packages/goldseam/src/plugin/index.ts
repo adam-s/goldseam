@@ -10,6 +10,7 @@ export interface GoldseamPluginOptions {
   failuresDir?: string;
 }
 
+/** Node-side install. Returns `config` so `setupNodeEvents` can be one line. */
 export function goldseam(
   on: Cypress.PluginEvents,
   config: Cypress.PluginConfigOptions,
@@ -31,3 +32,5 @@ export function goldseam(
 
   return config;
 }
+
+export default goldseam;

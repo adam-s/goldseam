@@ -13,20 +13,21 @@ minimal fix; the suite verifies it; the repair arrives as a pull request.
 
 ```bash
 npm install --save-dev goldseam
+npx goldseam init        # wires both files below for you (idempotent)
 ```
+
+Or wire it by hand — one line per world:
 
 ```ts
 // cypress/support/e2e.ts
-import { installGoldseam } from 'goldseam/support';
-installGoldseam();
+import 'goldseam/support/register';
 
 // cypress.config.ts
-import { goldseam } from 'goldseam/plugin';
+import goldseam from 'goldseam/plugin';
 export default defineConfig({
   e2e: {
     setupNodeEvents(on, config) {
-      goldseam(on, config);
-      return config;
+      return goldseam(on, config);
     },
   },
 });
@@ -34,6 +35,9 @@ export default defineConfig({
 
 That's the whole integration. Green runs are untouched and write nothing.
 When a test fails, a capture artifact appears in `.goldseam/failures/`.
+Options? `import { installGoldseam } from 'goldseam/support'` and call it
+with an options object instead of the register import — defaults are the
+product, options are the escape hatch.
 
 ## Options
 

@@ -2,15 +2,17 @@
 // `goldseam` CLI — the after-the-run half of the pipeline. Stages are
 // config, verdicts are artifacts.
 
-import { existsSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../heal/engine';
 import { resolveRunner } from '../heal/runners';
 import { HealOptions } from '../heal/types';
+import { SUPPORT_SNIPPET, wireConfigSource, wireSupportSource } from './init';
 
 const USAGE = `goldseam — self-healing for the Cypress suites you already have
 
 Usage:
+  goldseam init             wire this Cypress project (support + config), idempotent
   goldseam heal [options]   read failure artifacts, propose + verify selector fixes
   goldseam pr               open PR(s) from verified heals            (M5, not yet)
   goldseam report           summarize captures + heals (md/json)      (M5, not yet)
@@ -31,6 +33,45 @@ for the rerun stages.
 function arg(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
   return i === -1 ? undefined : process.argv[i + 1];
+}
+
+function init(): number {
+  const configPath = ['cypress.config.ts', 'cypress.config.js', 'cypress.config.mjs', 'cypress.config.cjs'].find(
+    (p) => existsSync(p),
+  );
+  if (!configPath) {
+    console.error('goldseam init: no cypress.config.{ts,js,mjs,cjs} here — run inside a Cypress project.');
+    return 1;
+  }
+
+  const config = wireConfigSource(readFileSync(configPath, 'utf8'));
+  if (config.changed) {
+    writeFileSync(configPath, config.source);
+    console.log(`✔ ${configPath}: wired goldseam(on, config) into setupNodeEvents`);
+  } else if (config.instructions) {
+    console.log(`∅ ${configPath}: couldn't find setupNodeEvents — add this yourself:\n\n${config.instructions}\n`);
+  } else {
+    console.log(`✔ ${configPath}: already wired`);
+  }
+
+  const isTs = configPath.endsWith('.ts');
+  const supportPath = [`cypress/support/e2e.${isTs ? 'ts' : 'js'}`, 'cypress/support/e2e.ts', 'cypress/support/e2e.js'].find(
+    (p) => existsSync(p),
+  );
+  if (supportPath) {
+    const support = wireSupportSource(readFileSync(supportPath, 'utf8'));
+    if (support.changed) writeFileSync(supportPath, support.source);
+    console.log(`✔ ${supportPath}: ${support.changed ? 'added the register import' : 'already wired'}`);
+  } else {
+    const created = `cypress/support/e2e.${isTs ? 'ts' : 'js'}`;
+    mkdirSync(dirname(created), { recursive: true });
+    writeFileSync(created, `${SUPPORT_SNIPPET}\n`);
+    console.log(`✔ ${created}: created with the register import`);
+  }
+
+  console.log('\nDone. Failures now write capture artifacts to .goldseam/failures/;');
+  console.log('heal them with: npx goldseam heal');
+  return 0;
 }
 
 async function heal(): Promise<number> {
@@ -79,6 +120,9 @@ async function heal(): Promise<number> {
 
 const command = process.argv[2];
 switch (command) {
+  case 'init':
+    process.exit(init());
+    break;
   case 'heal':
     heal().then(
       (code) => process.exit(code),

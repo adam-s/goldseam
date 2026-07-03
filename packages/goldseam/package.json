@@ -8,6 +8,10 @@
       "types": "./dist/support/index.d.ts",
       "default": "./dist/support/index.js"
     },
+    "./support/register": {
+      "types": "./dist/support/register.d.ts",
+      "default": "./dist/support/register.js"
+    },
     "./plugin": {
       "types": "./dist/plugin/index.d.ts",
       "default": "./dist/plugin/index.js"

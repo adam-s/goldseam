@@ -11,6 +11,7 @@ input for `packages/qa-relocator`.
 | [packaging.md](packaging.md) | npm mechanics: entry points, types, options design, versioning, testing, docs bar |
 | [cy-prompt-anatomy.md](cy-prompt-anatomy.md) | How the incumbent works under the hood — first-party evidence from the shipped binary, public API + version timeline |
 | [cy-prompt-usage.md](cy-prompt-usage.md) | How people use cy.prompt in the wild — 35 usage patterns from the full issue-queue sweep, mapped to demo-shop widgets and the benchmark's selector-style axis |
+| [competition.md](competition.md) | The healing landscape (Healenium, CodeceptJS heal, mabl/Testim class) — integration-cost comparison, the empty quadrant, and the measured DX bar |
 | [qa-relocator-blueprint.md](qa-relocator-blueprint.md) | Our product: target API, artifact schema, model-runner interface, roadmap |
 | [verification-ladder.md](verification-ladder.md) | Phased heal-verification design: how Adam's red-team/adversary/snapshot/eval skills fold in as config, not refactors |
 

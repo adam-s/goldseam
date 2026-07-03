@@ -1,5 +1,5 @@
 import { defineConfig } from 'cypress';
-import { goldseam } from 'goldseam/plugin';
+import goldseam from 'goldseam/plugin';
 
 export default defineConfig({
   e2e: {
@@ -8,8 +8,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:4173',
     video: false,
     setupNodeEvents(on, config) {
-      goldseam(on, config);
-      return config;
+      return goldseam(on, config);
     },
   },
 });
