@@ -25,6 +25,8 @@ export interface FailureCapture {
 /** What lands on disk in `.goldseam/failures/<slug>-<hash6>.json`. */
 export interface FailureArtifact extends FailureCapture {
   schemaVersion: number;
+  /** Parsed from errorMessage when derivable; absent otherwise. */
+  failedSelector?: string;
 }
 
 /** The browser→Node bridge; namespaced to stay composable with other plugins' tasks. */

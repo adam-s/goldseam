@@ -38,7 +38,7 @@ or
 - Test: ${artifact.title}
 - Spec: ${artifact.specPath}
 - Error: ${artifact.errorMessage}
-- URL at failure: ${artifact.url}
+${artifact.failedSelector ? `- Broken selector (parsed from the error): ${artifact.failedSelector}\n` : ''}- URL at failure: ${artifact.url}
 ${feedback ? `\n## Feedback from previous rejected attempt\n${feedback}\n` : ''}
 ## Spec source (${artifact.specPath})
 \`\`\`ts
