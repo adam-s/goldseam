@@ -18,6 +18,32 @@ describe('maskText', () => {
   it('leaves short numbers alone (prices, years, quantities)', () => {
     expect(maskText('$19.99 in 2026, qty 3')).toBe('$19.99 in 2026, qty 3');
   });
+
+  it('masks JWTs', () => {
+    expect(
+      maskText('Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.SflKxwRJSMeKKF2QT4fwpM'),
+    ).toBe('Bearer [redacted-jwt]');
+  });
+
+  it('masks long hex and base64-shaped tokens', () => {
+    expect(maskText('sid=d41d8cd98f00b204e9800998ecf8427ed41d8cd9')).toBe('sid=[redacted-token]');
+    expect(maskText('hash d41d8cd98f00b204e9800998ecf8427e end')).toBe('hash [redacted-token] end');
+    expect(maskText('blob QmFzZTY0VG9rZW5XaXRoRGlnaXRzMTIzNDU2Nzg5MEFCQ0RFRg here')).toBe(
+      'blob [redacted-token] here',
+    );
+  });
+
+  it('does not mask long plain words without digits', () => {
+    const word = 'Supercalifragilisticexpialidociousandthensomemore';
+    expect(maskText(word)).toBe(word);
+  });
+
+  it('masks sensitive query-string values but keeps the keys', () => {
+    expect(maskText('https://x.test/cb?access_token=abc123&state=ok')).toBe(
+      'https://x.test/cb?access_token=[redacted]&state=ok',
+    );
+    expect(maskText('href="/reset?token=xyz789&lang=en"')).toBe('href="/reset?token=[redacted]&lang=en"');
+  });
 });
 
 describe('redactedOuterHtml', () => {

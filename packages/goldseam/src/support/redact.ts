@@ -13,11 +13,25 @@
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const DIGIT_RUN_RE = /\d(?:[\s-]?\d){6,}/g;
+const JWT_RE = /\beyJ[\w-]{4,}\.[\w-]+\.[\w-]*/g;
+const HEX_TOKEN_RE = /\b[0-9a-f]{32,}\b/gi;
+// Base64ish runs are only tokens if they carry digits — prose never does.
+const BASE64_CANDIDATE_RE = /[A-Za-z0-9+/_-]{40,}={0,2}/g;
+const SENSITIVE_QUERY_RE =
+  /([?&](?:token|key|secret|session|sid|auth|password|code|signature|api_?key|access_token|id_token|refresh_token)=)[^&\s"'<>]+/gi;
 
-/** Mask email/number-like content in a string (also used on the aria YAML). */
+/**
+ * Mask secret-shaped content in a string — emails, long digit runs
+ * (phone/card/account), JWTs, hex/base64 tokens, and sensitive
+ * query-string values. Also used on the aria YAML and the capture URL.
+ */
 export function maskText(text: string): string {
   return text
+    .replace(SENSITIVE_QUERY_RE, '$1[redacted]')
+    .replace(JWT_RE, '[redacted-jwt]')
     .replace(EMAIL_RE, '[redacted-email]')
+    .replace(HEX_TOKEN_RE, '[redacted-token]')
+    .replace(BASE64_CANDIDATE_RE, (m) => (/\d/.test(m) ? '[redacted-token]' : m))
     .replace(DIGIT_RUN_RE, '[redacted-number]');
 }
 

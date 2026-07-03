@@ -81,9 +81,13 @@ major.
 
 - Values of text-entry form controls (`input` except
   submit/button/reset, `textarea`, `option`) are **never captured**.
-- Email-shaped text and long digit runs (7+ digits, or 12+ with
-  space/dash separators — phone/card/account shaped) are masked in text
-  nodes, attribute values, and the aria snapshot.
+- Masked in text nodes, attribute values, the aria snapshot, and the
+  capture URL: email-shaped text; long digit runs (7+ digits —
+  phone/card/account shaped); JWTs; hex tokens (32+ chars); base64-shaped
+  tokens (40+ chars containing digits); and values of sensitive
+  query-string parameters (`token`, `key`, `secret`, `session`, `auth`,
+  `password`, `code`, `signature`, `api_key`, `access_token`,
+  `id_token`, `refresh_token`, `sid`) with keys preserved.
 - Redaction is intentionally over-eager: a masked price is cheaper than a
   leaked card number. Selector repair does not need field values.
 

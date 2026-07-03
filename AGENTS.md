@@ -205,10 +205,11 @@ Tradeoffs, not oversights:
 - **Dual failure-hooking plugins can mutually defer.** Our sole-listener
   re-throw rule means goldseam + another non-throwing `fail`-listener
   plugin could swallow real failures. Documented; audit support files.
-- **Redaction scope is narrower than "no secrets".** Emails and long
-  digit runs are masked; JWTs, tokens in query strings, and API keys in
-  `data-*` attributes are not. The README states exactly what is
-  guaranteed; widening is tracked work, not an accident.
+- **Redaction is pattern-based, not semantic.** Emails, digit runs,
+  JWTs, hex/base64 tokens, and sensitive query params are masked
+  everywhere including the URL; a secret in a format none of those
+  patterns match (short opaque IDs, custom encodings, data: URIs) still
+  leaks. The README states exactly what is guaranteed.
 - **`rerun-test` without `@cypress/grep` reruns the whole spec** — a
   superset, valid but slower. Grep integration is optional by design.
 - **Heal reruns overwrite the original capture artifact.** A rejected

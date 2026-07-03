@@ -63,7 +63,7 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
     };
     try {
       const doc = Cypress.$('html')[0].ownerDocument;
-      stash.url = doc.location.href;
+      stash.url = redact ? maskText(doc.location.href) : doc.location.href;
       const domHtml = redact
         ? redactedOuterHtml(doc.documentElement)
         : doc.documentElement.outerHTML;
