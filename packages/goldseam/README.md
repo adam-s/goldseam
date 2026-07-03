@@ -144,6 +144,37 @@ Single-test isolation in `rerun-test` uses `@cypress/grep` when your
 project registers it; without it the whole spec reruns (a superset — a
 valid but slower verdict).
 
+## Natural-language authoring — `cy.goldseam()`
+
+The cy.prompt-shaped API, minus the vendor cloud:
+
+```ts
+cy.goldseam([
+  'Go to the shop',
+  'Add the Ember Mug to the cart',
+  'Type {{customer}} into the full name field',
+  'The cart count should show 1',
+], { placeholders: { customer: Cypress.env('NAME') } });
+```
+
+- Steps translate ONCE (through your model) into a **constrained command
+  vocabulary** — visit/click/type/check/select/trigger/scrollTo/
+  viewport/assert/wait. Generated code is never evaluated; `trigger`
+  means hover/mouseenter tooltips work (cypress#33042's top ask).
+- Translations cache in **`.goldseam-prompts/` — a committable file**,
+  so the cache is code-reviewed, shared through git, and replays in CI
+  with zero model calls. (The incumbent's cache lives in their Cloud;
+  file-based caching is their users' top wish, cypress#33273.)
+- `{{placeholder}}` values substitute at execution time only — they
+  never reach the model and never affect cache identity (parity).
+- 50-step cap per call (parity). Call it after the page under test has
+  loaded, or the first-run translation sees a blank page.
+- `npx goldseam eject` renders any cached translation as plain Cypress
+  code — and unlike the incumbent, **ejecting keeps healing**: pasted
+  code goes through the normal capture → heal pipeline.
+- Translation model: the plugin's `promptModel` option (default
+  `claude` → Sonnet), or the `GOLDSEAM_PROMPT_MODEL` env var.
+
 ## Compatibility
 
 Cypress ≥ 15 (E2E), tested on 15.18. No other plugins required; the task

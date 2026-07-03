@@ -8,6 +8,7 @@ import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../heal/engine';
 import { resolveRunner } from '../heal/runners';
 import { HealOptions } from '../heal/types';
 import { SUPPORT_SNIPPET, wireConfigSource, wireSupportSource } from './init';
+import { renderEntry } from './eject';
 import { ReportEntry, buildReport, renderMarkdown } from './report';
 import { FailureArtifact } from '../shared/types';
 import { HealArtifact } from '../heal/types';
@@ -18,6 +19,7 @@ Usage:
   goldseam init             wire this Cypress project (support + config), idempotent
   goldseam heal [options]   read failure artifacts, propose + verify selector fixes
   goldseam report [options] per-test summary of captures + heals
+  goldseam eject            render cached cy.goldseam translations as plain Cypress code
   goldseam pr               open PR(s) from verified heals            (M5, not yet)
 
 heal options:
@@ -207,6 +209,22 @@ switch (command) {
   case 'report':
     process.exit(report());
     break;
+  case 'eject': {
+    const dir = arg('--prompts-dir') ?? '.goldseam-prompts';
+    if (!existsSync(dir)) {
+      console.log(`goldseam eject: no translations in ${dir}.`);
+      process.exit(0);
+    }
+    for (const f of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+      const entry = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+      console.log(`\n// ─── ${f} ───`);
+      console.log(renderEntry(entry.steps, entry.commands));
+    }
+    console.log('\n// Paste into your spec to replace the cy.goldseam(...) call.');
+    console.log('// Ejected code keeps healing — it goes through the normal capture → heal pipeline.');
+    process.exit(0);
+    break;
+  }
   case 'pr':
     console.error(`goldseam ${command}: not implemented yet (see docs/plan.md, M5)`);
     process.exit(1);

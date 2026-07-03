@@ -37,3 +37,8 @@ jobs:
       # deterministic cmd: stub model — no API calls in CI.
       - name: Heal end-to-end
         run: npm run test:heal
+
+      # cy.goldseam authoring: translate → committable cache → replay →
+      # eject, all with the stub model.
+      - name: Authoring end-to-end
+        run: npm run test:prompt

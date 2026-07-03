@@ -22,6 +22,15 @@ const REPLIES = {
     giveUp: { reason: 'no element in the capture plausibly matches the broken selector' },
     reasoning: 'Nothing in the DOM or aria tree resembles the target.',
   },
+  // cy.goldseam translation for the demo flow, {{qty}} passed through as a
+  // placeholder token (its value must never appear in the cache).
+  translate: {
+    commands: [
+      { action: 'visit', url: '/' },
+      { action: 'click', selector: '[data-testid="add-to-cart-5"]' },
+      { action: 'assert', selector: '#cart-count', should: 'have.text', value: '{{qty}}' },
+    ],
+  },
   // Repeated selector: one edit per occurrence, each made unique by its
   // surrounding call chain.
   multi: {

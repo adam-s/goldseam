@@ -4,10 +4,15 @@
 import { join } from 'path';
 import { CAPTURE_TASK, FailureCapture } from '../shared/types';
 import { writeCaptureArtifact } from './artifacts';
+import { TranslatePayload, loadPromptCache, translateSteps } from './translate';
 
 export interface GoldseamPluginOptions {
   /** Where failure artifacts land. Default `.goldseam/failures`. */
   failuresDir?: string;
+  /** Committable translation cache for cy.goldseam(). Default `.goldseam-prompts`. */
+  promptsDir?: string;
+  /** Runner for first-run step translation. Default `claude` (Sonnet). */
+  promptModel?: string;
 }
 
 /** Node-side install. Returns `config` so `setupNodeEvents` can be one line. */
@@ -17,6 +22,8 @@ export function goldseam(
   options: GoldseamPluginOptions = {},
 ): Cypress.PluginConfigOptions {
   const failuresDir = options.failuresDir ?? join('.goldseam', 'failures');
+  const promptsDir = options.promptsDir ?? '.goldseam-prompts';
+  const promptModel = options.promptModel ?? process.env.GOLDSEAM_PROMPT_MODEL ?? 'claude';
 
   on('task', {
     [CAPTURE_TASK]: (capture: FailureCapture) => {
@@ -28,6 +35,9 @@ export function goldseam(
       }
       return null;
     },
+    'goldseam:prompt:load': ({ key }: { key: string }) => loadPromptCache(promptsDir, key),
+    'goldseam:prompt:translate': (payload: TranslatePayload) =>
+      translateSteps(payload, promptModel, promptsDir),
   });
 
   return config;

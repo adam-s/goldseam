@@ -5,11 +5,11 @@ import { RepairReply } from './types';
 
 export class ReplyParseError extends Error {}
 
-export function parseRepairReply(raw: string): RepairReply {
+/** Fence-tolerant JSON-object parse — shared by every model reply path. */
+export function parseJsonBlock(raw: string): unknown {
   let text = raw.trim();
   const fenced = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
   if (fenced) text = fenced[1];
-
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -19,7 +19,11 @@ export function parseRepairReply(raw: string): RepairReply {
   if (typeof parsed !== 'object' || parsed === null) {
     throw new ReplyParseError('reply is not a JSON object');
   }
-  const reply = parsed as RepairReply;
+  return parsed;
+}
+
+export function parseRepairReply(raw: string): RepairReply {
+  const reply = parseJsonBlock(raw) as RepairReply;
 
   if (reply.giveUp) {
     if (typeof reply.giveUp.reason !== 'string' || !reply.giveUp.reason) {

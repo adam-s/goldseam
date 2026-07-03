@@ -26,6 +26,7 @@ window.getComputedStyle = ((elt: Element, pseudo?: string | null) =>
   pseudo ? ({ content: 'none', display: 'inline' } as CSSStyleDeclaration) : realGetComputedStyle(elt)) as typeof window.getComputedStyle;
 
 (globalThis as any).Cypress = {
+  Commands: { add: () => {} }, // cy.goldseam registration — inert here
   on: (event: string, fn: Handler) => {
     onCallCount++;
     (cypressListeners[event] ??= []).push(fn);

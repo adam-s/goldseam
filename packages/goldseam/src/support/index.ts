@@ -12,6 +12,7 @@
 
 import { ariaSnapshot } from '@goldseam/aria-snapshot';
 import { CAPTURE_TASK, FailureCapture } from '../shared/types';
+import { registerAuthoringCommand } from './authoring';
 import { maskText, redactedOuterHtml } from './redact';
 import { cloneWithShadow } from './shadow';
 
@@ -29,6 +30,8 @@ let installed = false;
 export function installGoldseam(options: GoldseamSupportOptions = {}): void {
   if (installed) return;
   installed = true;
+
+  registerAuthoringCommand();
 
   const includeAria = options.ariaSnapshot ?? true;
   const maxDomBytes = options.maxDomBytes ?? 1024 * 1024;
