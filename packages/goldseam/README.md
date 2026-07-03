@@ -84,9 +84,15 @@ major.
 
 ## Invariants (tested)
 
-- No `cy.*` inside the `fail` handler; the handler re-throws in `finally`,
-  so a capture failure can never mask — or green-light — a real test
-  failure.
+- No `cy.*` inside the `fail` handler; when goldseam is the only `fail`
+  listener it re-throws in `finally`, so a capture failure can never mask
+  — or green-light — a real test failure.
+- **Transparent toward your own `Cypress.on('fail')` handlers:** if you
+  register one (e.g. to swallow an expected failure), goldseam defers to
+  it — your suite behaves exactly as it does without the plugin.
+- **Retry-aware:** with test retries enabled, a flaky-then-green test
+  leaves no artifact; only the final failed attempt is captured.
+- Failures inside `before`/`beforeEach` hooks are captured.
 - Captures are best-effort: a degraded capture records `captureError` and
   the run behaves exactly as without the plugin.
 - Quiet on green: passing runs produce no artifacts, no logs, no tasks.
@@ -95,6 +101,17 @@ major.
 
 Cypress ≥ 15 (E2E), tested on 15.18. No other plugins required; the task
 name is namespaced (`goldseam:capture`) to compose cleanly.
+
+Known walls (documented, not hidden):
+
+- **Shadow DOM** content is not serialized by `outerHTML`, so captures of
+  shadow-root-heavy apps are incomplete.
+- **`cy.origin`** blocks: the support file cannot reach cross-origin
+  documents; captures there degrade to error + URL (`captureError` set).
+- If another *plugin* also registers a non-throwing `fail` listener, the
+  combination could swallow real failures (each defers to the other).
+  goldseam only defers when a second listener exists; audit your support
+  file if you install two failure-hooking plugins.
 
 ## Troubleshooting
 

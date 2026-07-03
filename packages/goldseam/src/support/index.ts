@@ -39,6 +39,18 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
     stash = null;
   });
 
+  // Transparency rule (probed, 2026-07-03): with zero 'fail' listeners a
+  // test fails normally, but once ANY listener exists, Cypress only fails
+  // the test if a listener throws. Users rely on non-throwing handlers to
+  // swallow expected failures — so we re-throw only when we are the sole
+  // listener, otherwise the user's handler keeps its exact semantics.
+  const shouldRethrow = (): boolean => {
+    const listeners = (Cypress as unknown as { listeners?: (e: string) => unknown[] })
+      .listeners?.('fail');
+    // Unknown emitter shape ⇒ fail safe: preserve the failure.
+    return !listeners || listeners.length <= 1;
+  };
+
   Cypress.on('fail', (err, runnable) => {
     stash = {
       title: runnable.fullTitle(),
@@ -68,14 +80,21 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
     } catch (error) {
       stash.captureError = error instanceof Error ? error.message : String(error);
     } finally {
-      throw err;
+      if (shouldRethrow()) throw err;
     }
   });
 
-  // cy.* is legal again here; ship the stash to the Node side.
+  // cy.* is legal again here; ship the stash to the Node side — but only
+  // for the FINAL attempt. With retries on, the fail event and afterEach
+  // fire per attempt (probed), and a flaky-then-green test must not leave
+  // a stale capture for the healer to "fix".
   afterEach(function () {
-    if (this.currentTest?.state === 'failed' && stash) {
-      cy.task(CAPTURE_TASK, stash, { log: false });
-    }
+    const test = this.currentTest;
+    if (test?.state !== 'failed' || !stash) return;
+    const allowed = typeof test.retries === 'function' ? test.retries() : 0;
+    const attempt =
+      (Cypress as unknown as { currentRetry?: number }).currentRetry ?? 0;
+    if (attempt < Math.max(allowed, 0)) return; // non-final attempt: a retry is coming
+    cy.task(CAPTURE_TASK, stash, { log: false });
   });
 }

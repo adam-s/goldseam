@@ -27,3 +27,8 @@ jobs:
       # itself and runs Cypress via the Module API.
       - name: System tests
         run: npm run test:system
+
+      # Pinned behaviors: retries leave no stale artifacts, hook failures
+      # capture, user fail-handlers keep their semantics.
+      - name: Hardening tests
+        run: npm run test:hardening

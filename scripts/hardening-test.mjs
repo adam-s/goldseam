@@ -1,0 +1,69 @@
+// Capture-hardening system tests: the behaviors probed and fixed on
+// 2026-07-03, pinned so they can never silently regress.
+//
+// 1. retries: a flaky-then-green test leaves NO artifact (stale captures
+//    would poison the healer); a test that exhausts retries leaves exactly
+//    one.
+// 2. hook failures: a beforeEach failure still produces a capture.
+// 3. transparency: a user's own swallowing Cypress.on('fail') handler keeps
+//    its exact semantics (test stays green) with goldseam installed.
+
+import { spawn } from 'node:child_process';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
+import cypress from 'cypress';
+
+delete process.env.ELECTRON_RUN_AS_NODE;
+
+let failures = 0;
+const check = (ok, label) => {
+  console.log(`${ok ? '  ✔' : '  ✖'} ${label}`);
+  if (!ok) failures++;
+};
+
+async function runScenario(name) {
+  rmSync('.goldseam', { recursive: true, force: true });
+  const res = await cypress.run({
+    quiet: true,
+    config: { specPattern: `cypress/hardening/${name}.cy.ts` },
+  });
+  const artifacts = existsSync('.goldseam/failures')
+    ? readdirSync('.goldseam/failures').length
+    : 0;
+  return { passed: res.totalPassed, failed: res.totalFailed, artifacts };
+}
+
+const server = spawn('npx', ['http-server', 'demo', '-p', '4173', '-c-1', '--silent'], {
+  stdio: 'ignore',
+});
+
+try {
+  await new Promise((r) => setTimeout(r, 1500));
+
+  console.log('\n— retries —');
+  const flaky = await runScenario('retry-flaky');
+  check(flaky.passed === 1, 'flaky test passes on retry');
+  check(flaky.artifacts === 0, 'flaky-then-green leaves no artifact');
+
+  const exhausted = await runScenario('retry-fail');
+  check(exhausted.failed === 1, 'exhausted retries fail the test');
+  check(exhausted.artifacts === 1, 'exactly one artifact after final attempt');
+
+  console.log('\n— hook failures —');
+  const hook = await runScenario('hook-failure');
+  check(hook.failed === 1, 'beforeEach failure fails the test');
+  check(hook.artifacts === 1, 'beforeEach failure still captures');
+
+  console.log('\n— transparency toward user fail handlers —');
+  const swallow = await runScenario('user-swallow');
+  check(swallow.passed === 1 && swallow.failed === 0, "user's swallow handler keeps its test green");
+  check(swallow.artifacts === 0, 'swallowed (passing) test leaves no artifact');
+} finally {
+  server.kill();
+  rmSync('.goldseam', { recursive: true, force: true });
+}
+
+if (failures > 0) {
+  console.error(`\nHARDENING TEST FAILED (${failures} check(s))`);
+  process.exit(1);
+}
+console.log('\nHARDENING TEST PASSED');
