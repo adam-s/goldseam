@@ -174,9 +174,21 @@ Full designs in [verification-ladder.md](plugins/verification-ladder.md).
 - **Phase 3 — adversarial gate:** `adversary` (independent refute-first
   model call), `review` (rubric-scored diff review), `regression-pin`
   (every delivered heal ships a replayable regression artifact).
-- **Backlog** (see [blueprint](plugins/qa-relocator-blueprint.md)): heal
-  memory (`healed-via-cache` tier), selector-flakiness telemetry,
-  `--suggest-testids`, GitHub Action, Playwright capture shim.
+- **Backlog** (see [blueprint](plugins/qa-relocator-blueprint.md)):
+  selector-flakiness telemetry, `--suggest-testids`, GitHub Action,
+  Playwright capture shim. (Heal memory shipped 2026-07.)
+- **AI-surface parity backlog** (mined from Cypress Cloud's 2026 AI
+  feature set — cy.prompt shipped here already as `cy.goldseam`):
+  - **`goldseam mcp`** — a local MCP server exposing captures, heals,
+    reports, and the benchmark to any assistant (their Cloud MCP reads
+    run data server-side; ours reads artifact files — no cloud, same
+    capability). Highest-value next AI item.
+  - **Assertion suggestions** (Studio-AI analog): after a heal or an
+    authored step, propose strengthening assertions from the captured
+    DOM — delivered as diff suggestions, never auto-applied.
+  - **Flake telemetry**: non-final retry attempts are deliberately not
+    captured today; counting them per selector feeds pre-emptive healing
+    candidates (their "flake detection", file-based).
 
 ## Testing strategy (held throughout, per packaging.md)
 
