@@ -73,6 +73,14 @@ try {
   const green = await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   check(green.totalFailed === 0 && green.totalPassed === 1, 'healed spec is green');
 
+  console.log('\n— report joins captures with heals —');
+  const reportMd = spawnSync('node', [CLI, 'report'], { encoding: 'utf8' });
+  check(reportMd.status === 0 && reportMd.stdout.includes('**1 healed**'), 'md report shows the heal');
+  check(reportMd.stdout.includes('adds a mug to the cart'), 'md report maps to the test title');
+  const reportJson = spawnSync('node', [CLI, 'report', '--format', 'json'], { encoding: 'utf8' });
+  const parsed = JSON.parse(reportJson.stdout);
+  check(parsed.totals.healed === 1 && parsed.rows[0].verdict === 'healed', 'json report is structured');
+
   console.log('\n— ladder teeth: a plausible-but-wrong edit must be rejected by rerun —');
   rmSync('.goldseam', { recursive: true, force: true });
   writeFileSync(
