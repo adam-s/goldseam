@@ -43,5 +43,23 @@
     "jsdom": "^24.0.0",
     "typescript": "^6.0.3",
     "vitest": "^3.0.0"
-  }
+  },
+  "keywords": [
+    "cypress",
+    "cypress-plugin",
+    "self-healing",
+    "testing",
+    "e2e",
+    "ai",
+    "test-maintenance"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adam-s/goldseam.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adam-s/goldseam/issues"
+  },
+  "homepage": "https://github.com/adam-s/goldseam#readme",
+  "author": "Adam Sohn"
 }
