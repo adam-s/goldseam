@@ -1,0 +1,19 @@
+@qa-relocator/aria-snapshot
+
+This package contains code derived from Playwright
+(https://github.com/microsoft/playwright), Copyright (c) Microsoft
+Corporation, licensed under the Apache License, Version 2.0. The files
+src/ariaSnapshot.ts, src/roleUtils.ts, src/domUtils.ts, src/yaml.ts,
+src/isomorphic/ariaSnapshot.ts and src/isomorphic/stringUtils.ts retain
+their original license headers. They were obtained via the cordyceps
+project's vendored copy of Playwright's injected-script library.
+
+src/isomorphic/cssTokenizer.ts is derived from a CSS tokenizer released
+under CC0 1.0 Universal (public domain dedication):
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Local modifications:
+- roleUtils.ts: AriaRole type import redirected from 'react' to the local
+  ./isomorphic/ariaSnapshot definition.
+- Added src/index.ts (public API surface and ariaSnapshot() convenience
+  wrapper).
