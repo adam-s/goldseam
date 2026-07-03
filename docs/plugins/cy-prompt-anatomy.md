@@ -50,30 +50,71 @@ module = await loadRemote('cy-prompt')
    is exactly what qa-relocator does (see
    [extension-points.md](extension-points.md)).
 
-## Documented behavior (docs + blog, July 2026)
+## Documented behavior (docs + blog + changelog + issue queue, July 2026)
 
-- **Input:** `cy.prompt(steps: string[], { placeholders? })` — English
-  steps; `{{placeholder}}` values are excluded from AI calls and from cache
-  identity.
+- **Input:** `cy.prompt(steps: string[], options?: { placeholders? })` —
+  English steps; `placeholders` is the **only** options-object key.
+  `{{placeholder}}` values are excluded from AI calls and from cache
+  identity. `timeout`/`force` are expressed *inside* the natural-language
+  step ("with a timeout of 10 seconds", "force click"), not as options.
+  Yields whatever the final generated command yields.
 - **Translation:** Cloud-hosted LLMs convert steps to Cypress commands using
   page context; sensitive DOM data (passwords, credit cards, hidden inputs)
   auto-excluded.
-- **Caching:** generated code cached after first run, shared across
-  machines/CI; repeat runs make no AI calls; cache invalidated by prompt or
-  DOM changes.
+- **Caching:** generated code cached after first run; the cache lives **in
+  Cypress Cloud** (no file-based representation — confirmed by maintainer
+  in [#33273](https://github.com/cypress-io/cypress/issues/33273)), shared
+  across machines/CI; repeat runs make no AI calls; cache keyed on the
+  whole step array — adding one step invalidates the entire prompt's cache.
 - **Self-healing:** when a cached selector fails, only that step
-  regenerates. Two tiers: *healed via cache* (no AI call) and *healed via
-  AI*. Heals are flagged in the Command Log, console, and Cloud runs UI.
-- **Export:** "Get Code" shows/exports generated code to the spec file —
-  their own escape hatch from runtime magic into version control.
+  regenerates. Two tiers with exact Command Log labels: **"Self-Healed via
+  Cache"** (a previously cached selector resolves, no AI call) and
+  **"Self-Healed via AI"** (original NL step + current DOM sent to the
+  model, new selector generated and written back to cache). Flagged in
+  Command Log, console, and Cloud runs UI.
+- **Export:** "Get Code" ejects generated code to the spec file — and
+  **permanently forfeits healing**: healing only exists while the prompt
+  remains in code. Their framing: eject when you "need strict
+  predictability for review and auditing." (You can have healing or
+  reviewable code in the repo — never both. Goldseam's thesis is that this
+  is a false choice.)
 - **Reports:** Cloud prompt reports (JSON/YAML/Markdown) per recorded run.
-- **Limits:** E2E only; Chromium only; **no canvas, no iframes**; English
-  only; metered per-org via Cloud with per-user hourly limits.
+- **Limits:** E2E only; Chromium only (Chrome/Edge/Electron); **50 steps
+  max per prompt**; per-user hourly metering; English-optimized; **no
+  canvas, no iframes**, no `cy.request`/`cy.intercept` generation, no
+  multi-element assertions, no cookie/session clearing.
+- **Offline:** since the flag removal, the app calls
+  `api.cypress.io/cy-prompt/session` — air-gapped runs break even without
+  invoking cy.prompt
+  ([#33927](https://github.com/cypress-io/cypress/issues/33927)).
+
+### Version timeline (changelog)
+
+| Version | Date | Change |
+| --- | --- | --- |
+| 15.4.0 | 2025-10-07 | `cy.prompt` reserved; invite-gated behind `experimentalPromptCommand` |
+| 15.6.0 | 2025-11-04 | "Self-healed" badge added to Command Log |
+| 15.13.0 | 2026-03-24 | Beta; flag removed; any Cloud login or record key |
+
+### Demand evidence (the niche, in their own issue queue)
+
+- [#20458](https://github.com/cypress-io/cypress/issues/20458) (2022,
+  self-healing for existing scripts) — years of "any update?" comments,
+  closed with *"this is addressed via cy.prompt."*
+- [#30805](https://github.com/cypress-io/cypress/issues/30805) (same ask) —
+  closed as duplicate. No public plan to heal existing `cy.get` suites.
+- [#32673](https://github.com/cypress-io/cypress/issues/32673) — open
+  request for BYO API keys / custom OpenAI-compatible endpoints
+  (BASE_URL, MODEL_ID, API_KEY): the RepairRunner, requested by their own
+  users.
+
+Usage patterns extracted from the full issue sweep live in
+[cy-prompt-usage.md](cy-prompt-usage.md).
 
 ## What we adopt, counter, and skip
 
 | cy.prompt capability | qa-relocator response |
-|---|---|
+| --- | --- |
 | Heals prompt-authored steps only | **Counter:** heal existing unmodified `cy.get` suites — the installed base |
 | Cloud-hosted LLM, no BYO model | **Counter:** pluggable runner — `claude -p`, any API, or local (Ollama) |
 | Runtime selector substitution | **Counter:** build-time heal delivered as a reviewed PR (their "Get Code" validates the direction; we make it the product) |
