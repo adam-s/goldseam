@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cart — Demo Shop</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="cart">
+  <header>
+    <a href="index.html" id="brand">Demo Shop</a>
+    <nav>
+      <a href="index.html">Products</a>
+      <a href="cart.html" data-testid="nav-cart">Cart (<span id="cart-count">0</span>)</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Your cart</h1>
+    <section id="cart-contents" aria-label="Cart contents"></section>
+  </main>
+  <script src="js/shop.js"></script>
+</body>
+</html>

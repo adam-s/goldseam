@@ -1,4 +1,4 @@
-@qa-relocator/aria-snapshot
+@goldseam/aria-snapshot
 
 This package contains code derived from Playwright
 (https://github.com/microsoft/playwright), Copyright (c) Microsoft

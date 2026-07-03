@@ -1,0 +1,20 @@
+/* Minimal styling — enough that visibility checks behave like a real page. */
+body { font-family: system-ui, sans-serif; margin: 0; color: #1a202c; }
+header { display: flex; justify-content: space-between; align-items: center;
+  padding: 0.75rem 1.5rem; background: #2d3748; color: #fff; }
+header a { color: #fff; text-decoration: none; }
+nav a { margin-left: 1rem; }
+main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+#product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; }
+.product-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; }
+.product-name { margin: 0 0 0.5rem; }
+.price { color: #2b6cb0; font-weight: 600; }
+.btn { padding: 0.4rem 0.9rem; border: 1px solid #cbd5e0; border-radius: 4px;
+  background: #edf2f7; cursor: pointer; display: inline-block; text-decoration: none; color: inherit; }
+.btn-primary { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+.cart-table { width: 100%; border-collapse: collapse; }
+.cart-table th, .cart-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+form label { display: block; margin: 0.75rem 0 0.25rem; }
+form input { padding: 0.4rem; width: 100%; max-width: 24rem; box-sizing: border-box; }
+form button { margin-top: 1rem; }
+[hidden] { display: none !important; }

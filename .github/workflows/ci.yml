@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install dependencies + Cypress binary (cached by the action).
+      - uses: cypress-io/github-action@v6
+        with:
+          runTests: false
+
+      - name: Build packages
+        run: npm run build:packages
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # Green run must stay quiet; broken selector must produce a
+      # schema-valid capture artifact. The script serves the demo shop
+      # itself and runs Cypress via the Module API.
+      - name: System tests
+        run: npm run test:system

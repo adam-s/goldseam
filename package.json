@@ -1,0 +1,25 @@
+{
+  "name": "goldseam-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-healing for the Cypress suites you already have: failure capture, minimal selector fixes from your own model, verified and delivered as pull requests.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build --workspaces",
+    "test:unit": "npm test --workspaces --if-present",
+    "test:system": "node scripts/system-test.mjs",
+    "cy:open": "env -u ELECTRON_RUN_AS_NODE cypress open",
+    "cy:run": "env -u ELECTRON_RUN_AS_NODE cypress run",
+    "cy:run:broken": "env -u ELECTRON_RUN_AS_NODE cypress run --config specPattern=cypress/system/broken-selector.cy.ts",
+    "demo": "http-server demo -p 4173 -c-1 --silent"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "cypress": "^15.18.0",
+    "http-server": "^14.1.1",
+    "typescript": "^6.0.3"
+  }
+}

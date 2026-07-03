@@ -1,0 +1,43 @@
+{
+  "name": "goldseam",
+  "version": "0.0.1",
+  "description": "Self-healing for the Cypress suites you already have: failures become rich captures, your model (local or API) proposes a minimal selector fix, the suite verifies it, and it arrives as a pull request.",
+  "license": "MIT",
+  "exports": {
+    "./support": {
+      "types": "./dist/support/index.d.ts",
+      "default": "./dist/support/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "default": "./dist/plugin/index.js"
+    },
+    "./types": {
+      "types": "./dist/shared/types.d.ts",
+      "default": "./dist/shared/types.js"
+    }
+  },
+  "bin": {
+    "goldseam": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@goldseam/aria-snapshot": "^0.1.0"
+  },
+  "peerDependencies": {
+    "cypress": ">=15"
+  },
+  "devDependencies": {
+    "cypress": "^15.18.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^3.0.0"
+  }
+}

@@ -12,21 +12,28 @@ object's story — never hidden magic.
 
 ## Status
 
-Pre-code. This repo currently holds:
+**M1 (capture) complete** — execution order lives in
+[docs/plan.md](docs/plan.md). This repo holds:
 
+- `packages/goldseam/` — the plugin: `goldseam/support` (fail-event stash,
+  redaction, aria snapshot, never-mask re-throw) + `goldseam/plugin`
+  (capture task → versioned artifacts in `.goldseam/failures/`) + the
+  `goldseam` CLI shell (`heal`/`pr`/`report` land in M3+). Unit-tested
+  (redaction, writer, capture-rule invariants) and system-tested (green
+  runs stay quiet; a broken selector produces a schema-valid artifact).
+- `packages/aria-snapshot/` — Playwright's aria snapshot (pure-DOM tree
+  walk + YAML renderer) as a standalone package. Apache-2.0, attribution
+  in NOTICE.
+- `demo/` + `cypress/` — the demo-shop fixture (grows to full scenario
+  coverage in M2) and the dogfood suite: this repo wires its own plugin
+  exactly as a target project would. `npm run test:system` proves the
+  loop.
 - `docs/plugins/` — the Cypress plugin engineering knowledge base
-  (extension points, paradigms, packaging bar, cy.prompt anatomy, product
-  blueprint). Start with `docs/plugins/README.md`.
-- `docs/cypress/` — Cypress platform internals (frame architecture,
-  comms channels, proxy/origin mechanics) learned while building the
+  (extension points, paradigms, packaging bar, cy.prompt anatomy + usage
+  catalog, product blueprint, verification ladder). Start with
+  `docs/plugins/README.md`.
+- `docs/cypress/` — Cypress platform internals learned while building the
   capture pipeline.
-- `packages/aria-snapshot/` — the one code asset carried over:
-  Playwright's aria snapshot (pure-DOM tree walk + YAML renderer) as a
-  standalone package. Apache-2.0, attribution in NOTICE.
-
-Prototype and provenance: the capture pipeline (fail-event stash →
-`cy.task` → guarded JSON artifacts) was built and verified in the
-`qa-relocator` teaching repo; it migrates here as the plugin core.
 
 ## Architecture (one line)
 
