@@ -11,6 +11,8 @@
 // Redaction is deliberately dumb and over-eager: a masked price is a
 // cheaper mistake than a leaked card number.
 
+import { cloneWithShadow } from './shadow';
+
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const DIGIT_RUN_RE = /\d(?:[\s-]?\d){6,}/g;
 const JWT_RE = /\beyJ[\w-]{4,}\.[\w-]+\.[\w-]*/g;
@@ -50,17 +52,14 @@ function stripControlValues(el: Element): void {
 }
 
 /**
- * Clone `root` and return redacted HTML. The live DOM is never mutated —
- * this runs inside the `fail` handler against the page under test.
+ * Redact a detached tree in place, descending into `<template>` content
+ * (where shadow-piercing capture puts shadow-root markup — TreeWalker does
+ * not enter content fragments on its own).
  */
-export function redactedOuterHtml(root: Element): string {
-  const clone = root.cloneNode(true) as Element;
-  const doc = clone.ownerDocument;
-  const walker = doc.createTreeWalker(
-    clone,
-    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-  );
-  const elements: Element[] = clone.nodeType === 1 ? [clone] : [];
+export function redactInPlace(root: Node): void {
+  const doc = root.ownerDocument as Document;
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  const elements: Element[] = root.nodeType === 1 ? [root as Element] : [];
   const textNodes: Text[] = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeType === 1) elements.push(node as Element);
@@ -72,10 +71,21 @@ export function redactedOuterHtml(root: Element): string {
       const masked = maskText(attr.value);
       if (masked !== attr.value) el.setAttribute(attr.name, masked);
     }
+    if (el.tagName === 'TEMPLATE') redactInPlace((el as HTMLTemplateElement).content);
   }
   for (const text of textNodes) {
     const masked = maskText(text.data);
     if (masked !== text.data) text.data = masked;
   }
+}
+
+/**
+ * Clone `root` (open shadow roots included as declarative templates) and
+ * return redacted HTML. The live DOM is never mutated — this runs inside
+ * the `fail` handler against the page under test.
+ */
+export function redactedOuterHtml(root: Element): string {
+  const clone = cloneWithShadow(root);
+  redactInPlace(clone);
   return clone.outerHTML;
 }

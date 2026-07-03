@@ -13,6 +13,7 @@
 import { ariaSnapshot } from '@goldseam/aria-snapshot';
 import { CAPTURE_TASK, FailureCapture } from '../shared/types';
 import { maskText, redactedOuterHtml } from './redact';
+import { cloneWithShadow } from './shadow';
 
 export interface GoldseamSupportOptions {
   /** Include the a11y-tree YAML in captures. Default true. */
@@ -66,7 +67,7 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
       stash.url = redact ? maskText(doc.location.href) : doc.location.href;
       const domHtml = redact
         ? redactedOuterHtml(doc.documentElement)
-        : doc.documentElement.outerHTML;
+        : cloneWithShadow(doc.documentElement).outerHTML;
       if (domHtml.length > maxDomBytes) {
         stash.domHtml = domHtml.slice(0, maxDomBytes);
         stash.domTruncated = true;

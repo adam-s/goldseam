@@ -65,6 +65,11 @@ try {
     }
     check(artifact.url !== 'about:blank', 'url is the loaded page, not about:blank');
     check(artifact.failedSelector === '[data-cy="does-not-exist"]', 'failedSelector parsed from the error');
+    check(
+      artifact.domHtml.includes('<template shadowrootmode="open">') &&
+        artifact.domHtml.includes('Ping support'),
+      'capture pierces open shadow roots',
+    );
     check(artifact.errorMessage.includes('does-not-exist'), 'errorMessage names the broken selector');
     check(artifact.redacted === true, 'capture is redacted');
     check(artifact.captureError === undefined, 'capture did not degrade');

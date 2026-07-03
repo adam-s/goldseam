@@ -90,6 +90,30 @@ function installTooltips() {
   });
 }
 
+// ── shadow-DOM widget ───────────────────────────────────────────────────────
+// Real apps render inside shadow roots (Material, AG-Grid, design systems);
+// capture must pierce open roots to give the model evidence.
+
+class SupportBadge extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' });
+    root.innerHTML = `
+      <style>
+        .badge { border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;
+          display: inline-flex; gap: 0.75rem; align-items: center; }
+        button { cursor: pointer; }
+      </style>
+      <div class="badge">
+        <span class="support-status">Support is online</span>
+        <button data-testid="support-ping">Ping support</button>
+      </div>`;
+    root.querySelector('button').addEventListener('click', () => {
+      root.querySelector('.support-status').textContent = 'Ping received';
+    });
+  }
+}
+customElements.define('support-badge', SupportBadge);
+
 // ── page renderers, keyed by <body data-page="..."> ────────────────────────
 
 function productCard(p) {

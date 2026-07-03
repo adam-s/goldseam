@@ -77,4 +77,30 @@ describe('redactedOuterHtml', () => {
     expect(document.body.innerHTML).toContain('a@b.com');
     expect(document.querySelector('input')!.getAttribute('value')).toBe('keep');
   });
+
+  it('serializes open shadow roots as declarative templates, redacted', () => {
+    document.body.innerHTML = '<div id="host"></div><p>light dom</p>';
+    const host = document.getElementById('host')!;
+    const root = host.attachShadow({ mode: 'open' });
+    root.innerHTML = '<button data-user="shadow@secret.com">Inside shadow</button>';
+    const html = redactedOuterHtml(document.body);
+    expect(html).toContain('<template shadowrootmode="open">');
+    expect(html).toContain('Inside shadow');
+    expect(html).toContain('light dom');
+    expect(html).not.toContain('shadow@secret.com');
+    expect(html).toContain('[redacted-email]');
+    // live DOM untouched, shadow content still live
+    expect(root.querySelector('button')!.getAttribute('data-user')).toBe('shadow@secret.com');
+  });
+
+  it('handles nested shadow roots', () => {
+    document.body.innerHTML = '<div id="outer"></div>';
+    const outer = document.getElementById('outer')!.attachShadow({ mode: 'open' });
+    const inner = document.createElement('span');
+    outer.appendChild(inner);
+    inner.attachShadow({ mode: 'open' }).innerHTML = '<em>deep</em>';
+    const html = redactedOuterHtml(document.body);
+    expect(html.match(/<template shadowrootmode="open">/g)).toHaveLength(2);
+    expect(html).toContain('<em>deep</em>');
+  });
 });
