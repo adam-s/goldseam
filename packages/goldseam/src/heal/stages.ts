@@ -9,7 +9,7 @@ import { join } from 'path';
 import { buildCacheEdit, loadCache, lookup } from './cache';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
-import { EditRejected, validateEdit } from './validate';
+import { EditRejected, validateEdits } from './validate';
 import { HealContext, HealStage, StageVerdict } from './types';
 
 const verdict = (
@@ -86,13 +86,16 @@ export const proposeStage: HealStage = {
           started,
         );
       }
-      const edit = validateEdit(reply, artifact.specPath, specSource);
-      ctx.proposal = { ...reply, edits: [edit] };
+      const edits = validateEdits(reply, artifact.specPath, specSource);
+      ctx.proposal = { ...reply, edits };
       ctx.proposalSource = 'model';
+      const summary = edits
+        .map((e) => `"${e.oldString.trim()}" → "${e.newString.trim()}"`)
+        .join('; ');
       return verdict(
         'propose',
         'pass',
-        `edit: "${edit.oldString.trim()}" → "${edit.newString.trim()}" (confidence ${reply.confidence})`,
+        `${edits.length} edit(s): ${summary} (confidence ${reply.confidence})`,
         started,
       );
     } catch (e) {

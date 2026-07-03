@@ -123,8 +123,9 @@ are `healed`, `gave-up`, or `failed`, and give-up is a first-class,
 reported outcome (page never loaded, degraded capture, low confidence, or
 the model's own judgment).
 
-Proposals are validated mechanically before touching disk: exactly one
-edit, in the failing spec only, `oldString` unique and verbatim, the
+Proposals are validated mechanically before touching disk: exact-string
+edits in the failing spec only (one per occurrence of the broken
+selector, capped at 8), each `oldString` unique and verbatim, every
 change confined to a quoted selector string, no line-count changes, and
 nothing that resembles an assertion edit — heals never weaken assertions.
 The model sees the capture and the spec source, never application source.

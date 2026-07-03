@@ -40,13 +40,28 @@ function insideQuotes(code: string, index: number): boolean {
   return quote !== null;
 }
 
-export function validateEdit(reply: RepairReply, specPath: string, specSource: string): RepairEdit {
-  const edits = reply.edits ?? [];
-  if (edits.length !== 1) {
-    throw new EditRejected(`exactly one edit required, got ${edits.length}`);
-  }
-  const edit = edits[0];
+/** Real specs reference a selector several times; each occurrence needs its
+ * own exact-string edit. The cap is a minimality guard, not a feature. */
+const MAX_EDITS = 8;
 
+export function validateEdits(reply: RepairReply, specPath: string, specSource: string): RepairEdit[] {
+  const edits = reply.edits ?? [];
+  if (edits.length === 0) throw new EditRejected('at least one edit required');
+  if (edits.length > MAX_EDITS) {
+    throw new EditRejected(`${edits.length} edits proposed; more than ${MAX_EDITS} is not a minimal heal`);
+  }
+  const seen = new Set<string>();
+  for (const edit of edits) {
+    if (seen.has(edit.oldString)) {
+      throw new EditRejected('duplicate oldString across edits');
+    }
+    seen.add(edit.oldString);
+    validateSingleEdit(edit, specPath, specSource);
+  }
+  return edits;
+}
+
+function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: string): RepairEdit {
   if (edit.file !== specPath) {
     throw new EditRejected(`edit targets ${edit.file}; only the failing spec (${specPath}) may be edited`);
   }

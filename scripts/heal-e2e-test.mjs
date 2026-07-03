@@ -107,6 +107,37 @@ try {
   check(cachedArtifact.verdict === 'healed' && cachedArtifact.tier === 'cache', 'healed from cache, ladder-verified');
   check(readFileSync(TMP_SPEC, 'utf8').includes('add-to-cart-5'), 'cached replacement applied');
 
+  console.log('\n— multi-occurrence: repeated broken selector heals with one edit per site —');
+  rmSync('.goldseam/failures', { recursive: true, force: true });
+  rmSync('.goldseam/heals', { recursive: true, force: true });
+  writeFileSync(
+    TMP_SPEC,
+    `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
+    cy.get('[data-testid="buy-now-5"]').should('not.be.disabled');
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+  );
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  // The selector appears twice, so the cache tier (which requires a unique
+  // occurrence) must miss, and the model must supply per-occurrence edits.
+  const multi = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs multi'], {
+    encoding: 'utf8',
+  });
+  check(multi.status === 0 && multi.stdout.includes('[healed]'), 'multi-edit heal succeeds');
+  check(multi.stdout.includes('2 edit(s)'), 'two edits proposed and validated');
+  const multiSpec = readFileSync(TMP_SPEC, 'utf8');
+  check(!multiSpec.includes('buy-now-5'), 'every occurrence was healed');
+  const multiArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  check(multiArtifact.verdict === 'healed' && multiArtifact.finalEdits.length === 2, 'both edits in the artifact');
+  check(multiArtifact.tier === 'model', 'cache correctly missed on the ambiguous selector');
+
   console.log('\n— ladder teeth: a plausible-but-wrong edit must be rejected by rerun —');
   rmSync('.goldseam', { recursive: true, force: true });
   writeFileSync(
@@ -138,7 +169,7 @@ try {
     JSON.stringify(wrongRungs) === JSON.stringify(['propose:pass', 'rerun-test:fail']),
     `rerun rung rejected it (${wrongRungs.join(' → ')})`,
   );
-  check(wrongArtifact.finalEdit === undefined, 'no finalEdit recorded on a failed heal');
+  check(wrongArtifact.finalEdits === undefined, 'no finalEdits recorded on a failed heal');
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });

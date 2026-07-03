@@ -25,7 +25,8 @@ export function buildRepairPrompt({ artifact, specSource, selectorPriority, feed
 
 Rules (non-negotiable):
 - Selector-only: change nothing but the selector string. Never touch assertions, timeouts, test logic, or add/remove lines.
-- One edit, exact-string: oldString must appear exactly once in the spec, verbatim; newString differs only inside the selector string.
+- Exact-string edits: each oldString must appear exactly once in the spec, verbatim; newString differs only inside the selector string.
+- If the broken selector appears in several places, emit one edit per occurrence (include enough surrounding text to make each oldString unique). Fix only occurrences of THIS break — nothing speculative.
 - Prefer selectors in this order: ${selectorPriority.join(' > ')}.
 - If the page never loaded (url about:blank), the capture is degraded, or no plausible target element exists, give up. Giving up is a correct answer.
 

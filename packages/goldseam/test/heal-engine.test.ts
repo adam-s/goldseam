@@ -77,7 +77,7 @@ describe('healArtifactFile', () => {
     const heal = await healArtifactFile(artifactPath, runner, makeOptions());
     expect(heal.verdict).toBe('healed');
     expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('#add-to-cart');
-    expect(heal.finalEdit?.newString).toContain('#add-to-cart');
+    expect(heal.finalEdits?.[0]?.newString).toContain('#add-to-cart');
     const healFiles = readdirSync(join(root, '.goldseam', 'heals'));
     expect(healFiles).toEqual(['cart-abc123-heal.json']);
   });

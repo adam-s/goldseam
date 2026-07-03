@@ -22,6 +22,24 @@ const REPLIES = {
     giveUp: { reason: 'no element in the capture plausibly matches the broken selector' },
     reasoning: 'Nothing in the DOM or aria tree resembles the target.',
   },
+  // Repeated selector: one edit per occurrence, each made unique by its
+  // surrounding call chain.
+  multi: {
+    edits: [
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();`,
+        newString: `cy.get('[data-testid="add-to-cart-5"]', { timeout: 2000 }).click();`,
+      },
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `cy.get('[data-testid="buy-now-5"]').should('not.be.disabled');`,
+        newString: `cy.get('[data-testid="add-to-cart-5"]').should('not.be.disabled');`,
+      },
+    ],
+    confidence: 0.93,
+    reasoning: 'The same drifted selector appears twice; both occurrences point at the add-to-cart button.',
+  },
   // Plausible-but-wrong: passes every mechanical validation (single quoted
   // selector-string change) but points at an element that does not exist —
   // only the rerun rungs can reject it. Proves the ladder has teeth.

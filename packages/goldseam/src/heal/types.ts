@@ -71,7 +71,7 @@ export interface HealArtifact {
   tier: 'cache' | 'model';
   verdict: 'healed' | 'gave-up' | 'failed';
   attempts: HealAttempt[];
-  finalEdit?: RepairEdit;
+  finalEdits?: RepairEdit[];
   confidence?: number;
   reasoning?: string;
   durationMs: number;

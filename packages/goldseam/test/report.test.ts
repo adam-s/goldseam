@@ -24,9 +24,9 @@ const heal = (verdict: HealArtifact['verdict']): HealArtifact => ({
   tier: 'model',
   verdict,
   attempts: [{ attempt: 1, ladder: [] }],
-  finalEdit:
+  finalEdits:
     verdict === 'healed'
-      ? { file: 'cypress/e2e/a.cy.ts', oldString: `'#x'`, newString: `'#y'` }
+      ? [{ file: 'cypress/e2e/a.cy.ts', oldString: `'#x'`, newString: `'#y'` }]
       : undefined,
   confidence: verdict === 'healed' ? 0.9 : undefined,
   durationMs: 10,

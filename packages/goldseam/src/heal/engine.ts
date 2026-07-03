@@ -50,9 +50,11 @@ export async function healArtifactFile(
     options,
     runner,
     apply() {
-      const edit = ctx.proposal?.edits?.[0];
-      if (!edit || applied || options.dryRun) return;
-      writeFileSync(specAbs, originalSpec.replace(edit.oldString, edit.newString));
+      const edits = ctx.proposal?.edits;
+      if (!edits?.length || applied || options.dryRun) return;
+      let source = originalSpec;
+      for (const edit of edits) source = source.replace(edit.oldString, edit.newString);
+      writeFileSync(specAbs, source);
       applied = true;
     },
     revert() {
@@ -102,12 +104,14 @@ export async function healArtifactFile(
   if (outcome !== 'healed') ctx.revert();
 
   const tier = ctx.proposalSource === 'cache' ? 'cache' : 'model';
-  const finalEdit = outcome === 'healed' ? ctx.proposal?.edits?.[0] : undefined;
+  const finalEdits = outcome === 'healed' ? ctx.proposal?.edits : undefined;
 
   // A verified MODEL heal feeds heal memory; cache heals just proved the
   // memory is still valid.
-  if (options.cacheFile && finalEdit && tier === 'model' && artifact.failedSelector) {
-    const replacement = deriveReplacement(finalEdit, artifact.failedSelector);
+  // Only single-edit heals feed heal memory: one occurrence, one clean
+  // selector mapping. Multi-edit heals are applied but not cached.
+  if (options.cacheFile && finalEdits?.length === 1 && tier === 'model' && artifact.failedSelector) {
+    const replacement = deriveReplacement(finalEdits[0], artifact.failedSelector);
     if (replacement) {
       saveEntry(options.cacheFile, {
         failedSelector: artifact.failedSelector,
@@ -127,7 +131,7 @@ export async function healArtifactFile(
     tier,
     verdict: outcome,
     attempts,
-    finalEdit,
+    finalEdits,
     confidence: outcome === 'healed' ? ctx.proposal?.confidence : undefined,
     reasoning: ctx.proposal?.reasoning,
     durationMs: Date.now() - startedAt,

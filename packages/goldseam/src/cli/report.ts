@@ -31,9 +31,12 @@ export interface HealReport {
 }
 
 const summarizeEdit = (heal: HealArtifact): string | undefined => {
-  const edit = heal.finalEdit;
-  if (!edit) return undefined;
-  const line = `${edit.oldString.trim()} → ${edit.newString.trim()}`.replace(/\s+/g, ' ');
+  const edits = heal.finalEdits;
+  if (!edits?.length) return undefined;
+  const line = edits
+    .map((e) => `${e.oldString.trim()} → ${e.newString.trim()}`)
+    .join('; ')
+    .replace(/\s+/g, ' ');
   return line.length > 120 ? `${line.slice(0, 117)}…` : line;
 };
 

@@ -121,9 +121,10 @@ of what else improves:
   additive changes bump minor, breaking bump major.
 - **`validateEdit`**
   ([heal/validate.ts](packages/goldseam/src/heal/validate.ts)) enforces the
-  heal invariants mechanically: exactly one edit, failing spec only,
-  unique verbatim `oldString`, the change confined to a quoted string, no
-  assertion-shaped changes, no line-count changes. The model is asked to
+  heal invariants mechanically: per-occurrence exact-string edits (capped
+  at 8), failing spec only, each `oldString` unique and verbatim, every
+  change confined to a quoted string, no assertion-shaped changes, no
+  line-count changes. The model is asked to
   follow the rules and never trusted to.
 - **Stages are config, verdicts are artifacts.** The ladder is the
   `STAGES` registry in
