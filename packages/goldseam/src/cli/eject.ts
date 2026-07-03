@@ -4,7 +4,8 @@
 
 import { StepCommand } from '../shared/prompt-types';
 
-const q = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+const q = (s: string) =>
+  `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 
 export function renderCommand(cmd: StepCommand): string {
   switch (cmd.action) {

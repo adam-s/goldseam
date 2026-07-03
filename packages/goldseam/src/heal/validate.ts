@@ -102,8 +102,38 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
   }
 
   const { oldCore, newCore, prefix } = changedSpan(edit.oldString, edit.newString);
+
+  // Bare-string edits (cache tier: oldString IS the selector text, no
+  // quotes in the snippet): validate against the spec's surrounding
+  // characters instead — the occurrence must be a complete quoted string,
+  // not an assertion argument, and the replacement must not break out of
+  // the quotes.
+  if (!/['"`]/.test(edit.oldString)) {
+    const pos = specSource.indexOf(edit.oldString);
+    const open = specSource[pos - 1];
+    const close = specSource[pos + edit.oldString.length];
+    if (!(open === "'" || open === '"' || open === '`') || close !== open) {
+      throw new EditRejected('the change must be confined to a quoted selector string');
+    }
+    if (/['"`]|\$\{/.test(edit.newString)) {
+      throw new EditRejected('replacement must stay inside the quoted string');
+    }
+    const lead = specSource.slice(Math.max(0, pos - 40), pos - 1);
+    if (/(should|and|expect|assert)\s*\(\s*$/.test(lead)) {
+      throw new EditRejected('the change is inside an assertion; heals never weaken assertions');
+    }
+    return edit;
+  }
+
   if (!insideQuotes(edit.oldString, prefix.length) || !insideQuotes(edit.newString, prefix.length)) {
     throw new EditRejected('the change must be confined to a quoted selector string');
+  }
+  // The changed span is one contiguous prefix/suffix-trimmed region — but
+  // it can STRADDLE strings (e.g. '#a'…'1' → '#b'…'2' spans a selector AND
+  // an assertion value). A core containing quote characters or template
+  // interpolation crosses a string boundary: reject. (Red-team finding.)
+  if (/['"`]|\$\{/.test(oldCore) || /['"`]|\$\{/.test(newCore)) {
+    throw new EditRejected('the change spans more than one quoted string; one edit per selector site');
   }
   // Context beats fragments: a change inside .should()/.and()/expect() is
   // an assertion edit no matter what it says; a change inside cy.get() is

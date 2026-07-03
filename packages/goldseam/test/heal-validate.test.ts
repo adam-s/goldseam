@@ -149,6 +149,19 @@ describe('validateEdits', () => {
     ).toThrow(/never weaken assertions/);
   });
 
+  it('rejects a single edit straddling a selector AND an assertion (red-team CRITICAL)', () => {
+    expect(() =>
+      validateEdits(
+        reply(
+          `cy.get('#cart-count').should('have.text', '1');`,
+          `cy.get('#cart-value').should('have.text', '2');`,
+        ),
+        SPEC_PATH,
+        SPEC,
+      ),
+    ).toThrow(/spans more than one quoted string/);
+  });
+
   it('rejects line-count changes', () => {
     expect(() =>
       validateEdits(

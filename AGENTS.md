@@ -228,6 +228,16 @@ Tradeoffs, not oversights:
   `git grep -l goldseam` + npm scope; blocks publishing only.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
+- **Duplicate test titles can confuse rerun verdicts** — `rerunVerdictFor`
+  matches by full title; two identically-named tests in one spec could
+  let the wrong test's state decide. Rare in practice; index-based
+  matching is the fix if it bites (red-team, accepted for now).
+- **`cmd:` runner splits on whitespace** — executable paths containing
+  spaces need a wrapper script. No shell is involved, so this is a
+  usability limit, not an injection risk (red-team, accepted).
+- **`failedSelector` derives from the MASKED error message** — a selector
+  containing a 7+ digit run gets masked before extraction, costing a
+  cache key. Correctness unaffected (the model path still heals).
 
 ## Noise
 

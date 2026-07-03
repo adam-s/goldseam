@@ -133,6 +133,27 @@ describe('healArtifactFile', () => {
   });
 });
 
+describe('red-team regressions', () => {
+  it('rejects a capture whose specPath escapes the project', async () => {
+    const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+    writeFileSync(artifactPath, JSON.stringify({ ...artifact, specPath: '../outside.cy.ts' }));
+    await expect(healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions())).rejects.toThrow(
+      /outside the project/,
+    );
+  });
+
+  it("applies '$&'-style replacement text literally", async () => {
+    const dollarReply = JSON.stringify({
+      edits: [{ file: SPEC_REL, oldString: `cy.get('#add-to-basket')`, newString: `cy.get('#a-$&-b')` }],
+      confidence: 0.9,
+      reasoning: 'r',
+    });
+    const heal = await healArtifactFile(artifactPath, stubRunner([dollarReply]), makeOptions());
+    expect(heal.verdict).toBe('healed');
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain(`cy.get('#a-$&-b')`);
+  });
+});
+
 describe('heal memory (cache tier)', () => {
   // The capture's failedSelector must be derivable for caching; the
   // beforeEach artifact lacks one, so write it explicitly here.
@@ -169,6 +190,26 @@ describe('heal memory (cache tier)', () => {
     expect(heal.tier).toBe('cache');
     expect(runner.calls).toBe(0);
     expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('#add-to-cart');
+  });
+
+  it('a poisoned cache replacement fails validation and falls through to the model', async () => {
+    setFailedSelector();
+    writeFileSync(
+      cacheFile(),
+      JSON.stringify([
+        {
+          failedSelector: '#add-to-basket',
+          replacement: "#x').should('exist');//",
+          healedAt: 'x',
+          specPath: 'o.cy.ts',
+        },
+      ]),
+    );
+    const runner = stubRunner([GOOD_REPLY]);
+    const heal = await healArtifactFile(artifactPath, runner, makeOptions({ cacheFile: cacheFile() }));
+    expect(heal.verdict).toBe('healed');
+    expect(heal.tier).toBe('model'); // cache proposal rejected by the validator
+    expect(runner.calls).toBe(1);
   });
 
   it('an inapplicable cache entry falls through to the model in the same attempt', async () => {

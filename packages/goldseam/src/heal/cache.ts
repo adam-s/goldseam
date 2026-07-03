@@ -56,7 +56,7 @@ export function deriveReplacement(edit: RepairEdit, failedSelector: string): str
   const oldCore = oldString.slice(p, oldString.length - s);
   const newCore = newString.slice(p, newString.length - s);
   if (!oldCore || !failedSelector.includes(oldCore)) return undefined;
-  return failedSelector.replace(oldCore, newCore);
+  return failedSelector.replace(oldCore, () => newCore);
 }
 
 /**

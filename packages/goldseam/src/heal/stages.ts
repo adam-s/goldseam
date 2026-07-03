@@ -44,18 +44,26 @@ export const proposeStage: HealStage = {
       const entry = lookup(loadCache(options.cacheFile), artifact.failedSelector);
       const edit = entry && buildCacheEdit(entry, artifact.specPath, specSource);
       if (entry && edit) {
-        ctx.proposal = {
-          edits: [edit],
-          confidence: 1,
-          reasoning: `heal memory: "${entry.failedSelector}" → "${entry.replacement}" (verified ${entry.healedAt}, ${entry.specPath})`,
-        };
-        ctx.proposalSource = 'cache';
-        return verdict(
-          'propose',
-          'pass',
-          `cache hit: "${entry.failedSelector}" → "${entry.replacement}" (no model call)`,
-          started,
-        );
+        // The cache file is repo content — treat it as untrusted like any
+        // model reply and run the full validator (red-team finding: a
+        // poisoned replacement must not skip scrutiny).
+        try {
+          validateEdits({ edits: [edit], confidence: 1 }, artifact.specPath, specSource);
+          ctx.proposal = {
+            edits: [edit],
+            confidence: 1,
+            reasoning: `heal memory: "${entry.failedSelector}" → "${entry.replacement}" (verified ${entry.healedAt}, ${entry.specPath})`,
+          };
+          ctx.proposalSource = 'cache';
+          return verdict(
+            'propose',
+            'pass',
+            `cache hit: "${entry.failedSelector}" → "${entry.replacement}" (no model call)`,
+            started,
+          );
+        } catch {
+          // Invalid cache entry ⇒ miss; fall through to the model.
+        }
       }
     }
 

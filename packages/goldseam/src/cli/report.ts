@@ -75,6 +75,7 @@ export function renderMarkdown(report: HealReport): string {
     `${totals.captures} capture(s): **${totals.healed} healed**, ${totals.gaveUp} gave up, ${totals.failed} failed, ${totals.unhealed} unhealed.`,
     '',
   ];
+  const cell = (v: unknown) => String(v).replace(/\|/g, '\\|').replace(/\s+/g, ' ');
   if (rows.length > 0) {
     lines.push(
       '| Verdict | Test | Spec | Broken selector | Edit | Confidence | Attempts | Model |',
@@ -83,10 +84,10 @@ export function renderMarkdown(report: HealReport): string {
         [
           '',
           r.verdict,
-          r.title,
-          r.specPath,
-          r.failedSelector ? `\`${r.failedSelector}\`` : '—',
-          r.edit ? `\`${r.edit}\`` : '—',
+          cell(r.title),
+          cell(r.specPath),
+          r.failedSelector ? `\`${cell(r.failedSelector)}\`` : '—',
+          r.edit ? `\`${cell(r.edit)}\`` : '—',
           r.confidence ?? '—',
           r.attempts ?? '—',
           r.model ?? '—',

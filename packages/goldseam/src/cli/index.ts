@@ -45,7 +45,8 @@ for the rerun stages.
 
 function arg(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
-  return i === -1 ? undefined : process.argv[i + 1];
+  const value = i === -1 ? undefined : process.argv[i + 1];
+  return value?.startsWith('--') ? undefined : value;
 }
 
 function init(): number {

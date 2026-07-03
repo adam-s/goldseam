@@ -28,8 +28,13 @@ export interface GoldseamSupportOptions {
 let installed = false;
 
 export function installGoldseam(options: GoldseamSupportOptions = {}): void {
-  if (installed) return;
+  // Guard across module COPIES too (monorepo dupes/version skew): two
+  // installed instances would each defer re-throwing to the other and
+  // real failures would pass green (red-team finding).
+  const globalFlag = Cypress as unknown as { __goldseamInstalled?: boolean };
+  if (installed || globalFlag.__goldseamInstalled) return;
   installed = true;
+  globalFlag.__goldseamInstalled = true;
 
   registerAuthoringCommand();
 
@@ -59,7 +64,9 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
     stash = {
       title: runnable.fullTitle(),
       specPath: Cypress.spec.relative,
-      errorMessage: err.message,
+      // Error text embeds element text and asserted values — mask it like
+      // everything else the model sees (red-team finding).
+      errorMessage: redact ? maskText(err.message) : err.message,
       url: '',
       domHtml: '',
       ariaSnapshot: '',

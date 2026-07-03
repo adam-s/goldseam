@@ -76,7 +76,9 @@ export function registerAuthoringCommand(): void {
     const placeholders = options.placeholders ?? {};
 
     cy.task<PromptCacheEntry | null>('goldseam:prompt:load', { key }, { log: false }).then((cached) => {
-      if (cached) {
+      // Key is a 32-bit hash — confirm the steps themselves before trusting
+      // the entry (collision or hand-renamed file ⇒ retranslate).
+      if (cached && JSON.stringify(cached.steps) === JSON.stringify(steps)) {
         execute(cached.commands, placeholders);
         return;
       }

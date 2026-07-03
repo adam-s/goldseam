@@ -3,7 +3,7 @@
 // verdict — healed, failed, or gave-up — as a heal artifact.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { basename, join } from 'path';
+import { basename, join, resolve, sep } from 'path';
 import { FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
 import { STAGES } from './stages';
@@ -31,7 +31,12 @@ export async function healArtifactFile(
 ): Promise<HealArtifact> {
   const startedAt = Date.now();
   const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as FailureArtifact;
-  const specAbs = join(options.projectRoot, artifact.specPath);
+  // Artifacts are attacker-influenceable JSON; specPath must stay inside
+  // the project (red-team finding: traversal → arbitrary file overwrite).
+  const specAbs = resolve(options.projectRoot, artifact.specPath);
+  if (!specAbs.startsWith(resolve(options.projectRoot) + sep)) {
+    throw new Error(`capture names a spec outside the project: ${artifact.specPath}`);
+  }
   const originalSpec = existsSync(specAbs) ? readFileSync(specAbs, 'utf8') : null;
   if (originalSpec === null) {
     throw new Error(`spec named by the capture does not exist: ${artifact.specPath}`);
@@ -53,7 +58,9 @@ export async function healArtifactFile(
       const edits = ctx.proposal?.edits;
       if (!edits?.length || applied || options.dryRun) return;
       let source = originalSpec;
-      for (const edit of edits) source = source.replace(edit.oldString, edit.newString);
+      // Replacement via callback: '$&'-style patterns in model output must
+      // apply literally, not as replace() magic (red-team finding).
+      for (const edit of edits) source = source.replace(edit.oldString, () => edit.newString);
       writeFileSync(specAbs, source);
       applied = true;
     },
