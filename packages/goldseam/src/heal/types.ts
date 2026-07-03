@@ -50,6 +50,8 @@ export interface HealOptions {
   healsDir: string;
   /** Heal-memory file; null disables the cache tier. */
   cacheFile: string | null;
+  /** Cypress config file for the rerun rungs (monorepo per-app configs). */
+  configFile?: string;
   /** Titles of OTHER captures still awaiting heals in the same spec —
    * rerun-spec tolerates exactly these failures and nothing else. */
   knownBrokenTitles?: string[];

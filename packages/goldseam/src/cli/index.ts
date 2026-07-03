@@ -28,6 +28,7 @@ heal options:
   --only <substr>         heal only captures whose spec path or title matches
   --skip <substr>         skip captures whose spec path or title matches
   --no-cache              skip heal memory (.goldseam/heal-cache.json); always ask the model
+  --config-file <path>    Cypress config for reruns (monorepo per-app configs)
   --max-attempts <n>      hard attempt cap (default: ${DEFAULT_HEAL_OPTIONS.maxAttempts})
   --min-confidence <x>    give up below this confidence (default: ${DEFAULT_HEAL_OPTIONS.minConfidence})
   --stages <a,b,c>        ladder to run (default: ${DEFAULT_HEAL_OPTIONS.stages.join(',')})
@@ -100,6 +101,7 @@ async function heal(): Promise<number> {
     projectRoot,
     healsDir: arg('--heals-dir') ?? join('.goldseam', 'heals'),
     cacheFile: process.argv.includes('--no-cache') ? null : join('.goldseam', 'heal-cache.json'),
+    configFile: arg('--config-file'),
   };
   const runner = resolveRunner(arg('--model') ?? 'claude');
 

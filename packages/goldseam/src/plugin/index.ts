@@ -21,8 +21,15 @@ export function goldseam(
   config: Cypress.PluginConfigOptions,
   options: GoldseamPluginOptions = {},
 ): Cypress.PluginConfigOptions {
-  const failuresDir = options.failuresDir ?? join('.goldseam', 'failures');
-  const promptsDir = options.promptsDir ?? '.goldseam-prompts';
+  // Anchor artifacts to the PROJECT ROOT, not process.cwd(): Cypress runs
+  // setupNodeEvents with cwd set to the config file's directory, so a
+  // per-app config (common in monorepos — and how PrairieLearn is wired)
+  // would otherwise scatter .goldseam/ next to the config where
+  // `goldseam heal` (run from the repo root) can't find it. Surfaced by
+  // the PrairieLearn proving ground, 2026-07-03.
+  const root = config.projectRoot ?? process.cwd();
+  const failuresDir = options.failuresDir ?? join(root, '.goldseam', 'failures');
+  const promptsDir = options.promptsDir ?? join(root, '.goldseam-prompts');
   const promptModel = options.promptModel ?? process.env.GOLDSEAM_PROMPT_MODEL ?? 'claude';
 
   on('task', {

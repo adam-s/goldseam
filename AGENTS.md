@@ -172,6 +172,11 @@ Gotchas that will burn you:
   only failed-to-launch results do. Check the totals.
 - Stray demo servers hold port 4173: `lsof -ti:4173 | xargs kill`.
 - Packages use `moduleResolution: node16` (TS 6 removed `"node"`).
+- Cypress runs `setupNodeEvents` with cwd = the config file's directory,
+  so the plugin anchors `.goldseam/` to `config.projectRoot`, not
+  `process.cwd()`. For a per-app config in a monorepo, `goldseam heal`
+  needs `--config-file <path>` so its rerun rungs load that app's config
+  (both surfaced by the PrairieLearn proving ground).
 - Cypress `--spec` only accepts files matching `specPattern`; specs
   outside it (cypress/system/, cypress/hardening/) run via a
   `--config specPattern=...` override, as the npm scripts do.

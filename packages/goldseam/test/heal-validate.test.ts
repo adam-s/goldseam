@@ -149,6 +149,22 @@ describe('validateEdits', () => {
     ).toThrow(/never weaken assertions/);
   });
 
+  it('accepts an attribute-selector style change (inner quotes differ from the outer delimiter)', () => {
+    // data-testid → role: legit selector-style heal whose diff crosses the
+    // INNER `"` of `[attr="val"]` but never the outer `'`. PrairieLearn
+    // proving ground surfaced this as a false positive.
+    const spec = `cy.get('[data-testid="questions-table-scroll"]').should('be.visible');\n`;
+    const edits = validateEdits(
+      reply(
+        `cy.get('[data-testid="questions-table-scroll"]').should('be.visible');`,
+        `cy.get('[role="grid"]').should('be.visible');`,
+      ),
+      SPEC_PATH,
+      spec,
+    );
+    expect(edits[0].newString).toContain('[role="grid"]');
+  });
+
   it('rejects a single edit straddling a selector AND an assertion (red-team CRITICAL)', () => {
     expect(() =>
       validateEdits(

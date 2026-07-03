@@ -25,8 +25,10 @@ function changedSpan(oldString: string, newString: string): { oldCore: string; n
   };
 }
 
-/** Is position `index` inside a quoted region of `code`? Naive but effective for spec snippets. */
-function insideQuotes(code: string, index: number): boolean {
+/** The quote char enclosing `index` in `code`, or null if outside any
+ * string. Attribute selectors nest a different quote inside (`'[a="b"]'`),
+ * so we track the OUTER delimiter specifically. */
+function enclosingQuote(code: string, index: number): string | null {
   let quote: string | null = null;
   for (let i = 0; i < index; i++) {
     const ch = code[i];
@@ -37,7 +39,7 @@ function insideQuotes(code: string, index: number): boolean {
       quote = ch;
     }
   }
-  return quote !== null;
+  return quote;
 }
 
 /** Name of the innermost call whose parentheses enclose `index` — e.g. in
@@ -125,14 +127,20 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
     return edit;
   }
 
-  if (!insideQuotes(edit.oldString, prefix.length) || !insideQuotes(edit.newString, prefix.length)) {
+  const oldQuote = enclosingQuote(edit.oldString, prefix.length);
+  const newQuote = enclosingQuote(edit.newString, prefix.length);
+  if (oldQuote === null || newQuote === null) {
     throw new EditRejected('the change must be confined to a quoted selector string');
   }
-  // The changed span is one contiguous prefix/suffix-trimmed region — but
-  // it can STRADDLE strings (e.g. '#a'…'1' → '#b'…'2' spans a selector AND
-  // an assertion value). A core containing quote characters or template
-  // interpolation crosses a string boundary: reject. (Red-team finding.)
-  if (/['"`]|\$\{/.test(oldCore) || /['"`]|\$\{/.test(newCore)) {
+  // The changed span is one contiguous region, but it can STRADDLE strings
+  // (e.g. '#a')…('1' → '#b')…('2' spans a selector AND an assertion value).
+  // A core containing the OUTER delimiter closed one string and opened
+  // another — reject. Inner quotes of an attribute selector
+  // (`'[data-testid="x"]'` → `'[role="grid"]'`) are a DIFFERENT char than
+  // the outer `'`, so they pass. (Red-team CRITICAL; refined after the
+  // PrairieLearn proving ground flagged a legit data-testid→role heal.)
+  const outer = oldQuote;
+  if (oldCore.includes(outer) || newCore.includes(newQuote) || /\$\{/.test(oldCore + newCore)) {
     throw new EditRejected('the change spans more than one quoted string; one edit per selector site');
   }
   // Context beats fragments: a change inside .should()/.and()/expect() is

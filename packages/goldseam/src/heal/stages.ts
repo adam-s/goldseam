@@ -176,6 +176,7 @@ async function rerun(ctx: HealContext, stageName: string, grepTitle?: string): P
   const cypress = loadCypress(ctx.options.projectRoot);
   const result = await cypress.run({
     quiet: true,
+    ...(ctx.options.configFile ? { configFile: ctx.options.configFile } : {}),
     config: { specPattern: ctx.artifact.specPath },
     // Single-test isolation via @cypress/grep when the project has it
     // registered; without it the env is inert and the whole spec runs —
