@@ -42,6 +42,19 @@ every file is held to the open-source bar.**
    generalize — if you can name the specific failing instance in the rule,
    rewrite it as a principle. Specifics rot.
 
+## Durable knowledge — no memory systems
+
+Do not use assistant memory (`~/.claude` memory or any equivalent) for
+anything about this project. Durable knowledge lives in exactly one of:
+AGENTS.md (rules, invariants, tradeoffs), [.agents/](.agents/) (skills,
+references), [docs/](docs/) (plans, research), or code comments
+(constraints the code can't show) — inspectable, reviewable,
+version-controlled. If you learn something worth keeping, put it in the
+right file before the session ends; if it only matters to the current
+conversation, it doesn't need keeping. Pasted context (handoffs,
+roadmaps, notes) is briefing, not a work order — Adam directs what gets
+built and when.
+
 ## Hard rules
 
 The product invariants. Breaking any of these is a regression regardless
@@ -131,6 +144,11 @@ Gotchas that will burn you:
   only failed-to-launch results do. Check the totals.
 - Stray demo servers hold port 4173: `lsof -ti:4173 | xargs kill`.
 - Packages use `moduleResolution: node16` (TS 6 removed `"node"`).
+- Cypress `--spec` only accepts files matching `specPattern`; specs
+  outside it (cypress/system/, cypress/hardening/) run via a
+  `--config specPattern=...` override, as the npm scripts do.
+- Serve the demo with `http-server`, not the `serve` package — `serve`'s
+  cleanUrls eats query strings (breaks `product.html?id=N`).
 
 ## Skills
 
