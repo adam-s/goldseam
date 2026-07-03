@@ -94,10 +94,10 @@ each tied to a named invariant:
    Must be CAUGHT by writer unit test + system schema check.
 10. **Ladder teeth** — make `rerun` in
     [heal/stages.ts](../../../packages/goldseam/src/heal/stages.ts)
-    return `pass` without running Cypress. **Expected SURVIVED today** —
-    the known deferred finding "no negative-path rerun test". If it
-    survives, that's the prioritized missing test (a `cmd:` stub emitting
-    a plausible-but-wrong edit that only the rerun rungs can reject).
+    return `pass` without running Cypress. Must be CAUGHT by the
+    wrong-edit scenario in
+    [scripts/heal-e2e-test.mjs](../../../scripts/heal-e2e-test.mjs)
+    (a plausible-but-wrong stub edit must end `failed`, not `healed`).
 
 ## Prompt template
 

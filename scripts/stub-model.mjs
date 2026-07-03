@@ -22,6 +22,20 @@ const REPLIES = {
     giveUp: { reason: 'no element in the capture plausibly matches the broken selector' },
     reasoning: 'Nothing in the DOM or aria tree resembles the target.',
   },
+  // Plausible-but-wrong: passes every mechanical validation (single quoted
+  // selector-string change) but points at an element that does not exist —
+  // only the rerun rungs can reject it. Proves the ladder has teeth.
+  wrong: {
+    edits: [
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `'[data-testid="buy-now-5"]'`,
+        newString: `'[data-testid="add-to-basket-5"]'`,
+      },
+    ],
+    confidence: 0.9,
+    reasoning: 'Plausible-looking selector that matches nothing on the page.',
+  },
 };
 
 process.stdin.on('end', () => {

@@ -42,6 +42,33 @@ every file is held to the open-source bar.**
    generalize — if you can name the specific failing instance in the rule,
    rewrite it as a principle. Specifics rot.
 
+### Autonomous iteration campaigns
+
+When Adam explicitly authorizes unattended iteration ("keep iterating
+while I'm out"), run this loop, one commit per iteration:
+
+1. **Mine reality.** Search the incumbents' issue queues and docs
+   (cypress-io/cypress cy.prompt label, healenium/*, codeceptjs heal,
+   commercial changelogs) for how people actually use and break healing
+   tools. A use case we don't cover is a work item; so is a failure mode
+   we'd share.
+2. **Pick the highest-value gap** — prefer, in order: trust gaps (a way
+   the pipeline could lie), parity gaps (capability the incumbent has),
+   coverage gaps (usage-catalog scenario without a fixture), DX gaps.
+3. **Implement with pinned tests**, run the full gauntlet
+   (build → unit → system → hardening → heal), commit conventional,
+   push. Real-model calls stay out of CI.
+4. **Record learnings in the same commit** — deferred findings,
+   usage-catalog/competition doc updates, and fixes to these
+   instructions when an iteration exposes a gap in them (generalized —
+   the improvement loop applies to the loop itself).
+5. **Every few iterations, self-red-team** with the skills in
+   [.agents/skills/](.agents/skills/) and fix what survives scrutiny.
+
+The demo shop may grow arbitrarily complex in service of covering real
+use cases — realism outranks minimalism there (Adam's standing license).
+Publishing to npm and renaming stay out of scope for autonomous runs.
+
 ## Durable knowledge — no memory systems
 
 Do not use assistant memory (`~/.claude` memory or any equivalent) for
@@ -184,11 +211,11 @@ Tradeoffs, not oversights:
   guaranteed; widening is tracked work, not an accident.
 - **`rerun-test` without `@cypress/grep` reruns the whole spec** — a
   superset, valid but slower. Grep integration is optional by design.
-- **No negative-path rerun test yet:** no automated case where `propose`
-  passes but the rerun rungs catch a bad edit — the ladder's teeth are
-  proven only by unit tests + the give-up path. A `cmd:` stub emitting a
-  plausible-but-wrong edit would close this; expected SURVIVED in
-  mutation-red-team until then.
+- **Heal reruns overwrite the original capture artifact.** A rejected
+  edit's rerun fails the test, so our own plugin re-captures with the
+  same identity/filename. The engine reads the artifact once up front,
+  so heals are unaffected; the failures dir just reflects the latest
+  attempt. Revisit if the benchmark needs pristine originals.
 - **Heal `tier` is always `'model'` today.** The cache tier
   (heal memory) is Phase-2 backlog; the schema field exists so adding it
   won't bump the schema.

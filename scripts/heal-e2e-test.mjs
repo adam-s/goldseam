@@ -73,6 +73,39 @@ try {
   const green = await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   check(green.totalFailed === 0 && green.totalPassed === 1, 'healed spec is green');
 
+  console.log('\n— ladder teeth: a plausible-but-wrong edit must be rejected by rerun —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  writeFileSync(
+    TMP_SPEC,
+    `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+  );
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  const beforeWrong = readFileSync(TMP_SPEC, 'utf8');
+  const wrong = spawnSync(
+    'node',
+    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs wrong', '--max-attempts', '2'],
+    { encoding: 'utf8' },
+  );
+  check(wrong.status === 0 && wrong.stdout.includes('[failed]'), 'wrong edit ends in a failed verdict, exit 0');
+  check(readFileSync(TMP_SPEC, 'utf8') === beforeWrong, 'spec reverted after the ladder rejected the edit');
+  const wrongArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  check(wrongArtifact.verdict === 'failed' && wrongArtifact.attempts.length === 2, 'attempt cap honored');
+  const wrongRungs = wrongArtifact.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`);
+  check(
+    JSON.stringify(wrongRungs) === JSON.stringify(['propose:pass', 'rerun-test:fail']),
+    `rerun rung rejected it (${wrongRungs.join(' → ')})`,
+  );
+  check(wrongArtifact.finalEdit === undefined, 'no finalEdit recorded on a failed heal');
+
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });
   writeFileSync(
