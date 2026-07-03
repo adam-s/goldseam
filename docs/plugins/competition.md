@@ -51,6 +51,27 @@ queues (cypress#32673 BYO keys, cypress#33927 offline, cypress#20458
   requirement, not a nice-to-have); the benchmark table
   (heal-rate by selector style) is published evidence they never show.
 
+## What their issue queues teach (mined 2026-07-03)
+
+The incumbents' open bugs are a taxonomy of healing-trust failures.
+Each maps to a goldseam requirement — most already designed, now
+evidence-backed:
+
+| Failure mode in the wild | Evidence | goldseam requirement |
+| --- | --- | --- |
+| **Heals the wrong element** — similarity picks "the next element of the same type" | healenium#40, #38, #56, #76, #46, #310 | Verification ladder (rerun rungs proven; oracle rung M6). Similarity without verification is the core sin — never ship an unverified heal |
+| **Heals what it shouldn't** — invisible/absent elements "healed" | healenium#88 | Give-up as first-class + rerun assertions; oracle confirms the *intended* element |
+| **Verdict/telemetry lies** — "healing occurs despite not-successful mark" | healenium#75 | Verdicts are artifacts, one source of truth; the PR body renders the same ladder the engine recorded |
+| **Reports unusable** — no test-case mapping, can't export, drowns at scale | healenium#43, #42, #73, #82 | `goldseam report`: per-test rows (title, spec, verdict, tier, confidence, edit), md + json, no server |
+| **Selector-style rigidity** — only CSS healed; users want their locator style | healenium#67, #306 | `selectorPriority` honored in prompts and exposed in CLI; benchmark's selector-style axis |
+| **Heal doesn't persist** — re-heals the same break every scenario/run | codeceptjs#4527 | Heals are commits (permanent by construction); heal memory adds the no-model-call cache tier |
+| **Parallel mode breaks healing** | codeceptjs#4526, healenium#300 | Artifact files keyed by test identity; atomic writes; no shared server state to corrupt |
+| **Config not honored / silent no-op** | codeceptjs#4347, #3766 | Fail loud at setup; every run's options echoed in artifacts |
+| **Opaque algorithm** — users decompile jars to learn why it healed | healenium#56 | Reasoning + evidence in every heal artifact; open source end to end |
+| **Infra collapse** — Postgres, OOM, Jenkins/Azure connection failures | healenium#65, #57, #295, #297 | No infrastructure. Files in the repo, period |
+| **Auth inflexibility** — can't use Bearer-token AI endpoints | codeceptjs#4421 | `cmd:` escape hatch today; HTTP runners with custom headers/base URL (M5) |
+| **Per-test opt-out wanted** (@DisableHealing) | healenium#308 | Planned: capture-side exclude + `goldseam heal --only/--skip` filters |
+
 ## The DX bar (what "simplest possible" means, measured)
 
 Integration must stay at or under:
