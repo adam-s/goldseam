@@ -18,3 +18,28 @@ form label { display: block; margin: 0.75rem 0 0.25rem; }
 form input { padding: 0.4rem; width: 100%; max-width: 24rem; box-sizing: border-box; }
 form button { margin-top: 1rem; }
 [hidden] { display: none !important; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* tooltips */
+.help-icon, #shipping-info { font-size: 0.8rem; margin-left: 0.5rem; }
+.tooltip { display: inline-block; background: #1a202c; color: #fff; padding: 0.3rem 0.6rem;
+  border-radius: 4px; font-size: 0.8rem; margin-left: 0.4rem; }
+.portal-tooltip { position: fixed; z-index: 30; margin-left: 0; }
+
+/* filters */
+.filter-box { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 1rem; }
+.filter-box label { margin-right: 1rem; }
+
+/* reviews: a real scroll container */
+#reviews { max-height: 8rem; overflow-y: auto; border: 1px solid #e2e8f0;
+  border-radius: 6px; padding: 0 1rem; }
+.review { margin: 0.75rem 0; }
+
+/* modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(26, 32, 44, 0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 40; }
+.modal { background: #fff; border-radius: 8px; padding: 1.5rem; max-width: 28rem; }
+
+/* qty picker */
+.qty-picker { display: inline-flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
+.qty-picker button { width: 2rem; height: 2rem; }

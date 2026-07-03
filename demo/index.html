@@ -16,8 +16,26 @@
   </header>
   <main>
     <h1>Demo Shop</h1>
-    <p class="tagline">Furniture and objects that do not exist.</p>
+    <p class="tagline">Furniture and objects that do not exist.
+      <button class="help-icon" data-tooltip="Free returns within 30 days">Returns policy</button>
+      <button id="shipping-info" data-tooltip-portal="Ships in 2–4 business days">Shipping</button>
+    </p>
+
+    <fieldset class="filter-box" aria-label="Filter by category">
+      <legend>Filter</legend>
+      <label><input type="checkbox" value="furniture"> Furniture</label>
+      <label><input type="checkbox" value="kitchen"> Kitchen</label>
+      <label><input type="checkbox" value="lighting"> Lighting</label>
+      <label><input type="checkbox" value="bedding"> Bedding</label>
+    </fieldset>
+
     <section id="product-grid" aria-label="Products"></section>
+    <button id="load-more" class="btn">Load more products</button>
+
+    <section class="reviews-section" aria-label="Customer reviews">
+      <h2>Reviews</h2>
+      <div id="reviews"></div>
+    </section>
   </main>
   <script src="js/shop.js"></script>
 </body>
