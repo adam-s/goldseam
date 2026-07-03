@@ -65,18 +65,27 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
     try {
       const doc = Cypress.$('html')[0].ownerDocument;
       stash.url = redact ? maskText(doc.location.href) : doc.location.href;
-      const domHtml = redact
-        ? redactedOuterHtml(doc.documentElement)
-        : cloneWithShadow(doc.documentElement).outerHTML;
-      if (domHtml.length > maxDomBytes) {
-        stash.domHtml = domHtml.slice(0, maxDomBytes);
-        stash.domTruncated = true;
+      // Under cy.origin the AUT frame is cross-origin and jQuery resolves
+      // to the Cypress runner document instead (path /__/). Capturing the
+      // runner UI as "the app" is misleading evidence a model would heal
+      // against — degrade honestly instead (probed 2026-07-03).
+      if (doc.location.pathname.startsWith('/__')) {
+        stash.captureError =
+          'AUT document unreachable — got the Cypress runner instead (cross-origin failure under cy.origin?)';
       } else {
-        stash.domHtml = domHtml;
-      }
-      if (includeAria) {
-        const aria = ariaSnapshot(doc.body);
-        stash.ariaSnapshot = redact ? maskText(aria) : aria;
+        const domHtml = redact
+          ? redactedOuterHtml(doc.documentElement)
+          : cloneWithShadow(doc.documentElement).outerHTML;
+        if (domHtml.length > maxDomBytes) {
+          stash.domHtml = domHtml.slice(0, maxDomBytes);
+          stash.domTruncated = true;
+        } else {
+          stash.domHtml = domHtml;
+        }
+        if (includeAria) {
+          const aria = ariaSnapshot(doc.body);
+          stash.ariaSnapshot = redact ? maskText(aria) : aria;
+        }
       }
     } catch (error) {
       stash.captureError = error instanceof Error ? error.message : String(error);

@@ -9,7 +9,7 @@
 //    its exact semantics (test stays green) with goldseam installed.
 
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import cypress from 'cypress';
 
 delete process.env.ELECTRON_RUN_AS_NODE;
@@ -35,6 +35,10 @@ async function runScenario(name) {
 const server = spawn('npx', ['http-server', 'demo', '-p', '4173', '-c-1', '--silent'], {
   stdio: 'ignore',
 });
+// Second origin (same host, different port) for the cy.origin scenario.
+const server2 = spawn('npx', ['http-server', 'demo', '-p', '4174', '-c-1', '--silent'], {
+  stdio: 'ignore',
+});
 
 try {
   await new Promise((r) => setTimeout(r, 1500));
@@ -57,8 +61,21 @@ try {
   const swallow = await runScenario('user-swallow');
   check(swallow.passed === 1 && swallow.failed === 0, "user's swallow handler keeps its test green");
   check(swallow.artifacts === 0, 'swallowed (passing) test leaves no artifact');
+
+  console.log('\n— cy.origin: degrade honestly, never capture the runner UI —');
+  const origin = await runScenario('cross-origin');
+  check(origin.failed === 1 && origin.artifacts === 1, 'cross-origin failure still captures');
+  const originArtifact = JSON.parse(
+    readFileSync(`.goldseam/failures/${readdirSync('.goldseam/failures')[0]}`, 'utf8'),
+  );
+  check(
+    typeof originArtifact.captureError === 'string' && originArtifact.captureError.includes('unreachable'),
+    'captureError names the cross-origin degradation',
+  );
+  check(originArtifact.domHtml === '', 'no misleading runner-UI DOM in the capture');
 } finally {
   server.kill();
+  server2.kill();
   rmSync('.goldseam', { recursive: true, force: true });
 }
 

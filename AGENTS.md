@@ -198,8 +198,9 @@ place. Format conventions:
 
 Tradeoffs, not oversights:
 
-- **Shadow DOM isn't serialized** by `outerHTML`; captures of
-  shadow-root-heavy apps are incomplete. Documented in the package README.
+- **Closed shadow roots stay invisible.** Open roots are captured as
+  declarative `<template shadowrootmode>` markup; `{ mode: 'closed' }`
+  is unreachable by design. Documented in the package README.
 - **`cy.origin` blocks degrade** — the support file can't reach
   cross-origin documents; capture falls back to error + URL.
 - **Dual failure-hooking plugins can mutually defer.** Our sole-listener

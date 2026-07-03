@@ -150,8 +150,9 @@ name is namespaced (`goldseam:capture`) to compose cleanly.
 
 Known walls (documented, not hidden):
 
-- **Shadow DOM** content is not serialized by `outerHTML`, so captures of
-  shadow-root-heavy apps are incomplete.
+- **Open shadow roots are captured** (as declarative
+  `<template shadowrootmode="open">` markup, redacted like everything
+  else); **closed shadow roots** are unreachable by design.
 - **`cy.origin`** blocks: the support file cannot reach cross-origin
   documents; captures there degrade to error + URL (`captureError` set).
 - If another *plugin* also registers a non-throwing `fail` listener, the
