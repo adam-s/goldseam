@@ -216,9 +216,11 @@ Tradeoffs, not oversights:
   same identity/filename. The engine reads the artifact once up front,
   so heals are unaffected; the failures dir just reflects the latest
   attempt. Revisit if the benchmark needs pristine originals.
-- **Heal `tier` is always `'model'` today.** The cache tier
-  (heal memory) is Phase-2 backlog; the schema field exists so adding it
-  won't bump the schema.
+- **Heal memory caches by exact `failedSelector` only.** A renamed
+  element healed in one spec reapplies anywhere the identical broken
+  selector appears; near-miss selectors (same element, different
+  locator style) still go to the model. Semantic keying (aria identity)
+  is Phase-2 work.
 - **The name is not locked** (goldseam vs regraft). Rename cost:
   `git grep -l goldseam` + npm scope; blocks publishing only.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the

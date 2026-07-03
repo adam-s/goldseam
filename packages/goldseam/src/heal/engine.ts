@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join } from 'path';
 import { FailureArtifact } from '../shared/types';
+import { deriveReplacement, saveEntry } from './cache';
 import { STAGES } from './stages';
 import {
   HEAL_SCHEMA_VERSION,
@@ -15,7 +16,7 @@ import {
   RepairRunner,
 } from './types';
 
-export const DEFAULT_HEAL_OPTIONS: Omit<HealOptions, 'projectRoot' | 'healsDir'> = {
+export const DEFAULT_HEAL_OPTIONS: Omit<HealOptions, 'projectRoot' | 'healsDir' | 'cacheFile'> = {
   stages: ['propose', 'rerun-test', 'rerun-spec'],
   maxAttempts: 3,
   minConfidence: 0.5,
@@ -68,6 +69,7 @@ export async function healArtifactFile(
     const record: HealAttempt = { attempt, ladder: [] };
     attempts.push(record);
     ctx.proposal = undefined;
+    ctx.proposalSource = undefined;
 
     let attemptFailed = false;
     for (const stage of stages) {
@@ -84,6 +86,7 @@ export async function healArtifactFile(
       }
     }
     record.proposal = ctx.proposal;
+    record.source = ctx.proposalSource;
 
     if (outcome === 'gave-up') {
       ctx.revert();
@@ -98,16 +101,33 @@ export async function healArtifactFile(
   }
   if (outcome !== 'healed') ctx.revert();
 
+  const tier = ctx.proposalSource === 'cache' ? 'cache' : 'model';
+  const finalEdit = outcome === 'healed' ? ctx.proposal?.edits?.[0] : undefined;
+
+  // A verified MODEL heal feeds heal memory; cache heals just proved the
+  // memory is still valid.
+  if (options.cacheFile && finalEdit && tier === 'model' && artifact.failedSelector) {
+    const replacement = deriveReplacement(finalEdit, artifact.failedSelector);
+    if (replacement) {
+      saveEntry(options.cacheFile, {
+        failedSelector: artifact.failedSelector,
+        replacement,
+        healedAt: new Date().toISOString(),
+        specPath: artifact.specPath,
+      });
+    }
+  }
+
   const heal: HealArtifact = {
     schemaVersion: HEAL_SCHEMA_VERSION,
     captureRef: basename(artifactPath),
     specPath: artifact.specPath,
     title: artifact.title,
     model: runner.id,
-    tier: 'model',
+    tier,
     verdict: outcome,
     attempts,
-    finalEdit: outcome === 'healed' ? ctx.proposal?.edits?.[0] : undefined,
+    finalEdit,
     confidence: outcome === 'healed' ? ctx.proposal?.confidence : undefined,
     reasoning: ctx.proposal?.reasoning,
     durationMs: Date.now() - startedAt,

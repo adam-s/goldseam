@@ -48,12 +48,16 @@ export interface HealOptions {
   dryRun: boolean;
   projectRoot: string;
   healsDir: string;
+  /** Heal-memory file; null disables the cache tier. */
+  cacheFile: string | null;
 }
 
 export interface HealAttempt {
   attempt: number;
   proposal?: RepairReply;
   proposalError?: string;
+  /** Where the proposal came from. */
+  source?: 'cache' | 'model';
   ladder: StageVerdict[];
 }
 
@@ -63,7 +67,8 @@ export interface HealArtifact {
   specPath: string;
   title: string;
   model: string;
-  tier: 'model';
+  /** 'cache' = healed from heal memory, zero model calls (still verified). */
+  tier: 'cache' | 'model';
   verdict: 'healed' | 'gave-up' | 'failed';
   attempts: HealAttempt[];
   finalEdit?: RepairEdit;
@@ -79,6 +84,10 @@ export interface HealContext {
   runner: RepairRunner;
   /** Set by the propose stage; consumed by verify stages. */
   proposal?: RepairReply;
+  /** Where the current proposal came from (propose stage sets it). */
+  proposalSource?: 'cache' | 'model';
+  /** True once the cache tier has been tried this heal — never retried. */
+  cacheTried?: boolean;
   /** Feedback from a failed attempt, folded into the next prompt. */
   feedback?: string;
   /** Apply/revert the proposed edit on disk (engine-provided, idempotent). */

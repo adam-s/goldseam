@@ -129,6 +129,12 @@ Model runners: `claude` (the Claude Code CLI in print mode; defaults to
 Sonnet), `claude:<model>`, or `cmd:<executable>`. `openai:` / `anthropic:`
 / `ollama:` HTTP runners are planned behind the same interface.
 
+**Heal memory:** every verified model heal records
+`broken selector → replacement` in `.goldseam/heal-cache.json`; the next
+capture with the same broken selector heals with **zero model calls**
+(`tier: "cache"`), and — unlike the incumbents — the cached proposal
+still runs the full verification ladder. `--no-cache` opts out.
+
 Single-test isolation in `rerun-test` uses `@cypress/grep` when your
 project registers it; without it the whole spec reruns (a superset — a
 valid but slower verdict).

@@ -6,6 +6,7 @@
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { buildCacheEdit, loadCache, lookup } from './cache';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
 import { EditRejected, validateEdit } from './validate';
@@ -34,6 +35,30 @@ export const proposeStage: HealStage = {
 
     const specAbs = join(options.projectRoot, artifact.specPath);
     const specSource = readFileSync(specAbs, 'utf8');
+
+    // Cache tier: a previously verified heal for this exact broken
+    // selector proposes with zero model calls. Tried once per heal; the
+    // ladder still verifies it like any other proposal.
+    if (options.cacheFile && !ctx.cacheTried && artifact.failedSelector) {
+      ctx.cacheTried = true;
+      const entry = lookup(loadCache(options.cacheFile), artifact.failedSelector);
+      const edit = entry && buildCacheEdit(entry, artifact.specPath, specSource);
+      if (entry && edit) {
+        ctx.proposal = {
+          edits: [edit],
+          confidence: 1,
+          reasoning: `heal memory: "${entry.failedSelector}" → "${entry.replacement}" (verified ${entry.healedAt}, ${entry.specPath})`,
+        };
+        ctx.proposalSource = 'cache';
+        return verdict(
+          'propose',
+          'pass',
+          `cache hit: "${entry.failedSelector}" → "${entry.replacement}" (no model call)`,
+          started,
+        );
+      }
+    }
+
     const prompt = buildRepairPrompt({
       artifact,
       specSource,
@@ -63,6 +88,7 @@ export const proposeStage: HealStage = {
       }
       const edit = validateEdit(reply, artifact.specPath, specSource);
       ctx.proposal = { ...reply, edits: [edit] };
+      ctx.proposalSource = 'model';
       return verdict(
         'propose',
         'pass',

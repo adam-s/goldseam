@@ -30,6 +30,7 @@ function makeOptions(overrides: Partial<HealOptions> = {}): HealOptions {
     stages: ['propose'],
     projectRoot: root,
     healsDir: join(root, '.goldseam', 'heals'),
+    cacheFile: null,
     ...overrides,
   };
 }
@@ -129,5 +130,94 @@ describe('healArtifactFile', () => {
     expect(heal.attempts).toHaveLength(3);
     expect(runner.calls).toBe(3);
     expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC);
+  });
+});
+
+describe('heal memory (cache tier)', () => {
+  // The capture's failedSelector must be derivable for caching; the
+  // beforeEach artifact lacks one, so write it explicitly here.
+  function setFailedSelector() {
+    const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+    writeFileSync(
+      artifactPath,
+      JSON.stringify({ ...artifact, failedSelector: '#add-to-basket' }),
+    );
+  }
+  const cacheFile = () => join(root, '.goldseam', 'heal-cache.json');
+
+  it('a verified model heal records a cache entry', async () => {
+    setFailedSelector();
+    const heal = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ cacheFile: cacheFile() }));
+    expect(heal.tier).toBe('model');
+    const cache = JSON.parse(readFileSync(cacheFile(), 'utf8'));
+    expect(cache).toEqual([
+      expect.objectContaining({ failedSelector: '#add-to-basket', replacement: '#add-to-cart' }),
+    ]);
+  });
+
+  it('a cache hit heals with zero model calls, tier=cache, still verified by the ladder', async () => {
+    setFailedSelector();
+    writeFileSync(
+      cacheFile(),
+      JSON.stringify([
+        { failedSelector: '#add-to-basket', replacement: '#add-to-cart', healedAt: 'x', specPath: 'other.cy.ts' },
+      ]),
+    );
+    const runner = stubRunner([GOOD_REPLY]);
+    const heal = await healArtifactFile(artifactPath, runner, makeOptions({ cacheFile: cacheFile() }));
+    expect(heal.verdict).toBe('healed');
+    expect(heal.tier).toBe('cache');
+    expect(runner.calls).toBe(0);
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('#add-to-cart');
+  });
+
+  it('an inapplicable cache entry falls through to the model in the same attempt', async () => {
+    setFailedSelector();
+    writeFileSync(
+      cacheFile(),
+      JSON.stringify([
+        { failedSelector: '#something-else', replacement: '#whatever', healedAt: 'x', specPath: 'o.cy.ts' },
+      ]),
+    );
+    const runner = stubRunner([GOOD_REPLY]);
+    const heal = await healArtifactFile(artifactPath, runner, makeOptions({ cacheFile: cacheFile() }));
+    expect(heal.verdict).toBe('healed');
+    expect(heal.tier).toBe('model');
+    expect(runner.calls).toBe(1);
+    expect(heal.attempts).toHaveLength(1);
+  });
+
+  it('a cache proposal rejected by a later rung falls back to the model on the next attempt', async () => {
+    setFailedSelector();
+    writeFileSync(
+      cacheFile(),
+      JSON.stringify([
+        { failedSelector: '#add-to-basket', replacement: '#stale-cached-target', healedAt: 'x', specPath: 'o.cy.ts' },
+      ]),
+    );
+    // Temporary rung that rejects the stale cache proposal but passes the
+    // model's; registered directly in the STAGES registry.
+    const { STAGES } = await import('../src/heal/stages');
+    STAGES['reject-stale'] = {
+      name: 'reject-stale',
+      async run(ctx) {
+        const bad = ctx.proposal?.edits?.[0]?.newString.includes('stale');
+        return { stage: 'reject-stale', verdict: bad ? 'fail' : 'pass', evidence: bad ? 'stale' : 'ok', durationMs: 0 };
+      },
+    };
+    try {
+      const runner = stubRunner([GOOD_REPLY]);
+      const heal = await healArtifactFile(
+        artifactPath,
+        runner,
+        makeOptions({ cacheFile: cacheFile(), stages: ['propose', 'reject-stale'], maxAttempts: 2 }),
+      );
+      expect(heal.verdict).toBe('healed');
+      expect(heal.tier).toBe('model');
+      expect(heal.attempts.map((a) => a.source)).toEqual(['cache', 'model']);
+      expect(runner.calls).toBe(1);
+    } finally {
+      delete STAGES['reject-stale'];
+    }
   });
 });

@@ -81,6 +81,32 @@ try {
   const parsed = JSON.parse(reportJson.stdout);
   check(parsed.totals.healed === 1 && parsed.rows[0].verdict === 'healed', 'json report is structured');
 
+  console.log('\n— heal memory: the same break heals from cache, zero model calls —');
+  rmSync('.goldseam/failures', { recursive: true, force: true });
+  rmSync('.goldseam/heals', { recursive: true, force: true });
+  writeFileSync(
+    TMP_SPEC,
+    `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+  );
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  // The give-up stub refuses every request — if this heals, the cache did it.
+  const cached = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs giveup'], {
+    encoding: 'utf8',
+  });
+  check(cached.status === 0 && cached.stdout.includes('cache hit'), 'cache tier proposed with no model call');
+  const cachedArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  check(cachedArtifact.verdict === 'healed' && cachedArtifact.tier === 'cache', 'healed from cache, ladder-verified');
+  check(readFileSync(TMP_SPEC, 'utf8').includes('add-to-cart-5'), 'cached replacement applied');
+
   console.log('\n— ladder teeth: a plausible-but-wrong edit must be rejected by rerun —');
   rmSync('.goldseam', { recursive: true, force: true });
   writeFileSync(
