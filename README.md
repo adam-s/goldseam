@@ -16,6 +16,11 @@ lands as a reviewable file. **Two tools, kept separate on purpose:**
   your steps once into real Cypress commands, cached as committable files in
   `.goldseam-prompts/`.
 
+A selector breaks; one command heals it into a one-line reviewed diff
+(real model, real run, 68 seconds):
+
+![a broken selector healed into a reviewed one-line diff](docs/media/demo.gif)
+
 **Why not merge them into one self-healing prompt** (the loop `cy.prompt()`
 markets)? When a plain-English step breaks you can't tell whether the app
 regressed, the sentence was too vague, or a re-resolve would land on a
@@ -107,6 +112,11 @@ cy.goldseam([
 Steps translate once through your model into a fixed command vocabulary
 (never `eval`'d code), cached in a committable `.goldseam-prompts/` file
 that replays in CI with zero model calls.
+
+English steps → the model's translation as a reviewable file → replay with
+the model unplugged → ejected plain code — against a real page:
+
+![plain-English steps translated, cached, replayed, and ejected](docs/media/authored.gif)
 
 Full options, artifact schema, model runners, and guarantees:
 [packages/goldseam/README.md](packages/goldseam/README.md).

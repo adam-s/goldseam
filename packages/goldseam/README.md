@@ -83,6 +83,8 @@ That's the whole integration. Green runs are untouched and write nothing.
 stopped matching (someone renamed a `data-testid`, swapped a class,
 restructured the DOM).
 
+![a broken selector healed into a reviewed one-line diff](https://raw.githubusercontent.com/adam-s/goldseam/main/docs/media/demo.gif)
+
 ### How you use it
 
 1. **Run your tests like normal.** When one fails, goldseam quietly saves a
@@ -189,6 +191,8 @@ and the heal fails honestly rather than applying it.
 
 **Use this when:** you want a new test and would rather describe it than
 hand-write every selector.
+
+![plain-English steps translated, cached, replayed, and ejected](https://raw.githubusercontent.com/adam-s/goldseam/main/docs/media/authored.gif)
 
 ### How you use it
 
