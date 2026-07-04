@@ -238,8 +238,6 @@ Tradeoffs, not oversights:
   selector appears; near-miss selectors (same element, different
   locator style) still go to the model. Semantic keying (aria identity)
   is Phase-2 work.
-- **The name is not locked** (goldseam vs regraft). Rename cost:
-  `git grep -l goldseam` + npm scope; blocks publishing only.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
 - **Duplicate test titles can confuse rerun verdicts** — `rerunVerdictFor`

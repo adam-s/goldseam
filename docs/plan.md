@@ -39,9 +39,10 @@ heal a reviewed commit. Then the trust rungs nobody else ships.
 
 ### M0 — Name-lock & repo foundation
 
-- **Adam's call:** goldseam vs regraft. Check GitHub org + npm scope,
-  publish 0.0.1 placeholder, grab domain. Blocks *publishing*, not coding —
-  M1+ proceed under the working name (`git grep -l goldseam` + one rename).
+- **Resolved 2026-07-03:** the name is goldseam, locked by publishing —
+  `goldseam@0.0.1` and `aria-snapshot@0.1.0` are live on npm (both
+  unscoped; the @goldseam scope was taken, and flagship-unscoped +
+  generic-helper-unscoped is the professional pattern anyway).
 - Monorepo root: npm workspaces, root tsconfig, .gitignore, MIT license
   (aria-snapshot stays Apache-2.0 with NOTICE).
 - CI skeleton: build + typecheck + unit tests on push.
@@ -160,7 +161,9 @@ tier breakdown — data nobody else has.
   the `ELECTRON_RUN_AS_NODE` trap).
 - Release hygiene: conventional commits + changelog naming the artifact
   schemaVersion; `npm pack` inspection in CI (NOTICE present); publish
-  0.1.0; PR to the Cypress plugins directory.
+  0.1.0; PR to the Cypress plugins directory. Set up npm **Trusted
+  Publishing** (OIDC from the release workflow — no long-lived tokens;
+  first publishes were manual by necessity, 2026-07-03).
 - The cy-prompt-anatomy write-up as a technical blog post ("we read the
   loader in the binary").
 
@@ -216,7 +219,6 @@ test as the permanent regression gate.
 
 | Decision | Owner | Needed by |
 | --- | --- | --- |
-| Name: goldseam vs regraft (org/scope/domain) | Adam | M0 publish, not code |
 | Default heal model (Sonnet 5 for now; revisit with benchmark data) | M6 model axis | M7 |
 | Cypress peer range floor (tested floor, honestly declared) | benchmark data | M7 |
 | Redaction guarantees wording (schema doc is a public promise) | M1 review | M1 |

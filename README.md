@@ -8,7 +8,9 @@ suite verifies it; the repair arrives as a pull request.
 Named for kintsugi: the repair is visible, reviewed, and part of the
 object's story — never hidden magic.
 
-> Working name. If the brand changes, `git grep -l goldseam` and one rename.
+> Published on npm 2026-07-03: [`goldseam`](https://www.npmjs.com/package/goldseam)
+> (plugin + CLI) and [`aria-snapshot`](https://www.npmjs.com/package/aria-snapshot)
+> (the standalone helper). The name is final.
 
 ## Status
 
