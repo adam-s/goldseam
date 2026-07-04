@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the remove button in the row for 'Bob'"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": "#row-bob button.remove"
+      }
+    ]
+  }
+}

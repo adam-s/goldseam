@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the checkout button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": ".checkout-button"
+      }
+    ]
+  }
+}

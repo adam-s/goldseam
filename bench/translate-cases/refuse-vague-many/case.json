@@ -1,0 +1,8 @@
+{
+  "steps": [
+    "Click the button"
+  ],
+  "expect": {
+    "refuse": true
+  }
+}

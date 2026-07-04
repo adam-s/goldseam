@@ -1,0 +1,19 @@
+{
+  "steps": [
+    "Type 'kate' into the username input",
+    "Click the sign in button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "[data-test=\"signin-username\"]",
+        "textIncludes": "kate"
+      },
+      {
+        "action": "click",
+        "target": "[data-test=\"signin-submit\"]"
+      }
+    ]
+  }
+}

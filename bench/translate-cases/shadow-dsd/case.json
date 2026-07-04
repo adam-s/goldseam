@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the buy button inside the pricing card"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "shadowHost": "x-card#pricing"
+      }
+    ]
+  }
+}

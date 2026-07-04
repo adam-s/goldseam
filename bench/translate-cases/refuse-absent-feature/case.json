@@ -1,0 +1,8 @@
+{
+  "steps": [
+    "Click the export to CSV button"
+  ],
+  "expect": {
+    "refuse": true
+  }
+}

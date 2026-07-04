@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the print button in the toolbar"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": "button[aria-label=\"Print report\"]"
+      }
+    ]
+  }
+}

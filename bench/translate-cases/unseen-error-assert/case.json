@@ -1,0 +1,25 @@
+{
+  "steps": [
+    "Type '4242' into the card field",
+    "Click pay now",
+    "An error should appear saying 'Card number is incomplete'"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "#card",
+        "textIncludes": "4242"
+      },
+      {
+        "action": "click",
+        "target": "#pay-now"
+      },
+      {
+        "action": "assert",
+        "containsIncludes": "Card number is incomplete",
+        "noSelector": true
+      }
+    ]
+  }
+}

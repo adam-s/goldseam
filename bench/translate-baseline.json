@@ -1,0 +1,271 @@
+{
+  "model": "claude:sonnet",
+  "ranAt": "2026-07-04T06:32:29.981Z",
+  "score": "16/16",
+  "mustRefuse": "3/3",
+  "results": [
+    {
+      "name": "aria-icon-buttons",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": "button[aria-label='Print report']"
+          }
+        ]
+      }
+    },
+    {
+      "name": "class-soup-distractors",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": ".checkout-button"
+          }
+        ]
+      }
+    },
+    {
+      "name": "force-click-overlay",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": "#cta",
+            "force": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "login-bare-ids",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "#username",
+            "text": "tomsmith"
+          },
+          {
+            "action": "type",
+            "selector": "#password",
+            "text": "Secret1!"
+          },
+          {
+            "action": "click",
+            "selector": "button[type='submit'].radius"
+          }
+        ]
+      }
+    },
+    {
+      "name": "login-data-test",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "[data-test=\"signin-username\"]",
+            "text": "kate"
+          },
+          {
+            "action": "click",
+            "selector": "[data-test=\"signin-submit\"]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "multistep-journey",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "#note-title",
+            "text": "Groceries"
+          },
+          {
+            "action": "type",
+            "selector": "#note-body",
+            "text": "eggs and bread"
+          },
+          {
+            "action": "click",
+            "selector": "#add-note"
+          },
+          {
+            "action": "assert",
+            "selector": "#note-count",
+            "should": "have.text",
+            "value": "2 notes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "placeholder-passthrough",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "#api-key",
+            "text": "{{apiKey}}"
+          },
+          {
+            "action": "click",
+            "selector": "#save-key"
+          }
+        ]
+      }
+    },
+    {
+      "name": "positional-list",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": ".cart-item:nth-child(2) .remove"
+          }
+        ]
+      }
+    },
+    {
+      "name": "refuse-absent-feature",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "refused",
+        "reason": "the model declined to translate: No export to CSV button found in the page HTML. The page contains buttons for Print, Share, Menu, and Contact, but none for CSV export. — make the step specific enough to name one target"
+      }
+    },
+    {
+      "name": "refuse-two-saves",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "refused",
+        "reason": "the model declined to translate: Two 'Save' buttons exist on the page (one in #profile, one in #billing) and the step does not specify which. Cannot determine the unambiguous target. — make the step specific enough to name one target"
+      }
+    },
+    {
+      "name": "refuse-vague-many",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "refused",
+        "reason": "the model declined to translate: Step says 'the button' but the page has three buttons (OK, Cancel, Retry) — no indication of which one to click. — make the step specific enough to name one target"
+      }
+    },
+    {
+      "name": "select-dropdown",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "select",
+            "selector": "#country",
+            "value": "jp"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shadow-dsd",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "shadow": "x-card#pricing",
+            "selector": ".buy"
+          }
+        ]
+      }
+    },
+    {
+      "name": "table-row-scoped",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": "#row-bob .remove"
+          }
+        ]
+      }
+    },
+    {
+      "name": "todo-classes",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": ".new-todo",
+            "text": "buy oat milk{enter}"
+          },
+          {
+            "action": "click",
+            "selector": ".clear-completed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unseen-error-assert",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "#card",
+            "text": "4242"
+          },
+          {
+            "action": "click",
+            "selector": "#pay-now"
+          },
+          {
+            "action": "assert",
+            "contains": "Card number is incomplete",
+            "should": "be.visible"
+          }
+        ]
+      }
+    }
+  ]
+}

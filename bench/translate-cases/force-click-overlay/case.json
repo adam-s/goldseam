@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Force click the 'Get started' button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": "#cta"
+      }
+    ]
+  }
+}

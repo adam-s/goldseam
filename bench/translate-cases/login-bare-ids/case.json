@@ -1,0 +1,25 @@
+{
+  "steps": [
+    "Type 'tomsmith' into the username field",
+    "Type 'Secret1!' into the password field",
+    "Click the login button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "#username",
+        "textIncludes": "tomsmith"
+      },
+      {
+        "action": "type",
+        "target": "#password",
+        "textIncludes": "Secret1!"
+      },
+      {
+        "action": "click",
+        "target": "#login button[type=\"submit\"]"
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "steps": [
+    "Click the save button"
+  ],
+  "expect": {
+    "refuse": true
+  }
+}

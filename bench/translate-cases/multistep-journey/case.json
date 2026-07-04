@@ -1,0 +1,31 @@
+{
+  "steps": [
+    "Type 'Groceries' into the title field",
+    "Type 'eggs and bread' into the note body",
+    "Click add note",
+    "The note count should say '2 notes'"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "#note-title",
+        "textIncludes": "Groceries"
+      },
+      {
+        "action": "type",
+        "target": "#note-body",
+        "textIncludes": "eggs and bread"
+      },
+      {
+        "action": "click",
+        "target": "#add-note"
+      },
+      {
+        "action": "assert",
+        "target": "#note-count",
+        "containsIncludes": "2 notes"
+      }
+    ]
+  }
+}

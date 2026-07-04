@@ -107,3 +107,14 @@ moments, never CI.
   design working as intended. Hidden-state preconditions (Vector's
   display:none search input) still need the toggle step spelled out —
   honest failure, actionable message.
+- 2026-07-04 translation eval harness (bench/translate-eval.mjs): 16
+  fixture cases across selector cultures (bare ids, data-test, semantic
+  classes, aria-labels, Material-style class soup), scoping (table rows,
+  positional, shadow DSD), placeholders, unseen-element asserts, and 3
+  must-refuse traps — deterministically graded (emitted selectors must
+  resolve to the INTENDED element; refusals required where ambiguity
+  exists; no LLM judge). Sonnet with the hardened prompt: 16/16 twice
+  consecutively, must-refuse 3/3 both runs. Baseline committed; any
+  prompt change must hold it. Caveats recorded: fixtures are
+  author-written; 16 cases is a floor, grown by adding every future
+  failure as a case.

@@ -1,0 +1,19 @@
+{
+  "steps": [
+    "Type {{apiKey}} into the API key field",
+    "Click the save button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "#api-key",
+        "textIncludes": "{{apiKey}}"
+      },
+      {
+        "action": "click",
+        "target": "#save-key"
+      }
+    ]
+  }
+}

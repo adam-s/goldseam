@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Select 'Japan' from the country dropdown"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "select",
+        "target": "#country"
+      }
+    ]
+  }
+}

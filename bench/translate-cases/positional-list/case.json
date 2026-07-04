@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the remove button of the second cart item"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": "li.cart-item:nth-child(2) button.remove"
+      }
+    ]
+  }
+}

@@ -4,3 +4,4 @@ dist/
 cypress/screenshots/
 cypress/videos/
 cypress/downloads/
+bench/translate-results.json

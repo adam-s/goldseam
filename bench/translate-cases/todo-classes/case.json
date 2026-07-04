@@ -1,0 +1,19 @@
+{
+  "steps": [
+    "Add a todo 'buy oat milk' by typing into the new-todo input and pressing enter",
+    "Click the clear completed button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": ".new-todo",
+        "textIncludes": "buy oat milk"
+      },
+      {
+        "action": "click",
+        "target": ".clear-completed"
+      }
+    ]
+  }
+}
