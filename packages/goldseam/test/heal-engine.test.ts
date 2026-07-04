@@ -214,6 +214,30 @@ describe('sibling-heal detection', () => {
   });
 });
 
+describe('apply/revert on rejection', () => {
+  it('a proposal applied to disk is reverted when a later rung rejects it (suite-bites gap)', async () => {
+    const { STAGES } = await import('../src/heal/stages');
+    STAGES['apply-then-fail'] = {
+      name: 'apply-then-fail',
+      async run(ctx) {
+        ctx.apply(); // mimic a rerun rung: edit hits disk before the verdict
+        return { stage: 'apply-then-fail', verdict: 'fail', evidence: 'rejected after apply', durationMs: 0 };
+      },
+    };
+    try {
+      const heal = await healArtifactFile(
+        artifactPath,
+        stubRunner([GOOD_REPLY]),
+        makeOptions({ stages: ['propose', 'apply-then-fail'], maxAttempts: 1 }),
+      );
+      expect(heal.verdict).toBe('failed');
+      expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC); // reverted, byte-for-byte
+    } finally {
+      delete STAGES['apply-then-fail'];
+    }
+  });
+});
+
 describe('retry economics', () => {
   it('stops after an identical proposal fails identically twice (no third model call)', async () => {
     const { STAGES } = await import('../src/heal/stages');

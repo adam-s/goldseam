@@ -1,44 +1,146 @@
 name: CI
 
+# The gauntlet, in the shape of the product's own trust ladder: build the
+# evidence, verify it offline, then verify it against a live app — and
+# then prove the suite itself can tell broken from working. No model
+# calls anywhere in CI; the deterministic cmd: stub stands in.
+
 on:
   push:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  # ── Rung 1: offline truth — types, units, both workspaces ────────────
+  unit:
+    name: unit (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        node: [22, 24]
+    env:
+      CYPRESS_INSTALL_BINARY: '0'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:packages
+      - run: npm run test:unit
 
-      # Install dependencies + Cypress binary (cached by the action).
+  # ── Rung 2: package hygiene — what ships is what we promised ─────────
+  package-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CYPRESS_INSTALL_BINARY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Pack inspection (NOTICE + README travel with the tarballs)
+        run: |
+          set -euo pipefail
+          aria=$(cd packages/aria-snapshot && npm pack --dry-run 2>&1)
+          echo "$aria" | grep -q "NOTICE"    || { echo "aria-snapshot tarball missing NOTICE"; exit 1; }
+          echo "$aria" | grep -q "README.md" || { echo "aria-snapshot tarball missing README"; exit 1; }
+          gold=$(cd packages/goldseam && npm pack --dry-run 2>&1)
+          echo "$gold" | grep -q "README.md" || { echo "goldseam tarball missing README"; exit 1; }
+          echo "$gold" | grep -q "dist/cli/index.js" || { echo "goldseam tarball missing CLI"; exit 1; }
+          echo "tarballs carry their promises"
+
+  # ── Rung 3: live app rungs — capture, hardening, heal, authoring ─────
+  system:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
       - uses: cypress-io/github-action@v6
         with:
           runTests: false
-
-      - name: Build packages
-        run: npm run build:packages
-
-      - name: Unit tests
-        run: npm run test:unit
-
-      # Green run must stay quiet; broken selector must produce a
-      # schema-valid capture artifact. The script serves the demo shop
-      # itself and runs Cypress via the Module API.
-      - name: System tests
+      - run: npm run build:packages
+      - name: System (green stays silent; broken selector captures)
         run: npm run test:system
 
-      # Pinned behaviors: retries leave no stale artifacts, hook failures
-      # capture, user fail-handlers keep their semantics.
-      - name: Hardening tests
+  hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cypress-io/github-action@v6
+        with:
+          runTests: false
+      - run: npm run build:packages
+      - name: Hardening (retries, hooks, user fail-handler transparency)
         run: npm run test:hardening
 
-      # Full heal loop (capture → propose → verify → artifact) with the
-      # deterministic cmd: stub model — no API calls in CI.
-      - name: Heal end-to-end
+  heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cypress-io/github-action@v6
+        with:
+          runTests: false
+      - run: npm run build:packages
+      - name: Heal E2E (full ladder, deterministic stub, oracle teeth)
         run: npm run test:heal
 
-      # cy.goldseam authoring: translate → committable cache → replay →
-      # eject, all with the stub model.
-      - name: Authoring end-to-end
+  authoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cypress-io/github-action@v6
+        with:
+          runTests: false
+      - run: npm run build:packages
+      - name: Authoring E2E (translate → cache → replay → eject, stubbed)
         run: npm run test:prompt
+
+  # ── Rung 4: the showcase — the adopter's story inside the Actions UI ─
+  showcase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cypress-io/github-action@v6
+        with:
+          runTests: false
+      - run: npm run build:packages
+      - name: Break a selector, capture, heal, report (stub model)
+        run: node scripts/ci-showcase.mjs
+      - name: Upload capture + heal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldseam-artifacts
+          path: .goldseam/
+          if-no-files-found: warn
+
+  # ── Rung 5: the suite must bite — CI shadow of the mutation red-team ─
+  suite-bites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CYPRESS_INSTALL_BINARY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Known regressions must fail the unit suite
+        run: node scripts/suite-bites.mjs

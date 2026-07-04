@@ -1,5 +1,7 @@
 # goldseam
 
+[![CI](https://github.com/adam-s/goldseam/actions/workflows/ci.yml/badge.svg)](https://github.com/adam-s/goldseam/actions/workflows/ci.yml)
+
 Self-healing for the test suites you already have. When a selector breaks,
 the failure becomes a rich capture (DOM + accessibility tree + error); your
 model — local or API, never a vendor cloud — proposes a minimal fix; the

@@ -122,12 +122,15 @@ export async function healArtifactFile(
         // calls (proving-campaign finding: 3× the same 0.97 edit against
         // a broken runner). Abort the heal instead.
         infraFailed = v.evidence.startsWith('cypress could not run');
-        // Dedup applies only when a PROPOSAL failed verification — propose-
-        // stage failures (parse/validation) are where feedback genuinely
-        // helps, so they keep the full retry budget. (Cast: TS narrows
-        // ctx.proposal from the loop-top reset, blind to stage.run.)
+        // Dedup applies only when a PROPOSAL failed at a DETERMINISTIC
+        // offline rung — identical input there provably yields identical
+        // output. Propose failures keep the feedback budget; rerun rungs
+        // keep the full budget because app flake is real (red-team:
+        // aborting a correct edit after one transient hiccup costs
+        // recall exactly where retries matter).
         const edits = (ctx.proposal as RepairReply | undefined)?.edits;
-        failureKey = edits ? `${v.stage}::${JSON.stringify(edits)}` : '';
+        const deterministic = !v.stage.startsWith('rerun');
+        failureKey = edits && deterministic ? `${v.stage}::${JSON.stringify(edits)}` : '';
         break;
       }
     }

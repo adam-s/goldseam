@@ -14,7 +14,7 @@ becomes a fix + pinned test + one conventional commit.
 | TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
 | Juice Shop | Angular Material, id/class/aria soup | DONE: aria-label heal, honest give-up; 3 bugs fixed |
 | Shoelace docs | web components, shadow DOM | DONE: shadow heal to [part] API; 185-shadow-root capture |
-| Cypress RWA | React, data-test everywhere | installing |
+| Cypress RWA | React, data-test everywhere | booted (node 24 ok); baseline specs written; leg in progress |
 
 Boot notes:
 - TodoMVC: `npx http-server /tmp/goldseam-proving/todomvc/examples/javascript-es6/dist -p 4180 -c-1`
@@ -64,3 +64,13 @@ moments, never CI.
   chasing the renamed internal. Cypress's own shadow limits documented
   live (no cross-boundary combinators; #33046 visibility). healenium#81 +
   cypress#8843 rows proved.
+- 2026-07-04 mid-campaign red-team over the fix batch: 2 HIGHs in the
+  hook verdict (after-hooks vacuous pass; pending-only pass) fixed —
+  verdicts now require >=1 PASSED test; HOOK_TITLE_RE anchored to mocha's
+  title shape (user tests mentioning hooks no longer misclassified);
+  dedup scoped to deterministic rungs (rerun flake keeps its budget);
+  ELECTRON strip scoped to the heal path. CI reworked into the gauntlet:
+  parallel rungs + package-hygiene + suite-bites (deterministic mutation
+  smoke — found a missing unit pin for apply-then-revert on day one) +
+  the showcase job (break -> capture -> heal -> report in the job summary,
+  artifacts uploaded).

@@ -264,6 +264,13 @@ Tradeoffs, not oversights:
 - **Scoped calls (`.find()` etc.) get existence-only resolution** — a
   whole-document count over-approximates within-parent uniqueness, so
   ambiguity there is deferred to the rerun rungs.
+- **Retry dedup is scoped to deterministic rungs.** An identical
+  proposal failing twice at resolve/oracle aborts (provably futile);
+  rerun-rung failures keep the full attempt budget because app flake is
+  real. Trivially-different edits still burn budget (accepted).
+- **`goldseam heal` strips ELECTRON_RUN_AS_NODE for its own children** —
+  an exotic `cmd:` model runner that is itself an Electron binary
+  needing that var would break; wrap it in a script that re-sets it.
 - **Frame-content matches are noted, not rejected.** A healed selector
   whose only matches live inside inlined iframe content may be legit (a
   suite with frame-entry helpers) or unreachable (bare `cy.get`); the

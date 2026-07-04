@@ -60,12 +60,25 @@ describe('rerunVerdictFor', () => {
       ] }] };
       const v = rerunVerdictFor('rerun-test', result, hookTitle, []);
       expect(v.pass).toBe(true);
-      expect(v.evidence).toMatch(/2 test\(s\) ran past the hook/);
+      expect(v.evidence).toMatch(/2 test\(s\) passed past the hook/);
     });
     it('fails when no tests ran (suite still aborts)', () => {
       const v = rerunVerdictFor('rerun-test', { runs: [{ tests: [] }] }, hookTitle, []);
       expect(v.pass).toBe(false);
-      expect(v.evidence).toMatch(/no tests ran/);
+      expect(v.evidence).toMatch(/no test passed/);
+    });
+    it('fails when everything is pending/skipped — vacuous runs are not heals (red-team)', () => {
+      const result = { runs: [{ tests: [
+        { title: ['todos', 'adds'], state: 'pending' },
+        { title: ['todos', 'clears'], state: 'skipped' },
+      ] }] };
+      const v = rerunVerdictFor('rerun-test', result, hookTitle, []);
+      expect(v.pass).toBe(false);
+    });
+    it('does not misclassify a TEST whose title merely mentions a hook (red-team)', () => {
+      const result = { runs: [{ tests: [{ title: ['suite', 'shows "before each" hook errors'], state: 'passed' }] }] };
+      const v = rerunVerdictFor('rerun-test', result, 'suite shows "before each" hook errors', []);
+      expect(v.pass).toBe(true); // matched as a NORMAL test by title, not the hook branch
     });
     it('fails when a non-pending test still fails after the hook heal', () => {
       const result = { runs: [{ tests: [

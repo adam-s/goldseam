@@ -228,7 +228,7 @@ const WEAK_ASSERTIONS = new Set(['exist', 'be.visible']);
 
 /** Mocha's hook naming in failure titles — a capture bearing it healed
  * HOOK code, which gates every test in the suite. */
-export const HOOK_TITLE_RE = /"(?:before|after) (?:each|all)" hook/;
+export const HOOK_TITLE_RE = /"(?:before|after) (?:each|all)" hook(?: for "[^"]*")?$/;
 
 /**
  * Assertion strings chained anywhere in the rest of the enclosing test

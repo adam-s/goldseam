@@ -435,8 +435,14 @@ export function rerunVerdictFor(
   // tests passed). Success for a hook heal = the suite ran past the
   // hook and nothing failed beyond the known pending breaks.
   if (HOOK_TITLE_RE.test(healedTitle)) {
-    if (tests.length === 0) {
-      return { pass: false, evidence: 'hook heal: no tests ran — the suite still aborts' };
+    // At least one test must actually PASS: an all-pending/skipped run
+    // means the suite never truly executed (red-team: vacuous pass). For
+    // after-hooks the gated tests run BEFORE the hook fires, so "no
+    // failures" is load-bearing — Cypress attributes a broken after-hook
+    // to a failed test, which the unexpected check below catches.
+    const passed = tests.filter((t) => t.state === 'passed').length;
+    if (passed === 0) {
+      return { pass: false, evidence: `hook heal: no test passed (${tests.length} ran) — the suite still aborts or skips` };
     }
     const failed = tests.filter((t) => t.state === 'failed').map(byTitle);
     const unexpected = failed.filter((t) => !knownBrokenTitles.includes(t));
@@ -448,7 +454,7 @@ export function rerunVerdictFor(
     }
     return {
       pass: true,
-      evidence: `hook failure healed: ${tests.length} test(s) ran past the hook${failed.length > 0 ? ` (${failed.length} known pending break(s))` : ''}`,
+      evidence: `hook failure healed: ${passed} test(s) passed past the hook${failed.length > 0 ? ` (${failed.length} known pending break(s))` : ''}`,
     };
   }
 

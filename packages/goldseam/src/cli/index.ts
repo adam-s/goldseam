@@ -4,11 +4,6 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 
-// VS Code terminals export ELECTRON_RUN_AS_NODE=1, which breaks the
-// Cypress binary the rerun rungs spawn ("Could not find Cypress test run
-// results"). This CLI already runs under plain node — the var can only
-// harm our children, so strip it (proving-campaign finding, TodoMVC).
-delete process.env.ELECTRON_RUN_AS_NODE;
 import { dirname, join } from 'path';
 import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../heal/engine';
 import { resolveRunner } from '../heal/runners';
@@ -98,6 +93,11 @@ function init(): number {
 }
 
 async function heal(): Promise<number> {
+  // VS Code terminals export ELECTRON_RUN_AS_NODE=1, which breaks the
+  // Cypress binary the rerun rungs spawn ("Could not find Cypress test
+  // run results") — strip it for the heal path only (report/eject spawn
+  // nothing; an exotic cmd: Electron runner is the documented tradeoff).
+  delete process.env.ELECTRON_RUN_AS_NODE;
   const projectRoot = process.cwd();
   const failuresDir = arg('--failures-dir') ?? join('.goldseam', 'failures');
   const options: HealOptions = {
