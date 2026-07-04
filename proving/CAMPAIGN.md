@@ -11,7 +11,7 @@ becomes a fix + pinned test + one conventional commit.
 | App | Culture | Status |
 | --- | --- | --- |
 | PrairieLearn | Bootstrap prod monorepo, data-testid | done 2026-07-03 (2 real bugs) |
-| TodoMVC (js-es6) | semantic classes, zero hooks | leg 1 done: real heal ✓, 2 bugs fixed |
+| TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
 | Juice Shop | Angular Material, id/class/aria soup | installing |
 | Shoelace docs | web components, shadow DOM | installing |
 | Cypress RWA | React, data-test everywhere | installing |
@@ -44,3 +44,9 @@ moments, never CI.
   feedback budget); weak-assertion window widens to the whole suite for
   hook heals (the flag misfired on strongly-asserted gated tests). All
   pinned; Sonnet healed the 2-edit hook drift through the full ladder.
+- 2026-07-04 TodoMVC leg 3: state-gated scenario (input hidden 3s,
+  `.new-todo:visible` timeout) → triage gave up honestly with ZERO model
+  calls ("state-gated, not selector drift") — the cypress#7306-class
+  proof. Authoring: 3 English steps → Sonnet translated to
+  visit/type/assert(have.length), green in one run, cache committed
+  (replays are free). TodoMVC leg complete.
