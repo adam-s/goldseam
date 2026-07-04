@@ -220,14 +220,22 @@ export function impliesCollection(source: string, from: number): boolean {
  * these proves "passes", not "points at the intended element". */
 const WEAK_ASSERTIONS = new Set(['exist', 'be.visible']);
 
+/** Mocha's hook naming in failure titles — a capture bearing it healed
+ * HOOK code, which gates every test in the suite. */
+export const HOOK_TITLE_RE = /"(?:before|after) (?:each|all)" hook/;
+
 /**
  * Assertion strings chained anywhere in the rest of the enclosing test
  * (up to the next it/describe) — the window the rerun rung re-verifies.
  * A downstream strong assertion (`have.text` on a counter) behaviorally
  * constrains the heal even when the healed chain itself only clicks.
+ * `wholeFile` widens the window to EOF — right for hook heals, where the
+ * behavioral constraint is every gated test (proving-campaign finding:
+ * the flag misfired on a beforeEach heal whose gated tests assert
+ * strongly).
  */
-export function assertionsAfter(source: string, from: number): string[] {
-  const boundary = source.slice(from).search(/\n\s*(?:it|describe)\s*[.(]/);
+export function assertionsAfter(source: string, from: number, wholeFile = false): string[] {
+  const boundary = wholeFile ? -1 : source.slice(from).search(/\n\s*(?:it|describe)\s*[.(]/);
   const window = source.slice(from, boundary === -1 ? source.length : from + boundary);
   const found: string[] = [];
   const re = /\.(?:should|and)\s*\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g;
@@ -243,14 +251,20 @@ export const isWeaklyAsserted = (assertions: string[]): boolean =>
  * Review flags for a verified heal (recorded on the heal artifact, shown
  * by the CLI and report). Flags never block — they route human attention.
  */
-export function reviewFlagsFor(specSource: string, edits: RepairEdit[]): string[] {
+export function reviewFlagsFor(
+  specSource: string,
+  edits: RepairEdit[],
+  options?: { hookHeal?: boolean },
+): string[] {
   let located = 0;
   let allWeak = true;
   for (const edit of edits) {
     const healed = healedSiteForEdit(specSource, edit);
     if (!healed) continue;
     located++;
-    if (!isWeaklyAsserted(assertionsAfter(healed.healedSource, healed.site.end))) allWeak = false;
+    if (!isWeaklyAsserted(assertionsAfter(healed.healedSource, healed.site.end, options?.hookHeal))) {
+      allWeak = false;
+    }
   }
   if (located > 0 && allWeak) {
     return [

@@ -173,6 +173,18 @@ describe('assertion strength', () => {
     expect(isWeaklyAsserted([])).toBe(true);
   });
 
+  it('hook heals count the whole suite as the assertion window (proving-campaign)', () => {
+    const spec = `describe('todos', () => {
+  beforeEach(() => { cy.get('#old-input').type('x{enter}'); });
+  it('a', () => { cy.get('#list li').should('have.length', 1); });
+});`;
+    const edit = { file: 'x', oldString: `cy.get('#old-input')`, newString: `cy.get('#new-input')` };
+    // per-test window (non-hook): sees no assertions before the next it( → weak
+    expect(reviewFlagsFor(spec, [edit])).toHaveLength(1);
+    // hook window: the gated test's have.length counts → not weak
+    expect(reviewFlagsFor(spec, [edit], { hookHeal: true })).toEqual([]);
+  });
+
   it('reviewFlagsFor flags an all-weak heal and stays silent otherwise', () => {
     const weak = `it('a', () => { cy.get('#old').click(); });`;
     const strong = `it('a', () => { cy.get('#old').click(); cy.get('#c').should('have.text', '1'); });`;

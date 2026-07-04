@@ -185,6 +185,31 @@ describe('infrastructure failures', () => {
   });
 });
 
+describe('retry economics', () => {
+  it('stops after an identical proposal fails identically twice (no third model call)', async () => {
+    const { STAGES } = await import('../src/heal/stages');
+    STAGES['always-reject'] = {
+      name: 'always-reject',
+      async run() {
+        return { stage: 'always-reject', verdict: 'fail', evidence: 'rejected: same reason', durationMs: 0 };
+      },
+    };
+    try {
+      const runner = stubRunner([GOOD_REPLY]); // same reply every attempt
+      const heal = await healArtifactFile(
+        artifactPath,
+        runner,
+        makeOptions({ stages: ['propose', 'always-reject'], maxAttempts: 5 }),
+      );
+      expect(heal.verdict).toBe('failed');
+      expect(heal.attempts).toHaveLength(2); // once + one retry proves it's stuck; never five
+      expect(runner.calls).toBe(2);
+    } finally {
+      delete STAGES['always-reject'];
+    }
+  });
+});
+
 describe('heal memory (cache tier)', () => {
   // The capture's failedSelector must be derivable for caching; the
   // beforeEach artifact lacks one, so write it explicitly here.

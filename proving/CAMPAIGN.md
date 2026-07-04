@@ -34,3 +34,13 @@ moments, never CI.
   CLI must strip ELECTRON_RUN_AS_NODE (VS Code terminals break the rerun
   rungs), and infra failures must abort instead of re-proposing (3×
   identical model calls burned). Both pinned.
+- 2026-07-04 TodoMVC leg 2 (hook drift): `.new-todo` drift broke beforeEach
+  → Cypress aborts the whole describe, ONE capture titled `todos "before
+  each" hook`. Exposed a correctness bug: rerunVerdictFor matched by test
+  title, so hook heals could NEVER verify ("did not run" while all 4 gated
+  tests passed). Fixed: hook-title verdicts judge the suite running past
+  the hook; grep skipped for hook titles; identical-proposal dedup stops
+  the retry burn (post-propose failures only — parse/validation keep the
+  feedback budget); weak-assertion window widens to the whole suite for
+  hook heals (the flag misfired on strongly-asserted gated tests). All
+  pinned; Sonnet healed the 2-edit hook drift through the full ladder.

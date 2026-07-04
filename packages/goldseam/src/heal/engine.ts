@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
 import { FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
-import { reviewFlagsFor } from './resolve';
+import { HOOK_TITLE_RE, reviewFlagsFor } from './resolve';
 import { STAGES } from './stages';
 import {
   HEAL_SCHEMA_VERSION,
@@ -14,6 +14,7 @@ import {
   HealAttempt,
   HealContext,
   HealOptions,
+  RepairReply,
   RepairRunner,
 } from './types';
 
@@ -75,6 +76,7 @@ export async function healArtifactFile(
   const attempts: HealAttempt[] = [];
   let outcome: HealArtifact['verdict'] = 'failed';
   let siblingHealed = false;
+  let lastFailureKey = '';
 
   // A multi-edit heal earlier in this run may have already fixed this
   // capture's break (shared selector across tests). Verify — never assume:
@@ -100,6 +102,7 @@ export async function healArtifactFile(
 
     let attemptFailed = false;
     let infraFailed = false;
+    let failureKey = '';
     for (const stage of stages) {
       const v = await stage.run(ctx);
       record.ladder.push(v);
@@ -115,6 +118,12 @@ export async function healArtifactFile(
         // calls (proving-campaign finding: 3× the same 0.97 edit against
         // a broken runner). Abort the heal instead.
         infraFailed = v.evidence.startsWith('cypress could not run');
+        // Dedup applies only when a PROPOSAL failed verification — propose-
+        // stage failures (parse/validation) are where feedback genuinely
+        // helps, so they keep the full retry budget. (Cast: TS narrows
+        // ctx.proposal from the loop-top reset, blind to stage.run.)
+        const edits = (ctx.proposal as RepairReply | undefined)?.edits;
+        failureKey = edits ? `${v.stage}::${JSON.stringify(edits)}` : '';
         break;
       }
     }
@@ -132,6 +141,11 @@ export async function healArtifactFile(
     }
     ctx.revert();
     if (infraFailed) break; // failed, honestly — the runner is broken, not the proposal
+    // Identical proposal failing at the same stage twice: feedback is not
+    // changing the model's mind — further attempts only burn calls
+    // (second proving-campaign sighting of the burn pattern).
+    if (failureKey && failureKey === lastFailureKey) break;
+    lastFailureKey = failureKey;
   }
   if (outcome !== 'healed') ctx.revert();
 
@@ -157,7 +171,10 @@ export async function healArtifactFile(
   // Verified ≠ correct: a heal whose surviving assertions are weak passed
   // the rerun without proving it points at the intended element. Flag it
   // for the human — flags route attention, they never block.
-  const reviewFlags = outcome === 'healed' && finalEdits ? reviewFlagsFor(originalSpec, finalEdits) : [];
+  const reviewFlags =
+    outcome === 'healed' && finalEdits
+      ? reviewFlagsFor(originalSpec, finalEdits, { hookHeal: HOOK_TITLE_RE.test(artifact.title) })
+      : [];
 
   const heal: HealArtifact = {
     schemaVersion: HEAL_SCHEMA_VERSION,

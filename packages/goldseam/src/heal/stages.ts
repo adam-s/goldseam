@@ -15,6 +15,7 @@ import {
   countSelectorMatches,
   countTextMatches,
   healedSiteForEdit,
+  HOOK_TITLE_RE,
   impliesCollection,
 } from './resolve';
 import { EditRejected, validateEdits } from './validate';
@@ -426,6 +427,31 @@ export function rerunVerdictFor(
 ): { pass: boolean; evidence: string } {
   const tests = result.runs?.flatMap((r) => r.tests ?? []) ?? [];
   const byTitle = (t: { title: string[] }) => t.title.join(' ');
+
+  // A hook-failure capture carries mocha's hook title ('suite "before
+  // each" hook'), which no TEST ever bears — the healed hook has no
+  // single test to find (proving-campaign finding, TodoMVC: a correct
+  // multi-edit heal was rejected as 'did not run' while all 4 gated
+  // tests passed). Success for a hook heal = the suite ran past the
+  // hook and nothing failed beyond the known pending breaks.
+  if (HOOK_TITLE_RE.test(healedTitle)) {
+    if (tests.length === 0) {
+      return { pass: false, evidence: 'hook heal: no tests ran — the suite still aborts' };
+    }
+    const failed = tests.filter((t) => t.state === 'failed').map(byTitle);
+    const unexpected = failed.filter((t) => !knownBrokenTitles.includes(t));
+    if (unexpected.length > 0) {
+      return {
+        pass: false,
+        evidence: `hook heal: suite ran but ${unexpected.length} test(s) still fail: ${unexpected.join('; ')}`,
+      };
+    }
+    return {
+      pass: true,
+      evidence: `hook failure healed: ${tests.length} test(s) ran past the hook${failed.length > 0 ? ` (${failed.length} known pending break(s))` : ''}`,
+    };
+  }
+
   const healed = tests.find((t) => byTitle(t) === healedTitle);
   if (!healed) {
     return { pass: false, evidence: `healed test "${healedTitle}" did not run (${tests.length} ran)` };
@@ -477,7 +503,10 @@ async function rerun(ctx: HealContext, stageName: string, grepTitle?: string): P
 
 export const rerunTestStage: HealStage = {
   name: 'rerun-test',
-  run: (ctx) => rerun(ctx, 'rerun-test', ctx.artifact.title),
+  // Hook titles match no test — grepping by them would filter the run to
+  // nothing; a hook heal reruns the whole spec.
+  run: (ctx) =>
+    rerun(ctx, 'rerun-test', HOOK_TITLE_RE.test(ctx.artifact.title) ? undefined : ctx.artifact.title),
 };
 
 export const rerunSpecStage: HealStage = {

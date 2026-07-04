@@ -50,4 +50,39 @@ describe('rerunVerdictFor', () => {
     expect(v.pass).toBe(false);
     expect(v.evidence).toContain('broke other test');
   });
+
+  describe('hook-failure captures (proving-campaign, TodoMVC)', () => {
+    const hookTitle = 'todos "before each" hook';
+    it('passes when the suite runs past the healed hook and stays green', () => {
+      const result = { runs: [{ tests: [
+        { title: ['todos', 'adds'], state: 'passed' },
+        { title: ['todos', 'clears'], state: 'passed' },
+      ] }] };
+      const v = rerunVerdictFor('rerun-test', result, hookTitle, []);
+      expect(v.pass).toBe(true);
+      expect(v.evidence).toMatch(/2 test\(s\) ran past the hook/);
+    });
+    it('fails when no tests ran (suite still aborts)', () => {
+      const v = rerunVerdictFor('rerun-test', { runs: [{ tests: [] }] }, hookTitle, []);
+      expect(v.pass).toBe(false);
+      expect(v.evidence).toMatch(/no tests ran/);
+    });
+    it('fails when a non-pending test still fails after the hook heal', () => {
+      const result = { runs: [{ tests: [
+        { title: ['todos', 'adds'], state: 'passed' },
+        { title: ['todos', 'clears'], state: 'failed' },
+      ] }] };
+      const v = rerunVerdictFor('rerun-test', result, hookTitle, []);
+      expect(v.pass).toBe(false);
+      expect(v.evidence).toMatch(/still fail/);
+    });
+    it('tolerates known pending breaks', () => {
+      const result = { runs: [{ tests: [
+        { title: ['todos', 'adds'], state: 'passed' },
+        { title: ['todos', 'clears'], state: 'failed' },
+      ] }] };
+      const v = rerunVerdictFor('rerun-test', result, hookTitle, ['todos clears']);
+      expect(v.pass).toBe(true);
+    });
+  });
 });

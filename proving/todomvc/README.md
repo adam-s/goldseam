@@ -27,7 +27,13 @@ never in this repo — specs here always match upstream.
 - Drift `clear-completed→purge-done`: captured (3.8KB DOM, failedSelector
   parsed), Sonnet healed to `.purge-done` (confidence 0.97) through
   triage → propose → resolve → oracle(skip) → rerun-test → rerun-spec.
-- **Two goldseam bugs found and fixed this leg:** the CLI inherited
+- Leg 2 (hook drift `.new-todo→.task-entry`): beforeEach failure aborts
+  the describe — one capture with mocha's hook title. Found that hook
+  heals could never pass the rerun verdict (title matching), that
+  identical rejected proposals burned the full retry budget, and that
+  the weak-assertion flag misjudged hook heals. All three fixed and
+  pinned; Sonnet then healed the two-edit hook drift in one attempt.
+- **Two goldseam bugs found and fixed leg 1:** the CLI inherited
   `ELECTRON_RUN_AS_NODE` from VS Code terminals and every rerun rung
   died ("Could not find Cypress test run results") — the CLI now strips
   it; and the engine burned three identical model calls retrying that
