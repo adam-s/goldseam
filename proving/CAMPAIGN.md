@@ -13,7 +13,7 @@ becomes a fix + pinned test + one conventional commit.
 | PrairieLearn | Bootstrap prod monorepo, data-testid | done 2026-07-03 (2 real bugs) |
 | TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
 | Juice Shop | Angular Material, id/class/aria soup | DONE: aria-label heal, honest give-up; 3 bugs fixed |
-| Shoelace docs | web components, shadow DOM | installing |
+| Shoelace docs | web components, shadow DOM | DONE: shadow heal to [part] API; 185-shadow-root capture |
 | Cypress RWA | React, data-test everywhere | installing |
 
 Boot notes:
@@ -58,3 +58,9 @@ moments, never CI.
   are model-visible — the first give-up proof was contaminated by its own
   scenario comment; reran hint-free and the model refused independently
   ("no plausible target element to remap").
+- 2026-07-04 Shoelace leg: source-level shadow drift (esbuild watch beats
+  chunk edits); capture carried 185 serialized shadow roots; Sonnet healed
+  .dialog__panel to [part="panel"] — the PUBLIC component API, better than
+  chasing the renamed internal. Cypress's own shadow limits documented
+  live (no cross-boundary combinators; #33046 visibility). healenium#81 +
+  cypress#8843 rows proved.
