@@ -1,8 +1,13 @@
 # goldseam build plan
 
 The road from this repo (docs + aria-snapshot) to a launched, best-in-class
-open-source plugin. Plan date: 2026-07-03. The design inputs live in
-[docs/plugins/](plugins/README.md); this file is the execution order.
+open-source plugin. Plan date: 2026-07-03. The living design references
+(usage catalog, competition, verification ladder, cy.prompt anatomy) are in
+[.agents/reference/](../.agents/reference/); this file is the execution
+order. The one-shot research that produced M1–M4 (extension points,
+plugin paradigms, packaging bar, the product blueprint, Cypress frame
+internals) was applied and retired 2026-07; its surviving rules live in
+AGENTS.md, the package README, and the code it shaped.
 
 **North star:** Phase-1 parity with cy.prompt's healing loop, for the suites
 people already have — capture → propose → verify → PR, self-hosted, every
@@ -12,8 +17,7 @@ heal a reviewed commit. Then the trust rungs nobody else ships.
 
 1. **Open-source ready from the first commit.** The repo is a public
    artifact: every file is part of the product's story. Conventions come
-   from the 0.3–1.3M-download predecessors catalogued in
-   [patterns.md](plugins/patterns.md) and [packaging.md](plugins/packaging.md)
+   from the 0.3–1.3M-download predecessors
    — two-line install, zero-config defaults, typed options, artifact files
    as the contract, wide peer ranges. We copy their citizenship and beat
    them on capability.
@@ -24,11 +28,11 @@ heal a reviewed commit. Then the trust rungs nobody else ships.
    substitution — every heal is a reviewed commit; give-up is a
    first-class, reported outcome.
 3. **Stages are config, verdicts are artifacts** (the
-   [verification-ladder](plugins/verification-ladder.md) rule). Parity
+   [verification-ladder](../.agents/reference/verification-ladder.md) rule). Parity
    ships with four rungs; later rungs are inserted stage implementations,
    never refactors.
 4. **The test surface is the usage catalog.** Demo-shop widgets and
-   benchmark axes map 1:1 to [cy-prompt-usage.md](plugins/cy-prompt-usage.md)
+   benchmark axes map 1:1 to [cy-prompt-usage.md](../.agents/reference/cy-prompt-usage.md)
    — we test against what people actually do with the incumbent.
 
 ## Milestones
@@ -46,7 +50,7 @@ heal a reviewed commit. Then the trust rungs nobody else ships.
 
 ### M1 — The capture plugin (`packages/goldseam`)
 
-- Subpath entries per [packaging.md](plugins/packaging.md): `./support`
+- Subpath entries: `./support`
   (`installGoldseam(options?)`), `./plugin` (`goldseam(on, config,
   options?)`), `./types` (artifact schema), `bin` CLI shell.
 - Port the proven capture pipeline: `Cypress.on('fail')` stash (no `cy.*`;
@@ -68,7 +72,7 @@ artifact, a green run writes nothing, and the capture-rule test passes.
 ### M2 — Fixture app with full scenario coverage
 
 - Demo shop grown to cover the usage-catalog clusters
-  ([cy-prompt-usage.md](plugins/cy-prompt-usage.md) mapping table):
+  ([cy-prompt-usage.md](../.agents/reference/cy-prompt-usage.md) mapping table):
   hover tooltip (incl. one portal-rendered), modal open/close (both
   `not.exist` temporal flavors), filterable product list (count/order/
   first-last), checkbox group + quantity stepper (multi/repeat actions),
@@ -150,7 +154,7 @@ tier breakdown — data nobody else has.
 
 ### M7 — Launch
 
-- Docs bar per [packaging.md](plugins/packaging.md): 60-second quickstart,
+- Docs bar: 60-second quickstart,
   the healed-PR GIF, options reference, compatibility statement,
   troubleshooting (captures not appearing → restart after config edit;
   the `ELECTRON_RUN_AS_NODE` trap).
@@ -165,7 +169,8 @@ real break; 0.1.0 is live.
 
 ## Post-v0.1 — already designed, inserted as stages
 
-Full designs in [verification-ladder.md](plugins/verification-ladder.md).
+Full designs in
+[verification-ladder.md](../.agents/reference/verification-ladder.md).
 The disambiguation catalog — every case where "not found" or "which
 element" forces a judgment, the correct verdict for each, and the shipped
 guards (`triage`, `resolve`, weak-assertion flag) — is healing's ship
@@ -178,9 +183,10 @@ gate: [disambiguation.md](../.agents/reference/disambiguation.md).
 - **Phase 3 — adversarial gate:** `adversary` (independent refute-first
   model call), `review` (rubric-scored diff review), `regression-pin`
   (every delivered heal ships a replayable regression artifact).
-- **Backlog** (see [blueprint](plugins/qa-relocator-blueprint.md)):
-  selector-flakiness telemetry, `--suggest-testids`, GitHub Action,
-  Playwright capture shim. (Heal memory shipped 2026-07.)
+- **Backlog**: selector-flakiness telemetry, `--suggest-testids`, GitHub
+  Action, Playwright capture shim, `cypress-on-fix` compatibility (bundle
+  or verify + README claim), artifact provenance fields (`cypressVersion`,
+  `capturedAt` — additive schema bump). (Heal memory shipped 2026-07.)
 - **AI-surface parity backlog** (mined from Cypress Cloud's 2026 AI
   feature set — cy.prompt shipped here already as `cy.goldseam`):
   - **Authored self-healing** (bridge `cy.goldseam` to recovery) —
@@ -198,7 +204,7 @@ gate: [disambiguation.md](../.agents/reference/disambiguation.md).
     captured today; counting them per selector feeds pre-emptive healing
     candidates (their "flake detection", file-based).
 
-## Testing strategy (held throughout, per packaging.md)
+## Testing strategy (held throughout)
 
 Unit tests for the Node side; jsdom for browser-side logic; the fixture
 project as the system test (green-path job + broken-selector job asserting

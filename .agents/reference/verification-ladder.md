@@ -8,7 +8,8 @@ rubiks-cube-mcp-2, goblins).
 ## The architectural rule that makes "later" cheap
 
 Every stage of the heal pipeline communicates **only through versioned
-artifact files** (the allure paradigm, see [patterns.md](patterns.md) §5).
+artifact files** (the allure paradigm: artifact files are the only
+inter-stage contract).
 A stage is anything that reads artifacts and writes artifacts. Therefore
 adding a verification or adversarial stage later is *inserting a stage
 implementation*, never *refactoring the pipeline*.

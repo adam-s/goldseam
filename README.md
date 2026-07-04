@@ -20,9 +20,10 @@ with Sonnet 5 via `claude -p`). Execution order lives in
   stash, redaction, aria snapshot, never-mask re-throw, retry-aware,
   transparent to user fail handlers) + `goldseam/plugin` (capture task →
   versioned artifacts in `.goldseam/failures/`) + `goldseam heal` (the
-  Phase-1 ladder: `propose → rerun-test → rerun-spec` behind a pluggable
+  Phase-1 ladder: `triage → propose → resolve → rerun-test → rerun-spec`
+  behind a pluggable
   RepairRunner, hard attempt cap, mechanical edit validation, first-class
-  give-up; `pr`/`report` land in M5). 37 unit tests + three system suites
+  give-up; `pr` lands in M5). 123 unit tests + three system suites
   (capture, hardening, heal E2E with a stub model).
 - `packages/aria-snapshot/` — Playwright's aria snapshot (pure-DOM tree
   walk + YAML renderer) as a standalone package. Apache-2.0, attribution
@@ -31,12 +32,10 @@ with Sonnet 5 via `claude -p`). Execution order lives in
   coverage in M2) and the dogfood suite: this repo wires its own plugin
   exactly as a target project would. `npm run test:system` proves the
   loop.
-- `docs/plugins/` — the Cypress plugin engineering knowledge base
-  (extension points, paradigms, packaging bar, cy.prompt anatomy + usage
-  catalog, product blueprint, verification ladder). Start with
-  `docs/plugins/README.md`.
-- `docs/cypress/` — Cypress platform internals learned while building the
-  capture pipeline.
+- `docs/plan.md` — the execution order; `.agents/reference/` — the living
+  design references (usage catalog, competition landscape, verification
+  ladder, disambiguation catalog) plus agent playbooks under
+  `.agents/skills/`.
 
 ## Architecture (one line)
 

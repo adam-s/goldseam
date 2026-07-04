@@ -20,7 +20,7 @@ this is the dynamic, empirical check.
 
 This skill is also the seed of goldseam's own Phase-2 `mutation-guard`
 ladder rung (re-break a healed target; the healed test must FAIL) — see
-[docs/plugins/verification-ladder.md](../../../docs/plugins/verification-ladder.md).
+[.agents/reference/verification-ladder.md](../../reference/verification-ladder.md).
 Lessons learned here feed that stage's design.
 
 ## When to invoke

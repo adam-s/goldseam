@@ -18,9 +18,9 @@ Self-healing for existing Cypress suites: a failure becomes a rich capture
 minimal selector fix, the suite verifies it through a stage ladder, and it
 arrives as a reviewed commit. Plugin (`goldseam/support` +
 `goldseam/plugin`) + CLI (`goldseam heal|pr|report`) in
-[packages/goldseam/](packages/goldseam/); design inputs in
-[docs/plugins/](docs/plugins/README.md); execution order in
-[docs/plan.md](docs/plan.md). **This repo is a public portfolio artifact —
+[packages/goldseam/](packages/goldseam/); living design references
+(usage catalog, competition, ladder) in [.agents/reference/](.agents/reference/);
+execution order in [docs/plan.md](docs/plan.md). **This repo is a public portfolio artifact —
 every file is held to the open-source bar.**
 
 ## The iteration process

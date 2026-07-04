@@ -100,7 +100,7 @@ plausible impostor quietly rewrites what the test proves.
 1. **It is not the wedge.** goldseam's reason to exist is healing the
    hand-written `cy.get` suites that make up the installed base — the ones
    cy.prompt cannot touch because it only heals its own prompt-authored
-   steps (see [plugins/competition.md](../../docs/plugins/competition.md)). Authoring
+   steps (see [competition.md](competition.md)). Authoring
    is parity, a box we can point to, not the pillar.
 2. **Doing it well is substantial.** The honest version is not "re-run the
    translator." It needs an intent anchor recorded on first pass (the aria
@@ -140,7 +140,7 @@ tool honest.
 
 Keep the two paths separate and each complete. Invest in the pillar:
 heal more selector styles, build the oracle rung
-([plugins/verification-ladder.md](../../docs/plugins/verification-ladder.md)), ship
+([verification-ladder.md](verification-ladder.md)), ship
 PR delivery, grow the benchmark. If the authoring path ever needs recovery
 before the full loop is built, the honest minimum is to re-resolve from
 the sentence and verify, never to string-hunt a replacement selector — but
