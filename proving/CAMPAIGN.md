@@ -92,3 +92,18 @@ moments, never CI.
   web components, which is open-issue territory for cy.prompt (#33042).
   Note: translation caches key on step text alone — a prompt/model change
   needs the cache file deleted to retranslate (by design; recorded).
+- 2026-07-04 live-site probes (throwaway, deleted): example.com,
+  Wikipedia, the-internet.herokuapp.com. Verified vague-but-unambiguous
+  steps translate grounded; positional language ("the second checkbox")
+  disambiguates; and a genuinely ambiguous step ("the checkbox", two
+  present) is REFUSED with a precise reason — repeatedly, and from cache
+  once refused. Product changes it forced: translation give-up (prompt +
+  parse + cached refusal), copy-from-DOM grounding rule (the model had
+  emitted legacy-Wikipedia #searchButton from priors), text-contains
+  asserts for unseen elements, and translationDom (head/script/style
+  stripped — a live Wikipedia head alone blew the 40k budget and forced
+  an honest refusal). Learning: fresh translations wobble run-to-run;
+  the committable cache pinning a reviewed-good translation is the
+  design working as intended. Hidden-state preconditions (Vector's
+  display:none search input) still need the toggle step spelled out —
+  honest failure, actionable message.

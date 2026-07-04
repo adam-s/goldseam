@@ -31,6 +31,10 @@ const REPLIES = {
       { action: 'assert', selector: '#cart-count', should: 'have.text', value: '{{qty}}' },
     ],
   },
+  // Ambiguous authoring step: the model must refuse, never guess.
+  'translate-giveup': {
+    giveUp: { reason: 'two checkboxes match "the checkbox" — say which one' },
+  },
   // Repeated selector: one edit per occurrence, each made unique by its
   // surrounding call chain.
   multi: {

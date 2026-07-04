@@ -84,6 +84,13 @@ export function registerAuthoringCommand(): void {
       // Key is a 32-bit hash — confirm the steps themselves before trusting
       // the entry (collision or hand-renamed file ⇒ retranslate).
       if (cached && JSON.stringify(cached.steps) === JSON.stringify(steps)) {
+        if (cached.giveUp) {
+          // A cached refusal replays as a deterministic failure: same
+          // steps, same answer, zero model calls.
+          throw new Error(
+            `goldseam: these steps were declined as ambiguous: ${cached.giveUp.reason} — edit the steps (new steps retranslate) or delete the cache entry`,
+          );
+        }
         execute(cached.commands, placeholders);
         return;
       }

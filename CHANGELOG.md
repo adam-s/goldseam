@@ -36,6 +36,14 @@ schema v1, prompt-cache schema v1).
   first-class give-up, heal memory cache tier, sibling-heal detection,
   test-level rerun verdicts. Heal schema v1. Runners: `claude`,
   `claude:<model>`, `cmd:<executable>`.
+- Authoring honesty (live-site proving): ambiguous or vague steps are
+  REFUSED, never guessed — the model replies `giveUp`, the refusal is
+  cached (deterministic replays, zero model calls), and the failure names
+  the ambiguity. Translation selectors must be copied from the provided
+  page HTML; expectations about not-yet-rendered elements become
+  text-contains asserts; the DOM budget is spent on body markup
+  (head/script/style stripped). Shadow-scoped interactions via the
+  `shadow` host field.
 - Authoring: `cy.goldseam(steps, { placeholders })` — constrained command
   vocabulary, committable translation cache (`.goldseam-prompts/`),
   placeholder values never sent to the model, `goldseam eject`.
