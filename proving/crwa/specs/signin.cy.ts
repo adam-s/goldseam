@@ -2,9 +2,10 @@
 describe('sign in', () => {
   it('validates the form before enabling submit', () => {
     cy.visit('/signin');
-    cy.get('[data-test="signin-submit"]').should('be.disabled');
     cy.get('[data-test="signin-username"]').type('nobody');
-    cy.get('[data-test="signin-password"]').type('s3cret-enough');
+    cy.get('[data-test="signin-password"]').type('abc'); // below the 4-char floor
+    cy.get('[data-test="signin-submit"]').should('be.disabled');
+    cy.get('[data-test="signin-password"]').type('definitely-long-enough');
     cy.get('[data-test="signin-submit"]').should('not.be.disabled');
   });
 

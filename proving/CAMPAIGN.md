@@ -14,7 +14,7 @@ becomes a fix + pinned test + one conventional commit.
 | TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
 | Juice Shop | Angular Material, id/class/aria soup | DONE: aria-label heal, honest give-up; 3 bugs fixed |
 | Shoelace docs | web components, shadow DOM | DONE: shadow heal to [part] API; 185-shadow-root capture |
-| Cypress RWA | React, data-test everywhere | booted (node 24 ok); baseline specs written; leg in progress |
+| Cypress RWA | React, data-test everywhere | DONE: 3-edit heal + sibling (0 calls) |
 
 Boot notes:
 - TodoMVC: `npx http-server /tmp/goldseam-proving/todomvc/examples/javascript-es6/dist -p 4180 -c-1`
@@ -74,3 +74,10 @@ moments, never CI.
   smoke — found a missing unit pin for apply-then-revert on day one) +
   the showcase job (break -> capture -> heal -> report in the job summary,
   artifacts uploaded).
+- 2026-07-04 CRWA leg: data-test drift broke 2 tests; Sonnet healed with
+  a 3-edit multi-site heal to button[type=submit]; the second capture
+  sibling-healed with zero model calls. Guidance: default selectorPriority
+  lacks data-test — adopters using it should configure it. CI gauntlet
+  verified fully green via gh (9/9 jobs incl. suite-bites + showcase).
+  Campaign totals: 4 new apps + PrairieLearn, 6 real Sonnet heals, 2
+  honest give-ups, 1 authored test, 10 goldseam bugs found+fixed+pinned.
