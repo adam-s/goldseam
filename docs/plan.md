@@ -179,6 +179,10 @@ Full designs in [verification-ladder.md](plugins/verification-ladder.md).
   Playwright capture shim. (Heal memory shipped 2026-07.)
 - **AI-surface parity backlog** (mined from Cypress Cloud's 2026 AI
   feature set — cy.prompt shipped here already as `cy.goldseam`):
+  - **Authored self-healing** (bridge `cy.goldseam` to recovery) —
+    deliberately deferred; the semantic reasoning and the reason not to
+    build it yet are in
+    [authored-self-healing.md](authored-self-healing.md).
   - **`goldseam mcp`** — a local MCP server exposing captures, heals,
     reports, and the benchmark to any assistant (their Cloud MCP reads
     run data server-side; ours reads artifact files — no cloud, same
