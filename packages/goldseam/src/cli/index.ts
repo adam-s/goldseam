@@ -303,37 +303,31 @@ async function eject(): Promise<number> {
   return 0;
 }
 
+/** Run an async command, exit with its code, and frame any rejection as
+ * `goldseam <name>: <message>` — one error contract for every command. */
+const runAsync = (name: string, fn: () => Promise<number>): void => {
+  fn().then(
+    (code) => process.exit(code),
+    (err) => {
+      console.error(`goldseam ${name}: ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+    },
+  );
+};
+
 const command = process.argv[2];
 switch (command) {
   case 'init':
     process.exit(init());
     break;
   case 'heal':
-    heal().then(
-      (code) => process.exit(code),
-      (err) => {
-        console.error(`goldseam heal: ${err instanceof Error ? err.message : err}`);
-        process.exit(1);
-      },
-    );
+    runAsync('heal', heal);
     break;
   case 'report':
-    report().then(
-      (code) => process.exit(code),
-      (err) => {
-        console.error(`goldseam report: ${err instanceof Error ? err.message : err}`);
-        process.exit(1);
-      },
-    );
+    runAsync('report', report);
     break;
   case 'eject':
-    eject().then(
-      (code) => process.exit(code),
-      (err) => {
-        console.error(`goldseam eject: ${err instanceof Error ? err.message : err}`);
-        process.exit(1);
-      },
-    );
+    runAsync('eject', eject);
     break;
   case 'pr':
     console.error(`goldseam ${command}: not implemented yet`);

@@ -1,10 +1,32 @@
-// The vendored aria walk (aria-snapshot) references browser globals —
-// `Node.*` constants, `Element.prototype`, `instanceof HTML*Element`. In
-// the browser and under vitest's jsdom environment they exist; in the
-// plain-Node CLI they don't. This shim installs one jsdom window's
-// constructors onto globalThis for the duration of a single call and
-// restores whatever was there before — the only place goldseam touches
-// globals, and only inside the oracle's offline evaluation.
+// Where goldseam touches DOM machinery outside the browser: parsing
+// captured HTML with jsdom, and shimming browser globals for the vendored
+// aria walk (aria-snapshot references `Node.*` constants,
+// `Element.prototype`, `instanceof HTML*Element` — present in the browser
+// and under vitest's jsdom environment, absent in the plain-Node CLI).
+// `withDomGlobals` installs one jsdom window's constructors onto globalThis
+// for the duration of a single call and restores whatever was there before.
+
+interface JsdomModule {
+  JSDOM: new (
+    html: string,
+    opts?: { virtualConsole?: unknown },
+  ) => { window: Record<string, unknown> & { document: Document } };
+  VirtualConsole: new () => unknown;
+}
+
+/** Parse captured HTML into a jsdom document + window. jsdom ships no
+ * types and is loaded lazily so propose-only paths never pay for it; the
+ * VirtualConsole swallows jsdom's CSS-parse and "not implemented" chatter —
+ * Angular Material's @layer stylesheets flooded the CLI output on Juice
+ * Shop (proving-campaign finding). */
+export function parseDom(html: string): {
+  document: Document;
+  window: Record<string, unknown> & { document: Document };
+} {
+  const jsdom = require('jsdom') as JsdomModule;
+  const { window } = new jsdom.JSDOM(html, { virtualConsole: new jsdom.VirtualConsole() });
+  return { document: window.document, window };
+}
 
 const DOM_GLOBAL_NAMES = [
   'Node',

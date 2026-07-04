@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../src/heal/engine';
-import { HealOptions, RepairRunner } from '../src/heal/types';
+import { HealOptions } from '../src/heal/types';
+import { stubRunner } from './helpers';
 
 const SPEC_REL = 'cypress/e2e/cart.cy.ts';
 const SPEC = `it('adds', () => {
@@ -33,19 +34,6 @@ function makeOptions(overrides: Partial<HealOptions> = {}): HealOptions {
     cacheFile: null,
     ...overrides,
   };
-}
-
-function stubRunner(replies: string[]): RepairRunner & { calls: number } {
-  const runner = {
-    id: 'cmd:stub',
-    calls: 0,
-    async repair(): Promise<string> {
-      const reply = replies[Math.min(runner.calls, replies.length - 1)];
-      runner.calls++;
-      return reply;
-    },
-  };
-  return runner;
 }
 
 beforeEach(() => {

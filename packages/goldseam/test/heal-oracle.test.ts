@@ -10,8 +10,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../src/heal/engine';
 import { withDomGlobals } from '../src/heal/dom-env';
 import { oracleStage } from '../src/heal/stages';
-import { HealContext, OracleEntry, RepairRunner } from '../src/heal/types';
+import { HealContext, OracleEntry } from '../src/heal/types';
 import { FailureArtifact } from '../src/shared/types';
+import { stubRunner } from './helpers';
 
 const SPEC_REL = 'cypress/e2e/cart.cy.ts';
 const DOM = `<html><body>
@@ -71,6 +72,7 @@ function makeCtx(
       oracleFile,
     },
     runner: { id: 'none', repair: async () => '' },
+    specSource: SPEC,
     proposal: {
       edits: [{ file: a.specPath, oldString: `cy.get('#add-to-basket')`, newString }],
       confidence: 0.9,
@@ -85,6 +87,7 @@ const IDENTITY: OracleEntry = { specPath: SPEC_REL, title: 'adds', role: 'button
 function makeCtxWithSpec(newString: string, oracleFile: string | null, a: FailureArtifact, spec: string): HealContext {
   const ctx = makeCtx(newString, oracleFile, a);
   writeFileSync(join(root, a.specPath), spec);
+  ctx.specSource = spec;
   return ctx;
 }
 
@@ -176,6 +179,7 @@ describe('oracle stage (plain-Node — the CLI path)', () => {
     const ctxFor = (text: string): HealContext => {
       const ctx = makeCtx(`unused`, file);
       writeFileSync(join(root, SPEC_REL), spec);
+      ctx.specSource = spec;
       ctx.proposal = {
         edits: [{ file: SPEC_REL, oldString: `cy.contains('Buy it now')`, newString: `cy.contains('${text}')` }],
         confidence: 0.9,
@@ -205,19 +209,6 @@ describe('engine with the oracle rung', () => {
       confidence: 0.9,
       reasoning: 'r',
     });
-
-  function stubRunner(replies: string[]): RepairRunner & { calls: number } {
-    const runner = {
-      id: 'cmd:stub',
-      calls: 0,
-      async repair(): Promise<string> {
-        const r = replies[Math.min(runner.calls, replies.length - 1)];
-        runner.calls++;
-        return r;
-      },
-    };
-    return runner;
-  }
 
   it('an impostor proposal fails at oracle and feeds back; the model recovers', async () => {
     const p = scaffold(artifact());

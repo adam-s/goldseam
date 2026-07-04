@@ -7,49 +7,28 @@
 //
 // The real-model path is the same CLI with --model claude (Sonnet).
 
-import { spawnSync, spawn } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import cypress from 'cypress';
-
-delete process.env.ELECTRON_RUN_AS_NODE;
+import { check, finish, healableSpec, runCli, startServer } from './lib/harness.mjs';
 
 const TMP_SPEC = 'cypress/system/tmp-healable.cy.ts';
-const CLI = 'packages/goldseam/dist/cli/index.js';
+const BROKEN = healableSpec('[data-testid="buy-now-5"]');
 
-let failures = 0;
-const check = (ok, label) => {
-  console.log(`${ok ? '  ✔' : '  ✖'} ${label}`);
-  if (!ok) failures++;
-};
-
-const server = spawn('npx', ['http-server', 'demo', '-p', '4173', '-c-1', '--silent'], {
-  stdio: 'ignore',
-});
+const server = await startServer('demo', 4173);
 
 try {
-  await new Promise((r) => setTimeout(r, 1500));
   rmSync('.goldseam', { recursive: true, force: true });
 
   console.log('\n— break: drifted selector fails and captures —');
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, BROKEN);
   const red = await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   check(red.totalFailed === 1, 'drifted spec fails');
   check(existsSync('.goldseam/failures') && readdirSync('.goldseam/failures').length === 1, 'capture written');
 
   console.log('\n— heal: full ladder with the stub model —');
-  const heal = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs fix'], {
-    encoding: 'utf8',
-  });
+  const heal = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs fix']);
   process.stdout.write(heal.stdout);
   check(heal.status === 0, 'heal CLI exits 0');
 
@@ -81,32 +60,20 @@ try {
   check(green.totalFailed === 0 && green.totalPassed === 1, 'healed spec is green');
 
   console.log('\n— report joins captures with heals —');
-  const reportMd = spawnSync('node', [CLI, 'report'], { encoding: 'utf8' });
+  const reportMd = runCli(['report']);
   check(reportMd.status === 0 && reportMd.stdout.includes('**1 healed**'), 'md report shows the heal');
   check(reportMd.stdout.includes('adds a mug to the cart'), 'md report maps to the test title');
-  const reportJson = spawnSync('node', [CLI, 'report', '--format', 'json'], { encoding: 'utf8' });
+  const reportJson = runCli(['report', '--format', 'json']);
   const parsed = JSON.parse(reportJson.stdout);
   check(parsed.totals.healed === 1 && parsed.rows[0].verdict === 'healed', 'json report is structured');
 
   console.log('\n— heal memory: the same break heals from cache, zero model calls —');
   rmSync('.goldseam/failures', { recursive: true, force: true });
   rmSync('.goldseam/heals', { recursive: true, force: true });
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, BROKEN);
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   // The give-up stub refuses every request — if this heals, the cache did it.
-  const cached = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs giveup'], {
-    encoding: 'utf8',
-  });
+  const cached = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs giveup']);
   check(cached.status === 0 && cached.stdout.includes('cache hit'), 'cache tier proposed with no model call');
   const cachedArtifact = JSON.parse(
     readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
@@ -119,22 +86,14 @@ try {
   rmSync('.goldseam/heals', { recursive: true, force: true });
   writeFileSync(
     TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('[data-testid="buy-now-5"]').should('not.be.disabled');
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
+    healableSpec('[data-testid="buy-now-5"]', {
+      extra: `cy.get('[data-testid="buy-now-5"]').should('not.be.disabled');`,
+    }),
   );
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   // The selector appears twice, so the cache tier (which requires a unique
   // occurrence) must miss, and the model must supply per-occurrence edits.
-  const multi = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs multi'], {
-    encoding: 'utf8',
-  });
+  const multi = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs multi']);
   check(multi.status === 0 && multi.stdout.includes('[healed]'), 'multi-edit heal succeeds');
   check(multi.stdout.includes('2 edit(s)'), 'two edits proposed and validated');
   const multiSpec = readFileSync(TMP_SPEC, 'utf8');
@@ -147,24 +106,10 @@ try {
 
   console.log('\n— ladder teeth: a hallucinated selector is rejected OFFLINE by resolve —');
   rmSync('.goldseam', { recursive: true, force: true });
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, BROKEN);
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   const beforeWrong = readFileSync(TMP_SPEC, 'utf8');
-  const wrong = spawnSync(
-    'node',
-    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs wrong', '--max-attempts', '2'],
-    { encoding: 'utf8' },
-  );
+  const wrong = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs wrong', '--max-attempts', '2']);
   check(wrong.status === 0 && wrong.stdout.includes('[failed]'), 'wrong edit ends in a failed verdict, exit 0');
   check(readFileSync(TMP_SPEC, 'utf8') === beforeWrong, 'spec untouched after the ladder rejected the edit');
   const wrongArtifact = JSON.parse(
@@ -180,24 +125,10 @@ try {
 
   console.log('\n— ladder teeth: an existing-but-wrong element (impostor) is rejected by rerun —');
   rmSync('.goldseam', { recursive: true, force: true });
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, BROKEN);
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   const beforeImpostor = readFileSync(TMP_SPEC, 'utf8');
-  const impostor = spawnSync(
-    'node',
-    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1'],
-    { encoding: 'utf8' },
-  );
+  const impostor = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1']);
   check(impostor.status === 0 && impostor.stdout.includes('[failed]'), 'impostor edit ends in a failed verdict');
   check(readFileSync(TMP_SPEC, 'utf8') === beforeImpostor, 'spec reverted after rerun rejected the impostor');
   const impostorArtifact = JSON.parse(
@@ -212,17 +143,7 @@ try {
 
   console.log('\n— oracle teeth: with a known-good identity, the impostor dies OFFLINE —');
   rmSync('.goldseam', { recursive: true, force: true });
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, BROKEN);
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   writeFileSync(
     '.goldseam/oracle.json',
@@ -235,11 +156,7 @@ try {
       },
     ]),
   );
-  const oracleImpostor = spawnSync(
-    'node',
-    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1'],
-    { encoding: 'utf8' },
-  );
+  const oracleImpostor = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1']);
   check(oracleImpostor.status === 0 && oracleImpostor.stdout.includes('[failed]'), 'impostor fails with oracle on file');
   const oracleImpostorArtifact = JSON.parse(
     readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
@@ -251,9 +168,7 @@ try {
     `oracle rejected the impostor offline, no rerun spent (${oracleImpostorRungs.join(' → ')})`,
   );
   // Same capture, honest proposal: the oracle should CONFIRM identity.
-  const oracleFix = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs fix'], {
-    encoding: 'utf8',
-  });
+  const oracleFix = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs fix']);
   check(oracleFix.status === 0 && oracleFix.stdout.includes('[healed]'), 'honest heal passes with oracle on file');
   check(
     oracleFix.stdout.includes('targets the known-good button "Add to cart"'),
@@ -275,11 +190,11 @@ try {
   console.log('\n— green-run manifest: harvest on green, oracle consumes it after real drift —');
   rmSync('.goldseam', { recursive: true, force: true });
   // A private app copy so the APP can drift while the spec stays put —
-  // the real-world direction (the E2E's other legs invert it).
-  const DRIFT_DIR = '/tmp/goldseam-e2e-demo';
-  rmSync(DRIFT_DIR, { recursive: true, force: true });
+  // the real-world direction (the E2E's other legs invert it). A fresh
+  // temp dir per run: concurrent runs must not clobber each other's copy.
+  const DRIFT_DIR = mkdtempSync(join(tmpdir(), 'goldseam-e2e-demo-'));
   cpSync('demo', DRIFT_DIR, { recursive: true });
-  const server2 = spawn('npx', ['http-server', DRIFT_DIR, '-p', '4179', '-c-1', '--silent'], { stdio: 'ignore' });
+  const server2 = await startServer(DRIFT_DIR, 4179);
   const ORACLE_CONFIG = 'cypress.tmp-oracle.config.ts';
   writeFileSync(
     ORACLE_CONFIG,
@@ -297,18 +212,7 @@ export default defineConfig({
 `,
   );
   try {
-    await new Promise((r) => setTimeout(r, 1200));
-    writeFileSync(
-      TMP_SPEC,
-      `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="add-to-cart-5"]', { timeout: 2000 }).click();
-    cy.get('#cart-count').should('have.text', '1');
-  });
-});
-`,
-    );
+    writeFileSync(TMP_SPEC, healableSpec('[data-testid="add-to-cart-5"]'));
     const green = await cypress.run({
       quiet: true,
       configFile: ORACLE_CONFIG,
@@ -326,44 +230,30 @@ export default defineConfig({
     const red2 = await cypress.run({ quiet: true, configFile: ORACLE_CONFIG });
     check(red2.totalFailed === 1, 'app drift breaks the unchanged spec');
 
-    const impostor2 = spawnSync(
-      'node',
-      [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-impostor', '--max-attempts', '1', '--config-file', ORACLE_CONFIG],
-      { encoding: 'utf8' },
-    );
+    const impostor2 = runCli([
+      'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-impostor',
+      '--max-attempts', '1', '--config-file', ORACLE_CONFIG,
+    ]);
     check(/oracle: fail/.test(impostor2.stdout) && /impostor guard/.test(impostor2.stdout), 'HARVESTED identity rejects an impostor offline');
 
-    const healed2 = spawnSync(
-      'node',
-      [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-fix', '--config-file', ORACLE_CONFIG],
-      { encoding: 'utf8' },
-    );
+    const healed2 = runCli([
+      'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-fix', '--config-file', ORACLE_CONFIG,
+    ]);
     if (!healed2.stdout.includes('[healed]')) process.stdout.write(healed2.stdout + healed2.stderr);
     check(healed2.status === 0 && healed2.stdout.includes('[healed]'), 'honest heal passes against the drifted app');
     check(/targets the known-good button "Add to cart/i.test(healed2.stdout), 'oracle verified identity from the HARVESTED manifest — no hand-written file');
   } finally {
-    server2.kill();
+    server2.stop();
     rmSync(DRIFT_DIR, { recursive: true, force: true });
     rmSync(ORACLE_CONFIG, { force: true });
   }
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });
-  writeFileSync(
-    TMP_SPEC,
-    `describe('healable', () => {
-  it('adds a mug to the cart', () => {
-    cy.visit('/');
-    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
-  });
-});
-`,
-  );
+  writeFileSync(TMP_SPEC, healableSpec('[data-testid="buy-now-5"]', { assert: false }));
   await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
   const before = readFileSync(TMP_SPEC, 'utf8');
-  const giveup = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs giveup'], {
-    encoding: 'utf8',
-  });
+  const giveup = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs giveup']);
   check(giveup.status === 0 && giveup.stdout.includes('[gave-up]'), 'give-up reported, exit 0');
   check(readFileSync(TMP_SPEC, 'utf8') === before, 'spec untouched on give-up');
   const giveupArtifact = JSON.parse(
@@ -371,13 +261,9 @@ export default defineConfig({
   );
   check(giveupArtifact.verdict === 'gave-up', 'give-up recorded as first-class verdict');
 } finally {
-  server.kill();
+  server.stop();
   rmSync(TMP_SPEC, { force: true });
   rmSync('.goldseam', { recursive: true, force: true });
 }
 
-if (failures > 0) {
-  console.error(`\nHEAL E2E FAILED (${failures} check(s))`);
-  process.exit(1);
-}
-console.log('\nHEAL E2E PASSED');
+finish('HEAL E2E');

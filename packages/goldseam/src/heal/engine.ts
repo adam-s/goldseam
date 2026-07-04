@@ -64,6 +64,7 @@ export async function healArtifactFile(
     artifactPath,
     options,
     runner,
+    specSource: originalSpec,
     apply() {
       const edits = ctx.proposal?.edits;
       if (!edits?.length || applied || options.dryRun) return;

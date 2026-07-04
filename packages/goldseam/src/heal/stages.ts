@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getAllByAria, queryAllDeep } from 'aria-snapshot';
 import { buildCacheEdit, loadCache, lookup } from './cache';
-import { withDomGlobals } from './dom-env';
+import { parseDom, withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
 import {
@@ -89,8 +89,9 @@ export const proposeStage: HealStage = {
       return verdict('propose', 'gave-up', `capture degraded: ${artifact.captureError}`, started);
     }
 
-    const specAbs = join(options.projectRoot, artifact.specPath);
-    const specSource = readFileSync(specAbs, 'utf8');
+    // The engine validated and read the spec once; propose/resolve/oracle
+    // all run before apply(), so ctx.specSource IS the on-disk content.
+    const specSource = ctx.specSource;
 
     // Cache tier: a previously verified heal for this exact broken
     // selector proposes with zero model calls. Tried once per heal; the
@@ -188,7 +189,7 @@ export const resolveStage: HealStage = {
       return verdict('resolve', 'pass', 'no proposed edits — nothing to resolve', started);
     }
     const truncNote = artifact.domTruncated ? ' (note: the capture DOM was truncated)' : '';
-    const specSource = readFileSync(join(options.projectRoot, artifact.specPath), 'utf8');
+    const specSource = ctx.specSource;
     const notes: string[] = [];
     for (const edit of edits) {
       const healed = healedSiteForEdit(specSource, edit);
@@ -292,20 +293,8 @@ export const oracleStage: HealStage = {
     }
     const identity = `${entry.role}${entry.name !== undefined ? ` "${entry.name}"` : ''}`;
 
-    // VirtualConsole swallows jsdom's "not implemented" chatter (pseudo-
-    // element getComputedStyle) — the walk tolerates the gap; the log spam
-    // would drown the verdict lines.
-    const jsdom = require('jsdom') as {
-      JSDOM: new (
-        html: string,
-        opts?: { virtualConsole?: unknown },
-      ) => { window: Record<string, unknown> & { document: Document } };
-      VirtualConsole: new () => unknown;
-    };
-    const { window } = new jsdom.JSDOM(artifact.domHtml, {
-      virtualConsole: new jsdom.VirtualConsole(),
-    });
-    const specSource = readFileSync(join(options.projectRoot, artifact.specPath), 'utf8');
+    const { window } = parseDom(artifact.domHtml);
+    const specSource = ctx.specSource;
 
     return withDomGlobals(window, () => {
       const docEl = window.document.documentElement;

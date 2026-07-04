@@ -8,17 +8,9 @@
 // 3. transparency: a user's own swallowing Cypress.on('fail') handler keeps
 //    its exact semantics (test stays green) with goldseam installed.
 
-import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import cypress from 'cypress';
-
-delete process.env.ELECTRON_RUN_AS_NODE;
-
-let failures = 0;
-const check = (ok, label) => {
-  console.log(`${ok ? '  ✔' : '  ✖'} ${label}`);
-  if (!ok) failures++;
-};
+import { check, finish, startServer } from './lib/harness.mjs';
 
 async function runScenario(name) {
   rmSync('.goldseam', { recursive: true, force: true });
@@ -32,17 +24,11 @@ async function runScenario(name) {
   return { passed: res.totalPassed, failed: res.totalFailed, artifacts };
 }
 
-const server = spawn('npx', ['http-server', 'demo', '-p', '4173', '-c-1', '--silent'], {
-  stdio: 'ignore',
-});
+const server = await startServer('demo', 4173);
 // Second origin (same host, different port) for the cy.origin scenario.
-const server2 = spawn('npx', ['http-server', 'demo', '-p', '4174', '-c-1', '--silent'], {
-  stdio: 'ignore',
-});
+const server2 = await startServer('demo', 4174);
 
 try {
-  await new Promise((r) => setTimeout(r, 1500));
-
   console.log('\n— retries —');
   const flaky = await runScenario('retry-flaky');
   check(flaky.passed === 1, 'flaky test passes on retry');
@@ -74,13 +60,9 @@ try {
   );
   check(originArtifact.domHtml === '', 'no misleading runner-UI DOM in the capture');
 } finally {
-  server.kill();
-  server2.kill();
+  server.stop();
+  server2.stop();
   rmSync('.goldseam', { recursive: true, force: true });
 }
 
-if (failures > 0) {
-  console.error(`\nHARDENING TEST FAILED (${failures} check(s))`);
-  process.exit(1);
-}
-console.log('\nHARDENING TEST PASSED');
+finish('HARDENING TEST');

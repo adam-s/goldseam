@@ -69,6 +69,7 @@ describe('oracle rung selector preference', () => {
       artifact, artifactPath: 'unused',
       options: { ...DEFAULT_HEAL_OPTIONS, projectRoot: root, healsDir: join(root, 'heals'), cacheFile: null, oracleFile: file },
       runner: { id: 'none', repair: async () => '' },
+      specSource: `it('adds', () => {\n  cy.get('#add-to-basket').click();\n});\n`,
       proposal: { edits: [{ file: artifact.specPath, oldString: `cy.get('#add-to-basket')`, newString }], confidence: 0.9 },
       apply() {}, revert() {},
     };

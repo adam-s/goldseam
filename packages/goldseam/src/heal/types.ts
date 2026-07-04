@@ -110,6 +110,10 @@ export interface HealContext {
   artifactPath: string;
   options: HealOptions;
   runner: RepairRunner;
+  /** The failing spec's source as the engine validated and read it. All
+   * offline rungs run before apply(), so this IS the on-disk content —
+   * one read, one path semantics, no per-stage re-reads. */
+  specSource: string;
   /** Set by the propose stage; consumed by verify stages. */
   proposal?: RepairReply;
   /** Where the current proposal came from (propose stage sets it). */

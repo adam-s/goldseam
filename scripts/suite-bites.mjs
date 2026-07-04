@@ -8,6 +8,7 @@
 
 import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { mutationGuard } from './lib/harness.mjs';
 
 const MUTATIONS = [
   {
@@ -28,7 +29,7 @@ const MUTATIONS = [
   {
     name: 'assertion guard dropped (heals-never-weaken invariant)',
     file: 'packages/goldseam/src/heal/validate.ts',
-    find: "  if (call && ASSERTION_CALLS.has(call)) {",
+    find: '  if (call && ASSERTION_CALLS.has(call)) {',
     replace: '  if (false) {',
   },
   {
@@ -39,6 +40,12 @@ const MUTATIONS = [
   },
 ];
 
+// Interrupt-safe: this script edits PRODUCTION source; a Ctrl-C mid-mutation
+// must restore it (dist stays stale — hence the note).
+const guard = mutationGuard({
+  interruptNote: 'dist/ may be stale — run `npm run build:packages`',
+});
+
 let failures = 0;
 for (const m of MUTATIONS) {
   const original = readFileSync(m.file, 'utf8');
@@ -47,9 +54,21 @@ for (const m of MUTATIONS) {
     failures++;
     continue;
   }
+  guard.save(m.file);
   writeFileSync(m.file, original.replace(m.find, m.replace));
   try {
-    execSync('npm run build:packages', { stdio: 'pipe' });
+    // A mutation that breaks the BUILD is caught too — that's the compiler
+    // biting, which counts. Only a clean build + green suite means SURVIVED.
+    let built = true;
+    try {
+      execSync('npm run build:packages', { stdio: 'pipe' });
+    } catch {
+      built = false;
+    }
+    if (!built) {
+      console.log(`✔ caught (build): ${m.name}`);
+      continue;
+    }
     const run = spawnSync('npm', ['run', 'test:unit'], { encoding: 'utf8' });
     if (run.status === 0) {
       console.error(`✖ SURVIVED: ${m.name} — the suite passed with broken code`);
@@ -58,7 +77,7 @@ for (const m of MUTATIONS) {
       console.log(`✔ caught: ${m.name}`);
     }
   } finally {
-    writeFileSync(m.file, original);
+    guard.restore();
   }
 }
 execSync('npm run build:packages', { stdio: 'pipe' }); // leave dist honest

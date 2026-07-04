@@ -9,7 +9,10 @@ export class EditRejected extends Error {}
 /** Words that indicate the change touched an assertion, not a selector. */
 const ASSERTION_CORE = /^(not\.)?(have|be|contain|exist|match|include|eq|equal|length|visible|enabled|disabled|checked|text|value|attr|class|css)\b/;
 
-function changedSpan(oldString: string, newString: string): { oldCore: string; newCore: string; prefix: string } {
+/** Trim the common prefix/suffix of an edit pair, leaving only the changed
+ * span. Shared with the cache tier (deriveReplacement) — the index
+ * arithmetic is subtle enough that two copies would drift. */
+export function changedSpan(oldString: string, newString: string): { oldCore: string; newCore: string; prefix: string } {
   let p = 0;
   while (p < oldString.length && p < newString.length && oldString[p] === newString[p]) p++;
   let s = 0;

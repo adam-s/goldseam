@@ -3,40 +3,16 @@
 // drives Cypress through the Module API — the same API the heal ladder's
 // rerun rungs will use.
 
-import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import cypress from 'cypress';
+import { check, finish, startServer } from './lib/harness.mjs';
 
-// VS Code terminals export this; it kills the Cypress Electron binary.
-delete process.env.ELECTRON_RUN_AS_NODE;
-
-const PORT = 4173;
 const FAILURES_DIR = join('.goldseam', 'failures');
 
-let failures = 0;
-const check = (ok, label) => {
-  console.log(`${ok ? '  ✔' : '  ✖'} ${label}`);
-  if (!ok) failures++;
-};
-
-async function waitForServer(url) {
-  for (let i = 0; i < 50; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error(`demo server never became ready at ${url}`);
-}
-
-const server = spawn('npx', ['http-server', 'demo', '-p', String(PORT), '-c-1', '--silent'], {
-  stdio: 'ignore',
-});
+const server = await startServer('demo', 4173);
 
 try {
-  await waitForServer(`http://localhost:${PORT}/`);
   rmSync('.goldseam', { recursive: true, force: true });
 
   console.log('\n— green run stays quiet —');
@@ -75,11 +51,8 @@ try {
     check(artifact.captureError === undefined, 'capture did not degrade');
   }
 } finally {
-  server.kill();
+  server.stop();
+  rmSync('.goldseam', { recursive: true, force: true });
 }
 
-if (failures > 0) {
-  console.error(`\nSYSTEM TEST FAILED (${failures} check(s))`);
-  process.exit(1);
-}
-console.log('\nSYSTEM TEST PASSED');
+finish('SYSTEM TEST');

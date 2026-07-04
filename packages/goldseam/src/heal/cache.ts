@@ -4,8 +4,9 @@
 // call. Unlike the incumbent's cache tier, a cache proposal still runs
 // the full verification ladder — cache skips cost, never scrutiny.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { dirname } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { writeJsonAtomic } from '../shared/fs';
+import { changedSpan } from './validate';
 import { RepairEdit } from './types';
 
 export interface CacheEntry {
@@ -29,10 +30,7 @@ export function loadCache(file: string): CacheEntry[] {
 export function saveEntry(file: string, entry: CacheEntry): void {
   const cache = loadCache(file).filter((e) => e.failedSelector !== entry.failedSelector);
   cache.push(entry);
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(cache, null, 2));
-  renameSync(tmp, file);
+  writeJsonAtomic(file, cache);
 }
 
 export const lookup = (cache: CacheEntry[], failedSelector: string): CacheEntry | undefined =>
@@ -44,17 +42,7 @@ export const lookup = (cache: CacheEntry[], failedSelector: string): CacheEntry 
  * the heal isn't cacheable (returns undefined).
  */
 export function deriveReplacement(edit: RepairEdit, failedSelector: string): string | undefined {
-  let p = 0;
-  const { oldString, newString } = edit;
-  while (p < oldString.length && p < newString.length && oldString[p] === newString[p]) p++;
-  let s = 0;
-  while (
-    s < oldString.length - p &&
-    s < newString.length - p &&
-    oldString[oldString.length - 1 - s] === newString[newString.length - 1 - s]
-  ) s++;
-  const oldCore = oldString.slice(p, oldString.length - s);
-  const newCore = newString.slice(p, newString.length - s);
+  const { oldCore, newCore } = changedSpan(edit.oldString, edit.newString);
   if (!oldCore || !failedSelector.includes(oldCore)) return undefined;
   return failedSelector.replace(oldCore, () => newCore);
 }

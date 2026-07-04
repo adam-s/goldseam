@@ -18,21 +18,9 @@
 // deferred to the rerun rungs, never a silent verdict either way.
 
 import { RepairEdit } from './types';
+import { parseDom as parseDomFull } from './dom-env';
 
-interface JsdomInstance {
-  window: { document: Document };
-}
-// jsdom ships no types; loaded lazily so propose-only paths never pay for
-// it. VirtualConsole swallows jsdom's CSS-parse chatter — Angular
-// Material's @layer stylesheets flooded the CLI output on Juice Shop
-// (proving-campaign finding).
-const parseDom = (html: string): Document => {
-  const jsdom = require('jsdom') as {
-    JSDOM: new (html: string, opts?: { virtualConsole?: unknown }) => JsdomInstance;
-    VirtualConsole: new () => unknown;
-  };
-  return new jsdom.JSDOM(html, { virtualConsole: new jsdom.VirtualConsole() }).window.document;
-};
+const parseDom = (html: string): Document => parseDomFull(html).document;
 
 export interface MatchCount {
   count: number;

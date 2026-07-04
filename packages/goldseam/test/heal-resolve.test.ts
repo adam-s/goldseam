@@ -19,8 +19,9 @@ import {
   stringSiteAt,
 } from '../src/heal/resolve';
 import { resolveStage, triageStage } from '../src/heal/stages';
-import { HealContext, HealOptions, RepairRunner } from '../src/heal/types';
+import { HealContext, HealOptions } from '../src/heal/types';
 import { FailureArtifact } from '../src/shared/types';
+import { stubRunner } from './helpers';
 
 const DOM = `<html><body>
   <header id="site-header"><span id="cart-count">0</span></header>
@@ -220,6 +221,7 @@ function makeCtx(spec: string, a: FailureArtifact, proposalEdits?: Array<{ oldSt
     artifactPath: 'unused',
     options: { ...DEFAULT_HEAL_OPTIONS, projectRoot: root, healsDir: join(root, 'heals'), cacheFile: null },
     runner: { id: 'none', repair: async () => '' },
+    specSource: spec,
     proposal: proposalEdits && {
       edits: proposalEdits.map((e) => ({ file: a.specPath, ...e })),
       confidence: 0.9,
@@ -393,19 +395,6 @@ describe('engine with the offline guard rungs', () => {
     const p = join(failuresDir, 'cart-abc123.json');
     writeFileSync(p, JSON.stringify(a));
     return p;
-  }
-
-  function stubRunner(replies: string[]): RepairRunner & { calls: number } {
-    const runner = {
-      id: 'cmd:stub',
-      calls: 0,
-      async repair(): Promise<string> {
-        const reply = replies[Math.min(runner.calls, replies.length - 1)];
-        runner.calls++;
-        return reply;
-      },
-    };
-    return runner;
   }
 
   const options = (): HealOptions => ({
