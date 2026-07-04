@@ -138,6 +138,10 @@ Report exactly:
 - CAUGHT if any step failed after the mutation
 - SURVIVED if all passed
 
+Include the reported test COUNTS for each step (the unit step must show
+both workspaces: aria-snapshot and goldseam). A verdict without counts
+is not trustworthy.
+
 For CAUGHT: name the failing test(s); one to three sentences — is the
 failure specific to the invariant, or incidental (build error)?
 For SURVIVED: state what the code now does incorrectly and what kind of
@@ -148,6 +152,20 @@ test would have caught it. No fix — diagnosis only.
 ~150–300 words. Lead with the one-word verdict. Before exiting,
 `git status` in the worktree must be clean. Verify and report.
 ```
+
+## Verdict hygiene (learned 2026-07-04)
+
+A SURVIVED verdict is only as good as proof that the relevant tests
+actually executed. One agent's copy silently skipped an entire
+workspace's unit suite and reported a false SURVIVED that the skipped
+tests demonstrably catch. Require in every verdict: the per-step test
+counts (unit must report BOTH workspaces — aria-snapshot AND goldseam),
+and re-verify any SURVIVED locally (apply the mutation in the main tree,
+run the narrowest relevant suite, revert) before treating it as a gap.
+Vacuous pins are the dual hazard: a test that early-returns on an
+environment limitation passes green while asserting nothing — mutation
+testing is exactly what exposes those; when found, replace the guard
+with a stub that forces the code path to execute.
 
 ## Reading the results
 

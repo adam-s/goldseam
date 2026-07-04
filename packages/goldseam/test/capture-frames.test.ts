@@ -60,12 +60,17 @@ describe('same-origin iframe capture', () => {
   });
 
   it('captures a same-origin iframe INSIDE a shadow root (red-team)', () => {
+    // jsdom never wires contentDocument for shadow-root frames, which made
+    // the first version of this pin VACUOUS (mutation testing caught it:
+    // an early-return guard fired every run, asserting nothing). Stub the
+    // getter with a real detached document so the inlining path executes.
     document.body.innerHTML = '<div id="host"></div>';
     const shadow = document.getElementById('host')!.attachShadow({ mode: 'open' });
     const frame = document.createElement('iframe');
     shadow.appendChild(frame);
-    if (!frame.contentDocument) return; // jsdom limitation guard — browser E2E covers it
-    frame.contentDocument.body.innerHTML = '<button class="pay-btn">Pay now</button>';
+    const frameDoc = document.implementation.createHTMLDocument('frame');
+    frameDoc.body.innerHTML = '<button class="pay-btn">Pay now</button>';
+    Object.defineProperty(frame, 'contentDocument', { value: frameDoc, configurable: true });
     const html = cloneWithShadow(document.documentElement).outerHTML;
     expect(html).toContain('shadowrootmode="open"');
     expect(html).toContain('data-frame-content');
