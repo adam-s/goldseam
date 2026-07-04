@@ -58,6 +58,20 @@ export function expandSerializedTemplates(root: Element): void {
   }
 }
 
+/** The aria identity of one element — the stable name the oracle rung
+ * verifies heals against. Null when the element has no computable role. */
+export function ariaIdentityOf(element: Element): { role: string; name: string } | null {
+  roleUtils.beginAriaCaches();
+  try {
+    const role = roleUtils.getAriaRole(element);
+    if (!role || role === 'presentation' || role === 'none') return null;
+    const name = normalizeWhiteSpace(roleUtils.getElementAccessibleName(element, false) || '');
+    return { role, name };
+  } finally {
+    roleUtils.endAriaCaches();
+  }
+}
+
 export interface DerivedTarget {
   /** 'css' → use with querySelector/cy.get; 'contains' → tag + text
    * (Cypress: cy.contains(selector, text)). */

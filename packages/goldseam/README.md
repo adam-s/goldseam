@@ -137,9 +137,13 @@ Three rungs judge offline, against the captured DOM, before any rerun:
   where the call chain expects one element (ambiguity) reject the
   proposal with feedback before an expensive rerun. Selectors static
   analysis can't evaluate are deferred to the rerun rungs, with evidence.
-- **`oracle`** (post-resolve): identity, not just existence. When
-  `.goldseam/oracle.json` (or `--oracle-file`) records the known-good aria
-  identity of the test's target —
+- **`oracle`** (post-resolve): identity, not just existence. Turn on
+  `recordOracles: true` (support options or Cypress env `goldseam`) and
+  every PASSING test records its selectors' aria identities into
+  `.goldseam/oracle.json` — the one sanctioned exception to "green runs
+  write nothing", and it writes only that manifest. When the app later
+  drifts, the heal for a broken selector must land on the identity that
+  selector had while green. Entries can also be hand-written —
   `[{ "specPath": "…", "title": "…", "role": "button", "name": "Add to cart" }]`
   — the healed selector must land on an element matching it. A look-alike
   that would pass every assertion is rejected offline (the impostor

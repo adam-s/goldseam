@@ -31,6 +31,29 @@ const REPLIES = {
       { action: 'assert', selector: '#cart-count', should: 'have.text', value: '{{qty}}' },
     ],
   },
+  // Oracle-manifest scenario (app drifted add-to-cart-5 → buy-btn-5).
+  'oracle-fix': {
+    edits: [
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `'[data-testid="add-to-cart-5"]'`,
+        newString: `'[data-testid="buy-btn-5"]'`,
+      },
+    ],
+    confidence: 0.94,
+    reasoning: 'The add-to-cart button now carries data-testid="buy-btn-5".',
+  },
+  'oracle-impostor': {
+    edits: [
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `'[data-testid="add-to-cart-5"]'`,
+        newString: `'#cart-count'`,
+      },
+    ],
+    confidence: 0.9,
+    reasoning: 'Existing element, wrong identity — the harvested oracle must catch it.',
+  },
   // Ambiguous authoring step: the model must refuse, never guess.
   'translate-giveup': {
     giveUp: { reason: 'two checkboxes match "the checkbox" — say which one' },

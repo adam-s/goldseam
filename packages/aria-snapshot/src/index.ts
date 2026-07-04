@@ -31,6 +31,7 @@ export {
   queryAllDeep,
   expandSerializedTemplates,
   deriveSelector,
+  ariaIdentityOf,
   type DerivedTarget,
 } from './targeting';
 

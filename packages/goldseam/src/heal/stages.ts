@@ -278,9 +278,15 @@ export const oracleStage: HealStage = {
         started,
       );
     }
-    const entry = entries.find(
+    // Prefer the identity harvested for the EXACT selector that broke;
+    // fall back to a hand-written test-level entry (no selector field).
+    // Other selectors' identities are not this break's oracle.
+    const forTest = entries.filter(
       (o) => o.specPath === artifact.specPath && o.title === artifact.title,
     );
+    const entry =
+      forTest.find((o) => o.selector !== undefined && o.selector === artifact.failedSelector) ??
+      forTest.find((o) => o.selector === undefined);
     if (!entry) {
       return verdict('oracle', 'pass', 'no known-good identity for this test — oracle skipped', started);
     }

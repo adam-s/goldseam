@@ -34,6 +34,9 @@ export interface RepairRunner {
 export interface OracleEntry {
   specPath: string;
   title: string;
+  /** The green-run selector this identity was harvested for; absent on
+   * hand-written test-level entries. */
+  selector?: string;
   role: string;
   /** Exact accessible name; omit to match by role alone. */
   name?: string;

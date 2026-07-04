@@ -31,3 +31,8 @@ export interface FailureArtifact extends FailureCapture {
 
 /** The browser→Node bridge; namespaced to stay composable with other plugins' tasks. */
 export const CAPTURE_TASK = 'goldseam:capture';
+
+/** Green-run oracle harvest (opt-in `recordOracles`): the ONE sanctioned
+ * exception to "green runs write nothing" — it writes only the
+ * known-good identity manifest, never captures. */
+export const ORACLE_TASK = 'goldseam:oracle:record';

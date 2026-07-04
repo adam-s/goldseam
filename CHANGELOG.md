@@ -21,6 +21,13 @@ schema v1, prompt-cache schema v1).
   `<template data-frame-content>` markup, redacted like everything else;
   the aria snapshot nests frame content under its `iframe` node.
   Cross-origin frames and closed shadow roots remain honest walls.
+- Green-run identity manifest (`recordOracles`, opt-in): passing tests
+  record each `cy.get` selector's aria identity (role + accessible name)
+  into `.goldseam/oracle.json` — the oracle rung then rejects any heal
+  that abandons the identity a selector had while green. The one
+  sanctioned exception to "green runs write nothing" (manifest only,
+  never captures). Support options also merge from Cypress env
+  `goldseam`.
 - Heal guards (the disambiguation catalog,
   `.agents/reference/disambiguation.md`): `triage` (a "missing" selector
   still matching the capture is timing, not drift — give up before any

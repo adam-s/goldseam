@@ -257,13 +257,11 @@ Tradeoffs, not oversights:
 - **`failedSelector` derives from the MASKED error message** — a selector
   containing a 7+ digit run gets masked before extraction, costing a
   cache key. Correctness unaffected (the model path still heals).
-- **Oracle identities are hand- or benchmark-supplied today.** The
-  oracle rung (shipped 2026-07) rejects impostors when
-  `.goldseam/oracle.json` has an identity for the test; the green-run
-  manifest that would record identities automatically is designed, not
-  built ([disambiguation.md](.agents/reference/disambiguation.md),
-  residual floor). Without an entry, an impostor satisfying every
-  surviving assertion still heals (weak-assertion flag is the fallback).
+- **The green-run manifest is opt-in** (`recordOracles`). Without it (or
+  a hand-written oracle.json), an impostor satisfying every surviving
+  assertion still heals — the weak-assertion flag is the fallback. The
+  harvest is the ONE sanctioned exception to "green runs write nothing":
+  it writes only `.goldseam/oracle.json`, never captures (E2E-pinned).
 - **Scoped calls (`.find()` etc.) get existence-only resolution** — a
   whole-document count over-approximates within-parent uniqueness, so
   ambiguity there is deferred to the rerun rungs.

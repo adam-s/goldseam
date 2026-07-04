@@ -7,8 +7,8 @@
 //
 // The real-model path is the same CLI with --model claude (Sonnet).
 
-import { spawnSync, spawn } from 'node:child_process';
-import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync, spawn, execSync } from 'node:child_process';
+import { copyFileSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import cypress from 'cypress';
 
 delete process.env.ELECTRON_RUN_AS_NODE;
@@ -271,6 +271,81 @@ try {
       ]),
     `oracle-pass ladder recorded in the artifact (${oracleFixRungs.join(' → ')})`,
   );
+
+  console.log('\n— green-run manifest: harvest on green, oracle consumes it after real drift —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  // A private app copy so the APP can drift while the spec stays put —
+  // the real-world direction (the E2E's other legs invert it).
+  const DRIFT_DIR = '/tmp/goldseam-e2e-demo';
+  rmSync(DRIFT_DIR, { recursive: true, force: true });
+  cpSync('demo', DRIFT_DIR, { recursive: true });
+  const server2 = spawn('npx', ['http-server', DRIFT_DIR, '-p', '4179', '-c-1', '--silent'], { stdio: 'ignore' });
+  const ORACLE_CONFIG = 'cypress.tmp-oracle.config.ts';
+  writeFileSync(
+    ORACLE_CONFIG,
+    `import { defineConfig } from 'cypress';
+import goldseam from 'goldseam/plugin';
+export default defineConfig({
+  e2e: {
+    baseUrl: 'http://127.0.0.1:4179',
+    supportFile: 'cypress/support/e2e.ts',
+    specPattern: '${TMP_SPEC}',
+    video: false,
+    setupNodeEvents(on, config) { return goldseam(on, config); },
+  },
+});
+`,
+  );
+  try {
+    await new Promise((r) => setTimeout(r, 1200));
+    writeFileSync(
+      TMP_SPEC,
+      `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="add-to-cart-5"]', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+    );
+    const green = await cypress.run({
+      quiet: true,
+      configFile: ORACLE_CONFIG,
+      env: { goldseam: { recordOracles: true } },
+    });
+    check(green.totalFailed === 0, 'green run stays green with recordOracles on');
+    const manifest = JSON.parse(readFileSync('.goldseam/oracle.json', 'utf8'));
+    const harvested = manifest.find((e) => e.selector === '[data-testid="add-to-cart-5"]');
+    check(!!harvested && harvested.role === 'button' && /add to cart/i.test(harvested.name ?? ''), 'manifest harvested the selector→identity map');
+    check(!existsSync('.goldseam/failures'), 'recordOracles wrote ONLY the manifest — no captures on green');
+
+    // The APP drifts; the spec (and thus failedSelector) stays put.
+    const shop = `${DRIFT_DIR}/js/shop.js`;
+    writeFileSync(shop, readFileSync(shop, 'utf8').replaceAll('add-to-cart', 'buy-btn'));
+    const red2 = await cypress.run({ quiet: true, configFile: ORACLE_CONFIG });
+    check(red2.totalFailed === 1, 'app drift breaks the unchanged spec');
+
+    const impostor2 = spawnSync(
+      'node',
+      [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-impostor', '--max-attempts', '1', '--config-file', ORACLE_CONFIG],
+      { encoding: 'utf8' },
+    );
+    check(/oracle: fail/.test(impostor2.stdout) && /impostor guard/.test(impostor2.stdout), 'HARVESTED identity rejects an impostor offline');
+
+    const healed2 = spawnSync(
+      'node',
+      [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs oracle-fix', '--config-file', ORACLE_CONFIG],
+      { encoding: 'utf8' },
+    );
+    if (!healed2.stdout.includes('[healed]')) process.stdout.write(healed2.stdout + healed2.stderr);
+    check(healed2.status === 0 && healed2.stdout.includes('[healed]'), 'honest heal passes against the drifted app');
+    check(/targets the known-good button "Add to cart/i.test(healed2.stdout), 'oracle verified identity from the HARVESTED manifest — no hand-written file');
+  } finally {
+    server2.kill();
+    rmSync(DRIFT_DIR, { recursive: true, force: true });
+    rmSync(ORACLE_CONFIG, { force: true });
+  }
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });

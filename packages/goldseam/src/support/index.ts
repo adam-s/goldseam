@@ -10,8 +10,8 @@
 // - The captured DOM is redacted by default; the model never needs field
 //   values to fix a selector.
 
-import { ariaSnapshot } from 'aria-snapshot';
-import { CAPTURE_TASK, FailureCapture } from '../shared/types';
+import { ariaIdentityOf, ariaSnapshot } from 'aria-snapshot';
+import { CAPTURE_TASK, FailureCapture, ORACLE_TASK } from '../shared/types';
 import { registerAuthoringCommand } from './authoring';
 import { maskText, redactedOuterHtml } from './redact';
 import { cloneWithShadow } from './shadow';
@@ -23,11 +23,20 @@ export interface GoldseamSupportOptions {
   maxDomBytes?: number;
   /** Strip form values and mask email/number-like text before capture. Default true. */
   redact?: boolean;
+  /** Record each passing test's selector→aria-identity map into
+   * .goldseam/oracle.json — the known-good manifest the oracle rung
+   * verifies heals against. Opt-in: the ONE exception to "green runs
+   * write nothing", and it writes only the manifest. Default false. */
+  recordOracles?: boolean;
 }
 
 let installed = false;
 
-export function installGoldseam(options: GoldseamSupportOptions = {}): void {
+export function installGoldseam(userOptions: GoldseamSupportOptions = {}): void {
+  // Config-file-only wiring: Cypress env `goldseam` merges under explicit
+  // options (also how the E2E toggles recordOracles per run).
+  const envOptions = (Cypress.env('goldseam') ?? {}) as GoldseamSupportOptions;
+  const options: GoldseamSupportOptions = { ...envOptions, ...userOptions };
   // Guard across module COPIES too (monorepo dupes/version skew): two
   // installed instances would each defer re-throwing to the other and
   // real failures would pass green (red-team finding).
@@ -43,10 +52,32 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
   const redact = options.redact ?? true;
 
   let stash: FailureCapture | null = null;
+  const recordOracles = options.recordOracles ?? false;
+  // selector → identity of the element it ACTUALLY yielded, per test.
+  const observed = new Map<string, { role: string; name: string }>();
 
   beforeEach(() => {
     stash = null;
+    observed.clear();
   });
+
+  if (recordOracles) {
+    Cypress.on('command:end', (cmd: unknown) => {
+      try {
+        const c = cmd as { attributes?: { name?: string; args?: unknown[] }; get?: (k: string) => unknown };
+        if (c.attributes?.name !== 'get') return;
+        const selector = c.attributes.args?.[0];
+        if (typeof selector !== 'string') return;
+        const subject = c.get?.('subject') as ArrayLike<Element> | undefined;
+        const el = subject?.[0];
+        if (!el || el.nodeType !== 1) return;
+        const identity = ariaIdentityOf(el);
+        if (identity) observed.set(selector, identity);
+      } catch {
+        // recording is best-effort; it must never disturb a run
+      }
+    });
+  }
 
   // Transparency rule (probed, 2026-07-03): with zero 'fail' listeners a
   // test fails normally, but once ANY listener exists, Cypress only fails
@@ -113,11 +144,23 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
   // a stale capture for the healer to "fix".
   afterEach(function () {
     const test = this.currentTest;
-    if (test?.state !== 'failed' || !stash) return;
-    const allowed = typeof test.retries === 'function' ? test.retries() : 0;
+    const allowed = typeof test?.retries === 'function' ? test.retries() : 0;
     const attempt =
       (Cypress as unknown as { currentRetry?: number }).currentRetry ?? 0;
-    if (attempt < Math.max(allowed, 0)) return; // non-final attempt: a retry is coming
+    const finalAttempt = attempt >= Math.max(allowed, 0);
+    if (recordOracles && test?.state === 'passed' && observed.size > 0) {
+      cy.task(
+        ORACLE_TASK,
+        {
+          specPath: Cypress.spec.relative,
+          title: test.fullTitle(),
+          entries: [...observed.entries()].map(([selector, id]) => ({ selector, ...id })),
+        },
+        { log: false },
+      );
+    }
+    if (test?.state !== 'failed' || !stash) return;
+    if (!finalAttempt) return; // non-final attempt: a retry is coming
     cy.task(CAPTURE_TASK, stash, { log: false });
   });
 }

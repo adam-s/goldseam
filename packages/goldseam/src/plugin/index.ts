@@ -5,6 +5,8 @@ import { join } from 'path';
 import { CAPTURE_TASK, FailureCapture } from '../shared/types';
 import { writeCaptureArtifact } from './artifacts';
 import { TranslatePayload, loadPromptCache, translateSteps } from './translate';
+import { OracleRecordPayload, recordOracleEntries } from './oracle';
+import { ORACLE_TASK } from '../shared/types';
 
 export interface GoldseamPluginOptions {
   /** Where failure artifacts land. Default `.goldseam/failures`. */
@@ -45,6 +47,8 @@ export function goldseam(
     'goldseam:prompt:load': ({ key }: { key: string }) => loadPromptCache(promptsDir, key),
     'goldseam:prompt:translate': (payload: TranslatePayload) =>
       translateSteps(payload, promptModel, promptsDir),
+    [ORACLE_TASK]: (payload: OracleRecordPayload) =>
+      recordOracleEntries(join(root, '.goldseam', 'oracle.json'), payload),
   });
 
   return config;

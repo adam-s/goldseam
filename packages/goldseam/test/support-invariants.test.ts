@@ -27,6 +27,7 @@ window.getComputedStyle = ((elt: Element, pseudo?: string | null) =>
 
 (globalThis as any).Cypress = {
   Commands: { add: () => {} }, // cy.goldseam registration — inert here
+  env: () => undefined, // options env-merge reads Cypress.env('goldseam')
   on: (event: string, fn: Handler) => {
     onCallCount++;
     (cypressListeners[event] ??= []).push(fn);

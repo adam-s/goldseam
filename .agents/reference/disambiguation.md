@@ -89,13 +89,11 @@ and the heal E2E.
 
 Honest limits, kept in view rather than papered over:
 
-- **The impostor is caught only when an identity is on file** (#3/#4):
-  the `oracle` rung (shipped 2026-07) rejects a healed selector that does
-  not land on the known-good aria identity — but identities come from
-  `.goldseam/oracle.json`, written by hand or by the benchmark. The open
-  half is provenance: a green-run manifest that records each selector's
-  aria identity while tests pass. Without an entry, the weak-assertion
-  flag and rerun assertions remain the only impostor defenses.
+- **The impostor guard needs the manifest turned on** (#3/#4): the
+  `oracle` rung rejects heals that abandon the known-good aria identity,
+  and `recordOracles` (shipped 2026-07-04) harvests those identities
+  automatically on green runs — but it is opt-in. Suites that never
+  enable it fall back to the weak-assertion flag and rerun assertions.
 - **Scoped selectors get existence-only checks** (#6): `.find()` counts
   against the whole document, so uniqueness within the parent scope is
   deferred to the rerun.
