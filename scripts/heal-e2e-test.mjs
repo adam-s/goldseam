@@ -259,6 +259,18 @@ try {
     oracleFix.stdout.includes('targets the known-good button "Add to cart"'),
     'oracle confirmed the identity, not just existence',
   );
+  const oracleFixArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  const oracleFixRungs = oracleFixArtifact.attempts.at(-1).ladder.map((r) => `${r.stage}:${r.verdict}`);
+  check(
+    JSON.stringify(oracleFixRungs) ===
+      JSON.stringify([
+        'triage:pass', 'propose:pass', 'resolve:pass', 'oracle:pass',
+        'rerun-test:pass', 'rerun-spec:pass',
+      ]),
+    `oracle-pass ladder recorded in the artifact (${oracleFixRungs.join(' → ')})`,
+  );
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });

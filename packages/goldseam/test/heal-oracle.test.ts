@@ -134,6 +134,8 @@ describe('oracle stage (plain-Node — the CLI path)', () => {
     const file = writeOracle([{ ...IDENTITY, name: 'Pay now' }]);
     const v = await oracleStage.run(makeCtx(`cy.get('#shadow-pay')`, file));
     expect(v.verdict).toBe('pass');
+    // evidence must prove the identity CHECK ran, not an oracle skip
+    expect(v.evidence).toMatch(/targets the known-good button "Pay now"/);
   });
 
   it('judges the element a positional chain ACTS on, not "any match" (red-team)', async () => {
@@ -255,6 +257,21 @@ describe('withDomGlobals', () => {
     expect(g.Element).toBe(before.Element);
     expect(g.Node).toBe(before.Node);
     expect('Element' in g).toBe(before.Element !== undefined);
+  });
+
+  it('restores a PRE-EXISTING global to its prior value, not just deletes', () => {
+    // plain-Node has no Element/Node, so without a sentinel only the
+    // delete branch of the restore loop ever runs (test-red-team LOW)
+    const g = globalThis as Record<string, unknown>;
+    g.Element = 'prior-value';
+    try {
+      withDomGlobals({ Element: 'shimmed' }, () => {
+        expect(g.Element).toBe('shimmed');
+      });
+      expect(g.Element).toBe('prior-value');
+    } finally {
+      delete g.Element;
+    }
   });
 
   it('restores on throw', () => {
