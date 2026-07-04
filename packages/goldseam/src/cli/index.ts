@@ -72,12 +72,24 @@ function init(): number {
     writeFileSync(configPath, config.source);
     console.log(`✔ ${configPath}: wired goldseam(on, config) into setupNodeEvents`);
   } else if (config.instructions) {
-    console.log(`∅ ${configPath}: couldn't find setupNodeEvents — add this yourself:\n\n${config.instructions}\n`);
+    console.log(`∅ ${configPath}: couldn't confidently wire goldseam(on, config) — add it yourself:\n\n${config.instructions}\n`);
   } else {
     console.log(`✔ ${configPath}: already wired`);
   }
 
-  const isTs = configPath.endsWith('.ts');
+  // A new support file is only created as .ts when the PROJECT has
+  // typescript: cypress.config.ts alone doesn't prove it (Cypress bundles
+  // its own TS for the config), and a scaffolded e2e.ts in a TS-less
+  // project fails the next run with "TypeScript is not installed".
+  const hasTypescript = (() => {
+    try {
+      require.resolve('typescript', { paths: [process.cwd()] });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const isTs = configPath.endsWith('.ts') && hasTypescript;
   const supportPath = [`cypress/support/e2e.${isTs ? 'ts' : 'js'}`, 'cypress/support/e2e.ts', 'cypress/support/e2e.js'].find(
     (p) => existsSync(p),
   );
@@ -90,6 +102,9 @@ function init(): number {
     mkdirSync(dirname(created), { recursive: true });
     writeFileSync(created, `${SUPPORT_SNIPPET}\n`);
     console.log(`✔ ${created}: created with the register import`);
+    if (configPath.endsWith('.ts') && !hasTypescript) {
+      console.log('  (created as .js — this project has no typescript installed)');
+    }
   }
 
   console.log('\nDone. Failures now write capture artifacts to .goldseam/failures/;');

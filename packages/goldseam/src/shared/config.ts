@@ -84,8 +84,8 @@ export function resolveHealModel(
 export function healModelSource(flag: string | undefined, env: NodeJS.ProcessEnv, config: GoldseamConfig): string {
   if (nonBlank(flag)) return '--model flag';
   if (nonBlank(env.GOLDSEAM_MODEL)) return 'GOLDSEAM_MODEL env';
-  if (nonBlank(config.healModel)) return 'goldseam.config.mjs (healModel)';
-  if (nonBlank(config.model)) return 'goldseam.config.mjs (model)';
+  if (nonBlank(config.healModel)) return 'healModel in goldseam.config.mjs';
+  if (nonBlank(config.model)) return 'model in goldseam.config.mjs';
   return 'built-in default';
 }
 

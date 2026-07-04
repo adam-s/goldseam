@@ -34,6 +34,9 @@
     "playwright",
     "yaml"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "author": "Adam Sohn",
   "bugs": {
     "url": "https://github.com/adam-s/goldseam/issues"

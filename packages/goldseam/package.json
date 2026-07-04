@@ -19,7 +19,8 @@
     "./types": {
       "types": "./dist/shared/types.d.ts",
       "default": "./dist/shared/types.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "goldseam": "./dist/cli/index.js"
@@ -30,6 +31,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p ../aria-snapshot/tsconfig.json && tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
@@ -38,6 +40,9 @@
   },
   "peerDependencies": {
     "cypress": ">=15"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "devDependencies": {
     "cypress": "^15.18.0",

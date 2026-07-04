@@ -87,27 +87,46 @@ export async function healArtifactFile(
   let siblingHealed = false;
   let lastFailureKey = '';
 
-  // A multi-edit heal earlier in this run may have already fixed this
-  // capture's break (shared selector across tests). Verify — never assume:
-  // the test must actually pass before we call it healed.
+  // The broken selector no longer appears in the spec: either a multi-edit
+  // heal earlier in this run already fixed it (shared selector across
+  // tests) — verify with a rerun, never assume — or the capture is STALE
+  // (spec healed in a previous run, capture left behind). Either way the
+  // model is never consulted: an edit anchored on an absent selector is
+  // provably unvalidatable, so attempts would only burn calls and end in
+  // a lying `failed` (fresh-consumer walkthrough: 3 wasted model calls and
+  // a good heal artifact overwritten with `failed`).
+  let staleCapture = false;
   if (
     !options.dryRun &&
     artifact.failedSelector &&
     !selectorOccursInCode(originalSpec, artifact.failedSelector)
   ) {
+    const record: HealAttempt = { attempt: 0, ladder: [], source: undefined };
+    attempts.push(record);
     try {
       const probe = await STAGES['rerun-test'].run(ctx); // no proposal ⇒ nothing applied
-      attempts.push({ attempt: 0, ladder: [probe], source: undefined });
+      record.ladder.push(probe);
       if (probe.verdict === 'pass') {
         outcome = 'healed';
         siblingHealed = true;
       }
     } catch {
-      // Probe unavailable (no cypress resolvable, etc.) — heal normally.
+      // Probe unavailable (no cypress resolvable, etc.) — fall through to
+      // the stale verdict below; the model still can't help here.
+    }
+    if (!siblingHealed) {
+      record.ladder.push({
+        stage: 'engine',
+        verdict: 'gave-up',
+        evidence: `stale capture: the broken selector (${artifact.failedSelector}) no longer appears in the spec — delete ${basename(artifactPath)} or rerun the suite to refresh captures`,
+        durationMs: 0,
+      });
+      outcome = 'gave-up';
+      staleCapture = true;
     }
   }
 
-  for (let attempt = 1; !siblingHealed && attempt <= options.maxAttempts; attempt++) {
+  for (let attempt = 1; !siblingHealed && !staleCapture && attempt <= options.maxAttempts; attempt++) {
     const record: HealAttempt = { attempt, ladder: [] };
     attempts.push(record);
     ctx.proposal = undefined;

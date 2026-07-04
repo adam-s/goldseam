@@ -12,6 +12,7 @@
 import {
   PromptCacheEntry,
   StepCommand,
+  isTextAssertion,
   promptKey,
   resolvePlaceholders,
 } from '../shared/prompt-types';
@@ -63,7 +64,14 @@ function execute(commands: StepCommand[], placeholders: Record<string, string>):
         if (cmd.value !== undefined) {
           subject.should(cmd.should, typeof cmd.value === 'string' ? fill(cmd.value) : cmd.value);
         } else if (cmd.selector && cmd.contains) {
-          subject.should(cmd.should, fill(cmd.contains));
+          // A text expectation must be ASSERTED. Text-consuming chainers
+          // take it as their argument; any other chainer (be.visible…)
+          // would silently ignore a second argument, so chain an explicit
+          // contain.text — otherwise "assert the status says ordered!"
+          // degrades to a visibility check (proven false green).
+          const text = fill(cmd.contains);
+          if (isTextAssertion(cmd.should)) subject.should(cmd.should, text);
+          else subject.should(cmd.should).and('contain.text', text);
         } else {
           subject.should(cmd.should);
         }

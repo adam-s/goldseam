@@ -97,8 +97,8 @@ or `cmd:<executable>` (prompt in on stdin, reply out).
 ## Author
 
 ```ts
+cy.visit('/shop');
 cy.goldseam([
-  'Go to the shop',
   'Add the Ember Mug to the cart',
   'The cart count should show 1',
 ]);
@@ -112,6 +112,8 @@ Full options, artifact schema, model runners, and guarantees:
 [packages/goldseam/README.md](packages/goldseam/README.md).
 
 ## Develop
+
+Node 22+.
 
 ```bash
 git clone https://github.com/adam-s/goldseam && cd goldseam

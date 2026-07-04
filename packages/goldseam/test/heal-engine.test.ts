@@ -200,6 +200,33 @@ describe('sibling-heal detection', () => {
       STAGES['rerun-test'] = realRerun;
     }
   });
+
+  it('a stale capture (selector gone, probe not green) gives up with zero model calls', async () => {
+    // The fresh-consumer walkthrough burned 3 real model calls reprocessing
+    // a capture whose break was already healed: edits anchored on an absent
+    // selector can never validate, so the model must not be consulted.
+    writeFileSync(join(root, SPEC_REL), `it('adds', () => {\n  cy.get('#add-to-cart').click();\n});\n`);
+    const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+    writeFileSync(artifactPath, JSON.stringify({ ...artifact, failedSelector: '#add-to-basket' }));
+    const { STAGES } = await import('../src/heal/stages');
+    const realRerun = STAGES['rerun-test'];
+    STAGES['rerun-test'] = {
+      name: 'rerun-test',
+      async run() {
+        return { stage: 'rerun-test', verdict: 'fail', evidence: 'suite red for another reason', durationMs: 0 };
+      },
+    };
+    try {
+      const runner = stubRunner([GOOD_REPLY]);
+      const heal = await healArtifactFile(artifactPath, runner, makeOptions());
+      expect(heal.verdict).toBe('gave-up');
+      expect(heal.attempts[0].ladder.at(-1)?.evidence).toMatch(/stale capture/);
+      expect(runner.calls).toBe(0);
+      expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('#add-to-cart'); // spec untouched
+    } finally {
+      STAGES['rerun-test'] = realRerun;
+    }
+  });
 });
 
 describe('apply/revert on rejection', () => {

@@ -18,6 +18,12 @@ describe('wireSupportSource', () => {
     const once = wireSupportSource('').source;
     expect(wireSupportSource(once).changed).toBe(false);
   });
+
+  it('still wires a file that merely MENTIONS goldseam (a cy.goldseam helper is not registration)', () => {
+    const r = wireSupportSource(`// helpers for cy.goldseam(...) steps\n`);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain(`goldseam/support/register`);
+  });
 });
 
 const TS_CONFIG = `import { defineConfig } from 'cypress';
@@ -54,10 +60,32 @@ describe('wireConfigSource', () => {
   it('handles async setupNodeEvents', () => {
     const r = wireConfigSource(`async setupNodeEvents(on, config) {\n  return config;\n}`);
     expect(r.changed).toBe(true);
+    expect(r.source).toContain('goldseam(on, config);');
   });
 
-  it('falls back to instructions when setupNodeEvents is absent', () => {
-    const r = wireConfigSource(`export default { e2e: { baseUrl: 'http://x' } };`);
+  it('does NOT endorse a broken mention as wired — prints instructions instead (fresh-clone walkthrough finding)', () => {
+    // Wrong import name, no real goldseam(...) call: init used to say
+    // "already wired" here, endorsing wiring that crashes at runtime.
+    const broken = `import { goldseamPlugin } from 'goldseam/plugin';\nexport default { e2e: { setupNodeEvents(on, config) {\n  return goldseamPlugin(on, config);\n} } };`;
+    const r = wireConfigSource(broken);
+    expect(r.changed).toBe(false);
+    expect(r.instructions).toContain('goldseam(on, config)');
+  });
+
+  it('inserts a whole setupNodeEvents block into the common bare `e2e: {}` shape', () => {
+    // The most common consumer config has no setupNodeEvents at all —
+    // init must wire it, not hand the user a snippet (walkthrough finding).
+    const r = wireConfigSource(`import { defineConfig } from 'cypress';\nexport default defineConfig({ e2e: { baseUrl: 'http://x' } });`);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain(`import goldseam from 'goldseam/plugin';`);
+    expect(r.source).toContain('setupNodeEvents(on, config) {');
+    expect(r.source).toContain('return goldseam(on, config);');
+    // and the result is idempotent
+    expect(wireConfigSource(r.source).changed).toBe(false);
+  });
+
+  it('falls back to instructions when there is no setupNodeEvents AND no e2e block', () => {
+    const r = wireConfigSource(`export default { component: { devServer: {} } };`);
     expect(r.changed).toBe(false);
     expect(r.instructions).toContain('goldseam(on, config)');
   });

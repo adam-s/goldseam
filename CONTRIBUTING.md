@@ -12,11 +12,14 @@ Standard Cypress-ecosystem monorepo shape:
 - `cypress/hardening/`, `cypress/system/` — probe and system-test specs,
   outside the default `specPattern`
 - `scripts/` — system-test drivers (Module API), benchmark, stub model
-- `bench/` — mutation benchmark definitions + latest results
-- `docs/` — build plan and the research knowledge base
-- `.agents/` — agent playbooks (see [AGENTS.md](AGENTS.md))
+- `bench/` — mutation benchmark + translation-eval baselines and results
+- `selfhost/` — recipes for running the model on your own hardware
+- `.agents/` — agent playbooks and design references (see
+  [AGENTS.md](AGENTS.md))
 
 ## Build + test
+
+Node 22+.
 
 ```bash
 npm install
@@ -28,8 +31,10 @@ npm run test:heal        # full heal loop with the stub model
 npm run test:prompt      # cy.goldseam authoring loop with the stub model
 ```
 
-All five suites run in CI with zero model calls. Real-model runs
-(`goldseam heal --model claude`, `scripts/benchmark.mjs`) are local-only.
+All five suites run in CI with zero model calls. (jsdom prints harmless
+`getComputedStyle` stack traces during `test:unit` — known noise, the
+tests still pass.) Real-model runs (`goldseam heal --model claude`,
+`scripts/benchmark.mjs`, `bench/translate-eval.mjs`) are local-only.
 
 ## Rules that are not style preferences
 

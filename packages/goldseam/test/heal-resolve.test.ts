@@ -413,7 +413,13 @@ describe('engine with the offline guard rungs', () => {
     });
 
   it('triage give-up costs zero model calls', async () => {
-    const p = scaffold(artifact({ failedSelector: '#add-to-cart', errorMessage: 'Expected to find element: `#add-to-cart`, but never found it.' }));
+    // The spec must actually USE the failed selector (a real capture always
+    // does — the test failed on it); otherwise the engine's stale-capture
+    // guard fires first.
+    const p = scaffold(
+      artifact({ failedSelector: '#add-to-cart', errorMessage: 'Expected to find element: `#add-to-cart`, but never found it.' }),
+      SPEC.replace('#add-to-basket', '#add-to-cart'),
+    );
     const runner = stubRunner([reply(`cy.get('#whatever')`)]);
     const heal = await healArtifactFile(p, runner, options());
     expect(heal.verdict).toBe('gave-up');

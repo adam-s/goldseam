@@ -107,6 +107,12 @@ npx goldseam report               # per-test summary of captures + heals (--form
 
 The app under test must be reachable (same requirement as `cypress run`).
 
+Captures outlive their heal: a successful heal edits your spec but leaves
+the capture in `.goldseam/failures/` (your next Cypress run refreshes or
+removes it). Re-running `heal` on a stale capture costs nothing — goldseam
+detects that the broken selector is gone from the spec and reports it
+without a model call.
+
 ### What it actually does
 
 Each capture runs a six-rung **ladder** — `triage → propose → resolve →
@@ -186,11 +192,11 @@ hand-write every selector.
 
 ### How you use it
 
-Write the steps as plain sentences:
+Visit the page first, then write the steps as plain sentences:
 
 ```ts
+cy.visit('/shop');
 cy.goldseam([
-  'Go to the shop',
   'Add the Ember Mug to the cart',
   'Type {{customer}} into the full name field',
   'The cart count should show 1',
@@ -203,8 +209,10 @@ cy.goldseam([
 - **Every run after that** replays that saved file — no model call, no
   cost, and you can read exactly what it will do in code review.
 
-Call `cy.goldseam(...)` **after the page under test has loaded**, or the
-first-run translation sees a blank page.
+The `cy.visit(...)` before the call matters: the first-run translation
+reads the **loaded page** to ground its selectors. Steps that describe
+elements on a page that hasn't been visited yet translate against a blank
+page and are refused.
 
 ### What it actually does
 
@@ -286,6 +294,7 @@ about ESM vs CommonJS. A copy-ready template with every field lives at
   "title": "checkout > pays with saved card",
   "specPath": "cypress/e2e/checkout.cy.ts",
   "errorMessage": "Timed out retrying: Expected to find element: `[data-cy=pay]`",
+  "failedSelector": "[data-cy=pay]", // parsed from the error when derivable
   "url": "https://…",            // "about:blank" ⇒ the visit never loaded (give-up signal)
   "domHtml": "…redacted outerHTML…",
   "ariaSnapshot": "…a11y YAML…", // Playwright format
@@ -356,6 +365,9 @@ Known walls (documented, not hidden):
 - **Cypress dies instantly in a VS Code terminal:** the integrated terminal
   exports `ELECTRON_RUN_AS_NODE=1`; prefix scripts with
   `env -u ELECTRON_RUN_AS_NODE`.
+- **`allowCypressEnv` deprecation warnings during heal:** Cypress 15 prints
+  this on every Module-API run the rerun rungs make — upstream and
+  cosmetic, not a goldseam error.
 
 > `goldseam pr` (heal delivered as a ready-made pull request) is planned.
 > The reasoning behind keeping heal and author separate lives in

@@ -164,9 +164,11 @@ of what else improves:
   user fail-handler transparency.
 - `npm run test:heal` — full heal loop with the deterministic `cmd:` stub
   ([scripts/stub-model.mjs](scripts/stub-model.mjs)). No model calls.
+- `npm run test:prompt` — the `cy.goldseam()` authoring loop with the stub:
+  translate → cache → replay → eject. No model calls.
 - `npm run demo` + `npm run cy:run` — the dogfood suite against
   the demo shop on port 4173.
-- `node bench/translate-eval.mjs` — 20 graded authoring cases (real
+- `node bench/translate-eval.mjs` — the graded authoring cases (real
   Sonnet calls, ~1/case); `bench/translate-tune.mjs` — the recursive
   rules tuner. Both local-only; baseline in bench/ must hold.
 - Real-model heal: `goldseam heal --model claude|ollama:<m>|openai:<m>`
@@ -175,8 +177,9 @@ of what else improves:
   at the repo root), read by both the CLI and the plugin. Self-host recipes
   in [selfhost/](selfhost/) (Ollama, Modal). Real-model calls never in CI.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): build → unit
-  → system → hardening → heal-with-stub. Remote:
-  `github.com/adam-s/goldseam`.
+  → system → hardening → heal-with-stub → prompt-with-stub, plus
+  package-hygiene, suite-bites (mutation smoke), and the showcase job.
+  Remote: `github.com/adam-s/goldseam`.
 
 Gotchas that will burn you:
 

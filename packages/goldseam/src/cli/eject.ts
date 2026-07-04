@@ -2,7 +2,7 @@
 // Unlike the incumbent, ejecting costs nothing: pasted code heals through
 // the normal capture → heal pipeline like any hand-written spec.
 
-import { StepCommand } from '../shared/prompt-types';
+import { StepCommand, isTextAssertion } from '../shared/prompt-types';
 
 const q = (s: string) =>
   `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
@@ -31,13 +31,18 @@ export function renderCommand(cmd: StepCommand): string {
       return `cy.viewport(${cmd.width}, ${cmd.height});`;
     case 'assert': {
       const subject = cmd.selector ? `cy.get(${q(cmd.selector)})` : `cy.contains(${q(cmd.contains as string)})`;
-      const extra =
-        cmd.value !== undefined
-          ? `, ${typeof cmd.value === 'string' ? q(cmd.value) : cmd.value}`
-          : cmd.selector && cmd.contains
-            ? `, ${q(cmd.contains)}`
-            : '';
-      return `${subject}.should(${q(cmd.should)}${extra});`;
+      if (cmd.value !== undefined) {
+        return `${subject}.should(${q(cmd.should)}, ${typeof cmd.value === 'string' ? q(cmd.value) : cmd.value});`;
+      }
+      if (cmd.selector && cmd.contains) {
+        // Mirror the executor: a text expectation paired with a non-text
+        // chainer must become a real contain.text assertion, not an inert
+        // second argument Chai ignores.
+        return isTextAssertion(cmd.should)
+          ? `${subject}.should(${q(cmd.should)}, ${q(cmd.contains)});`
+          : `${subject}.should(${q(cmd.should)}).and('contain.text', ${q(cmd.contains)});`;
+      }
+      return `${subject}.should(${q(cmd.should)});`;
     }
     case 'wait':
       return `cy.wait(${cmd.ms});`;

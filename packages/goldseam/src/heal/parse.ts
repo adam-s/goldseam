@@ -14,7 +14,10 @@ export function parseJsonBlock(raw: string): unknown {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new ReplyParseError(`reply is not valid JSON: ${text.slice(0, 200)}`);
+    // The ellipsis matters: a truncated prefix of well-formed JSON looks
+    // valid and sends the reader hunting the wrong bug — the real problem
+    // is usually further into the reply (walkthrough finding).
+    throw new ReplyParseError(`reply is not valid JSON: ${text.slice(0, 200)}${text.length > 200 ? '…' : ''}`);
   }
   if (typeof parsed !== 'object' || parsed === null) {
     throw new ReplyParseError('reply is not a JSON object');

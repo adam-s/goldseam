@@ -64,6 +64,24 @@ describe('renderEntry (eject)', () => {
     expect(code).toContain(`cy.get('#cart-count').should('have.text', '1');`);
   });
 
+  it('a text expectation paired with a non-text chainer becomes a REAL assertion (false-green fix)', () => {
+    // should('be.visible', 'ordered!') silently ignores the second arg in
+    // Chai — the fresh-consumer walkthrough proved an app showing the
+    // WRONG text stayed green. Both the executor and eject must chain an
+    // explicit contain.text instead.
+    const code = renderEntry(
+      ['The status should say ordered!'],
+      [{ action: 'assert', selector: '#status', contains: 'ordered!', should: 'be.visible' }],
+    );
+    expect(code).toContain(`cy.get('#status').should('be.visible').and('contain.text', 'ordered!');`);
+    // Text-consuming chainers keep the argument form.
+    const textCode = renderEntry(
+      ['The status should say ordered!'],
+      [{ action: 'assert', selector: '#status', contains: 'ordered!', should: 'contain.text' }],
+    );
+    expect(textCode).toContain(`cy.get('#status').should('contain.text', 'ordered!');`);
+  });
+
   it('accepts shadow-scoped interactions and rejects empty hosts (Shoelace proving)', () => {
     expect(
       validateCommands([
