@@ -21,6 +21,13 @@ schema v1, prompt-cache schema v1).
   `<template data-frame-content>` markup, redacted like everything else;
   the aria snapshot nests frame content under its `iframe` node.
   Cross-origin frames and closed shadow roots remain honest walls.
+- Runner matrix: `ollama:<model>` (local HTTP, zero egress,
+  JSON-constrained decoding) and `openai:<model>` (any OpenAI-compatible
+  endpoint via OPENAI_BASE_URL/OPENAI_API_KEY — Modal/vLLM serve, LM
+  Studio, OpenAI). Parse leniency for smaller models, strictness kept:
+  stringified confidence coerced, metadata nested inside edits hoisted;
+  repair prompt teaches the unquoted CSS attribute form. Proved: local
+  Qwen 2.5 14B healed an id drift through the full six-rung ladder.
 - Green-run identity manifest (`recordOracles`, opt-in): passing tests
   record each `cy.get` selector's aria identity (role + accessible name)
   into `.goldseam/oracle.json` — the oracle rung then rejects any heal

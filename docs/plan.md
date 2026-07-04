@@ -126,11 +126,11 @@ break produces a clean, reported give-up.
 - `goldseam pr`: branch, commit, PR with the ladder, reasoning, tier, and
   the exact failure it fixes rendered in the body.
 - `goldseam report`: md/json summary of captures + heals + give-ups.
-- Runner matrix behind the same interface: `openai:`/`anthropic:` via
-  Vercel AI SDK `generateObject` + schema; `ollama:` local HTTP (the
-  air-gapped story — [#33927](https://github.com/cypress-io/cypress/issues/33927)
-  and [#32673](https://github.com/cypress-io/cypress/issues/32673) are the
-  demand evidence); `cmd:` stdio escape hatch.
+- Runner matrix **shipped 2026-07-04**: `ollama:<model>` (local HTTP,
+  JSON-constrained decoding; proved by qwen2.5:14b healing an id drift
+  through the full ladder with zero egress) and `openai:<model>` (any
+  OpenAI-compatible base URL — covers Modal/vLLM `serve`); `cmd:` stdio
+  escape hatch since M3.
 
 **Done when:** the 90-second demo works (break selector → red run →
 `goldseam heal` → PR appears), and `ollama:` heals at least one mutation

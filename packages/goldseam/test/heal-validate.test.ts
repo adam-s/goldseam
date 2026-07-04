@@ -191,3 +191,29 @@ describe('validateEdits', () => {
     ).toThrow(EditRejected);
   });
 });
+
+describe('lenient confidence parsing (ollama proving)', () => {
+  it('hoists confidence/reasoning nested inside edits (qwen placement)', () => {
+    const reply = parseRepairReply(
+      JSON.stringify({
+        edits: [{ file: 'a', oldString: 'x', newString: 'y', confidence: 0.85, reasoning: 'nested' }],
+      }),
+    );
+    expect(reply.confidence).toBe(0.85);
+    expect(reply.reasoning).toBe('nested');
+  });
+
+  it('coerces an unambiguous stringified number', () => {
+    const reply = parseRepairReply(
+      JSON.stringify({ edits: [{ file: 'a', oldString: 'x', newString: 'y' }], confidence: '0.9' }),
+    );
+    expect(reply.confidence).toBe(0.9);
+  });
+  it('still rejects non-numeric confidence', () => {
+    expect(() =>
+      parseRepairReply(
+        JSON.stringify({ edits: [{ file: 'a', oldString: 'x', newString: 'y' }], confidence: 'high' }),
+      ),
+    ).toThrow(/confidence/);
+  });
+});

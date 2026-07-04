@@ -1,7 +1,6 @@
 // Model runners. Anything that maps a rendered prompt to raw reply text is
 // a runner; the engine never knows which model (or whether a model at all)
-// produced the reply. `openai:`/`anthropic:`/`ollama:` HTTP runners land in
-// M5 behind this same interface.
+// produced the reply.
 
 import { spawn } from 'child_process';
 import { RepairRunner } from './types';
@@ -54,9 +53,85 @@ function cmdRunner(commandLine: string): RepairRunner {
   };
 }
 
+/** POST JSON, return parsed body. Local-model prompts are big and slow —
+ * generous default timeout, overridable via GOLDSEAM_HTTP_TIMEOUT_MS. */
+async function postJson(url: string, body: unknown, headers: Record<string, string>): Promise<unknown> {
+  const timeoutMs = Number(process.env.GOLDSEAM_HTTP_TIMEOUT_MS ?? 300_000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new RunnerError(`${url} → HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e instanceof RunnerError) throw e;
+    throw new RunnerError(`${url}: ${e instanceof Error ? e.message : e}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** `ollama:<model>` — local HTTP, zero egress: the air-gapped story
+ * (cypress#33927 / #32673). Host via OLLAMA_HOST (default localhost). */
+function ollamaRunner(model: string): RepairRunner {
+  const host = process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434';
+  return {
+    id: `ollama:${model}`,
+    async repair(prompt: string): Promise<string> {
+      const reply = (await postJson(
+        `${host}/api/generate`,
+        // format:'json' = ollama's constrained decoding — local models
+        // reliably pick the right edit but flub JSON escaping without it
+        // (probed: qwen2.5-14b escaped oldString's quotes, not newString's,
+        // three attempts straight).
+        { model, prompt, stream: false, format: 'json', options: { temperature: 0 } },
+        {},
+      )) as { response?: string };
+      if (typeof reply.response !== 'string') {
+        throw new RunnerError('ollama reply carried no response text');
+      }
+      return reply.response;
+    },
+  };
+}
+
+/** `openai:<model>` — any OpenAI-compatible chat endpoint (OpenAI proper,
+ * a Modal/vLLM `serve` deployment, LM Studio, …). Base URL via
+ * OPENAI_BASE_URL (default api.openai.com), key via OPENAI_API_KEY. */
+function openaiRunner(model: string): RepairRunner {
+  const base = (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
+  const key = process.env.OPENAI_API_KEY;
+  return {
+    id: `openai:${model}`,
+    async repair(prompt: string): Promise<string> {
+      const reply = (await postJson(
+        `${base}/chat/completions`,
+        { model, messages: [{ role: 'user', content: prompt }], temperature: 0 },
+        key ? { authorization: `Bearer ${key}` } : {},
+      )) as { choices?: Array<{ message?: { content?: string } }> };
+      const content = reply.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') {
+        throw new RunnerError('openai-compatible reply carried no message content');
+      }
+      return content;
+    },
+  };
+}
+
 export function resolveRunner(spec: string): RepairRunner {
   if (spec === 'claude') return claudeRunner('sonnet'); // dev/benchmark default: Sonnet 5
   if (spec.startsWith('claude:')) return claudeRunner(spec.slice('claude:'.length));
   if (spec.startsWith('cmd:')) return cmdRunner(spec.slice('cmd:'.length));
-  throw new RunnerError(`unknown model runner "${spec}" (expected claude, claude:<model>, or cmd:<executable>)`);
+  if (spec.startsWith('ollama:')) return ollamaRunner(spec.slice('ollama:'.length));
+  if (spec.startsWith('openai:')) return openaiRunner(spec.slice('openai:'.length));
+  throw new RunnerError(
+    `unknown model runner "${spec}" (expected claude, claude:<model>, ollama:<model>, openai:<model>, or cmd:<executable>)`,
+  );
 }

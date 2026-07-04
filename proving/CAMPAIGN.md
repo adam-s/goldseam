@@ -135,3 +135,16 @@ moments, never CI.
   baseline refrozen. Haiku column: 23/23, must-refuse 4/4 — the hardened
   prompt holds a full model tier down. Green-run manifest (leg A) closed
   the oracle provenance floor the same day.
+- 2026-07-04 runner matrix (Adam: "we have a qwen model, also use
+  ollama"): ollama:/openai: runners shipped with HTTP-shape unit pins
+  (the openai runner covers a Modal/vLLM serve endpoint whenever one is
+  deployed — the detect-study modal_qwen.py is batch-mode today). The
+  air-gapped proof took SIX probe iterations, each finding something
+  real: qwen found the right heal but flubbed JSON escaping (→ ollama
+  format:json constrained decoding); then truncated newString at inner
+  quotes (→ prompt teaches unquoted [attr=value] form); then nested
+  confidence/reasoning inside edits (→ lenient hoist, strict validation
+  kept). Final: qwen2.5:14b healed #cart-count→[data-testid=nav-cart]
+  span through the full ladder, one attempt, zero egress. Recorded
+  limitation: long attribute-quoted selectors can still defeat 14B-class
+  JSON escaping — the validator rejects the mangled edit honestly.

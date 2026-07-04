@@ -41,6 +41,25 @@ export function parseRepairReply(raw: string): RepairReply {
       }
     }
   }
+  // Lenient input, strict meaning: smaller models misplace metadata INSIDE
+  // the edit objects (probed: qwen2.5-14b nested confidence/reasoning in
+  // edits[0]). Hoist when the top level lacks them — min confidence across
+  // edits, first reasoning — then validate strictly as usual.
+  if (reply.confidence === undefined && Array.isArray(reply.edits)) {
+    const nested = (reply.edits as unknown as Array<Record<string, unknown>>)
+      .map((e) => (typeof e.confidence === 'string' ? Number(e.confidence) : e.confidence))
+      .filter((c): c is number => typeof c === 'number' && !Number.isNaN(c));
+    if (nested.length > 0) reply.confidence = Math.min(...nested);
+    if (reply.reasoning === undefined) {
+      const r = (reply.edits as unknown as Array<Record<string, unknown>>).find((e) => typeof e.reasoning === 'string');
+      if (r) reply.reasoning = r.reasoning as string;
+    }
+  }
+  // Smaller models under JSON-constrained decoding also stringify numbers
+  // ("0.9") — unambiguous, so coerce. Anything non-numeric still rejects.
+  if (typeof reply.confidence === 'string' && /^\d*\.?\d+$/.test(reply.confidence)) {
+    reply.confidence = Number(reply.confidence);
+  }
   if (typeof reply.confidence !== 'number' || reply.confidence < 0 || reply.confidence > 1) {
     throw new ReplyParseError('confidence must be a number in [0, 1]');
   }

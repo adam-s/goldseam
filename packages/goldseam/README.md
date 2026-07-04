@@ -167,8 +167,15 @@ nothing that resembles an assertion edit — heals never weaken assertions.
 The model sees the capture and the spec source, never application source.
 
 Model runners: `claude` (the Claude Code CLI in print mode; defaults to
-Sonnet), `claude:<model>`, or `cmd:<executable>`. `openai:` / `anthropic:`
-/ `ollama:` HTTP runners are planned behind the same interface.
+Sonnet), `claude:<model>`, `ollama:<model>` (local HTTP, zero egress —
+the air-gapped story; host via `OLLAMA_HOST`, JSON-constrained decoding
+on), `openai:<model>` (any OpenAI-compatible endpoint — OpenAI proper, a
+Modal/vLLM `serve` deployment, LM Studio — via `OPENAI_BASE_URL` +
+`OPENAI_API_KEY`), or `cmd:<executable>` (prompt on stdin, reply on
+stdout). Local-model guidance: id/class-culture selectors heal reliably
+on a 14B Qwen; long attribute-quoted selectors can defeat smaller
+models' JSON escaping — the validator rejects the mangled edit and the
+heal fails honestly rather than applying garbage.
 
 **Heal memory:** every verified model heal records
 `broken selector → replacement` in `.goldseam/heal-cache.json`; the next

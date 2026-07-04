@@ -28,6 +28,7 @@ Rules (non-negotiable):
 - Exact-string edits: each oldString must appear exactly once in the spec, verbatim; newString differs only inside the selector string.
 - If the broken selector appears in several places, emit one edit per occurrence (include enough surrounding text to make each oldString unique). Fix only occurrences of THIS break — nothing speculative.
 - Prefer selectors in this order: ${selectorPriority.join(' > ')}.
+- In replacement selectors, write attribute values WITHOUT inner quotes when they are plain identifiers — [data-testid=add-to-cart], not [data-testid="add-to-cart"]. CSS allows it, and it avoids JSON string-escaping mistakes.
 - If the page never loaded (url about:blank), the capture is degraded, or no plausible target element exists, give up. Giving up is a correct answer.
 
 Reply with ONLY a JSON object, no prose, no code fences:
