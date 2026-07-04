@@ -17,6 +17,7 @@
 // these functions cannot evaluate produces a pass-with-evidence and is
 // deferred to the rerun rungs, never a silent verdict either way.
 
+import { queryAllDeep } from 'aria-snapshot';
 import { RepairEdit } from './types';
 
 interface JsdomInstance {
@@ -43,16 +44,13 @@ const STATE_PSEUDOS = /:(?:visible|hidden|animated|selected)\b/g;
 const JQUERY_PSEUDOS =
   /:(?:visible|hidden|animated|selected|input|submit|reset|button|text|password|file|image|checkbox|radio|header|parent)\b|:(?:first|last|even|odd)(?![\w-])|:(?:eq|lt|gt|contains)\((?:[^()]|\([^()]*\))*\)/g;
 
-/** Count matches under `root`, descending into open shadow roots (captured
- * as declarative `<template shadowrootmode>` — a healed selector targeting
- * shadow content must not read as absent). */
-function countIn(root: ParentNode, selector: string): number {
-  let n = root.querySelectorAll(selector).length;
-  for (const t of Array.from(root.querySelectorAll('template[shadowrootmode]'))) {
-    n += countIn((t as HTMLTemplateElement).content, selector);
-  }
-  return n;
-}
+/** Count matches under `root`, descending into serialized shadow roots
+ * (`<template shadowrootmode>`) and same-origin iframe content
+ * (`<template data-frame-content>`) — a healed selector targeting either
+ * must not read as absent. Boundary-safe: queryAllDeep never lets a
+ * combinator cross into template content. */
+const countIn = (root: ParentNode, selector: string): number =>
+  queryAllDeep(root, selector).length;
 
 /**
  * How many elements `selector` matches in the captured DOM. `strip`
@@ -97,7 +95,9 @@ export function countTextMatches(domHtml: string, text: string): number {
       if (!el.textContent?.includes(text)) continue;
       if (!Array.from(el.children).some((c) => c.textContent?.includes(text))) n++;
     }
-    for (const t of Array.from(root.querySelectorAll('template[shadowrootmode]'))) {
+    for (const t of Array.from(
+      root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+    )) {
       roots.push((t as HTMLTemplateElement).content);
     }
   }

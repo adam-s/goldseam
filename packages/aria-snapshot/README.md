@@ -23,6 +23,40 @@ suites), where the accessibility tree rides along with every failure
 capture — but it has no goldseam dependency and works anywhere a DOM
 exists (browser, jsdom).
 
+## Targeting
+
+The tree is an addressing space, not just evidence: a node like
+`button "Add to cart"` names an element, and the package resolves names
+in both directions.
+
+```ts
+import { getAllByAria, deriveSelector } from 'aria-snapshot';
+
+// identity → element
+const [btn] = getAllByAria(document.body, {
+  kind: 'role', role: 'button', name: 'Add to cart',
+});
+
+// element → best unique native selector, priority-ordered and
+// uniqueness-verified ({ kind, selector, text?, strategy })
+deriveSelector(btn, { priority: ['data-cy', 'data-testid', 'id', 'text', 'css'] });
+```
+
+A tool (or a model) points at *what* to target semantically; code decides
+*how* to target it.
+
+## Iframes and serialized captures
+
+- `ariaSnapshot(root, { frames: true })` descends **same-origin** iframes
+  (live DOM); their content nests under the `iframe` node. Cross-origin
+  frames stay opaque leaves.
+- Serialized DOM (a capture re-parsed for analysis) is traversed too:
+  declarative shadow templates (`<template shadowrootmode>`) and the
+  `<template data-frame-content>` convention for inlined iframe documents.
+  `queryAllDeep` runs boundary-respecting CSS queries over such captures;
+  `expandSerializedTemplates` rewrites them as plain wrappers when you
+  need ordinary queries and real computed styles.
+
 ## License
 
 Apache-2.0. This package is a lift of Playwright's isomorphic

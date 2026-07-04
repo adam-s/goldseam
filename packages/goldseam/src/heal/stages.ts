@@ -4,9 +4,11 @@
 // engine.
 
 import { createRequire } from 'module';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { expandSerializedTemplates, getAllByAria } from 'aria-snapshot';
 import { buildCacheEdit, loadCache, lookup } from './cache';
+import { withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
 import {
@@ -16,7 +18,7 @@ import {
   impliesCollection,
 } from './resolve';
 import { EditRejected, validateEdits } from './validate';
-import { HealContext, HealStage, StageVerdict } from './types';
+import { HealContext, HealStage, OracleEntry, StageVerdict } from './types';
 
 const verdict = (
   stage: string,
@@ -230,6 +232,129 @@ export const resolveStage: HealStage = {
   },
 };
 
+// The oracle rung: identity, not just existence. resolve proves the healed
+// selector points at SOMETHING; the rerun proves the test PASSES; neither
+// proves the selector points at the element the test meant. When a
+// known-good identity (aria role + accessible name recorded while the
+// test was green) is available, this rung requires the healed selector to
+// land on an element matching it — the impostor guard, offline, in the
+// DOM the model saw. Sound, not complete: no identity on file means a
+// skip with evidence, never a silent verdict.
+export const oracleStage: HealStage = {
+  name: 'oracle',
+  async run(ctx: HealContext): Promise<StageVerdict> {
+    const started = Date.now();
+    const { artifact, options } = ctx;
+    const edits = ctx.proposal?.edits;
+    if (!edits?.length) {
+      return verdict('oracle', 'pass', 'no proposed edits — nothing to check', started);
+    }
+    const file = options.oracleFile;
+    if (!file || !existsSync(file)) {
+      return verdict('oracle', 'pass', 'no known-good identity file — oracle skipped', started);
+    }
+    let entries: OracleEntry[];
+    try {
+      const parsed = JSON.parse(readFileSync(file, 'utf8'));
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      entries = parsed as OracleEntry[];
+    } catch (e) {
+      return verdict(
+        'oracle',
+        'pass',
+        `oracle file unreadable (${e instanceof Error ? e.message : e}) — oracle skipped`,
+        started,
+      );
+    }
+    const entry = entries.find(
+      (o) => o.specPath === artifact.specPath && o.title === artifact.title,
+    );
+    if (!entry) {
+      return verdict('oracle', 'pass', 'no known-good identity for this test — oracle skipped', started);
+    }
+    const identity = `${entry.role}${entry.name !== undefined ? ` "${entry.name}"` : ''}`;
+
+    // VirtualConsole swallows jsdom's "not implemented" chatter (pseudo-
+    // element getComputedStyle) — the walk tolerates the gap; the log spam
+    // would drown the verdict lines.
+    const jsdom = require('jsdom') as {
+      JSDOM: new (
+        html: string,
+        opts?: { virtualConsole?: unknown },
+      ) => { window: Record<string, unknown> & { document: Document } };
+      VirtualConsole: new () => unknown;
+    };
+    const { window } = new jsdom.JSDOM(artifact.domHtml, {
+      virtualConsole: new jsdom.VirtualConsole(),
+    });
+    const specSource = readFileSync(join(options.projectRoot, artifact.specPath), 'utf8');
+
+    return withDomGlobals(window, () => {
+      const docEl = window.document.documentElement;
+      // Serialized shadow/frame content becomes plain-queryable, so the
+      // identity query and the selector query see the SAME elements.
+      expandSerializedTemplates(docEl);
+      // Oracle files are user data: an unknown role simply matches nothing
+      // and lands in the gave-up path below, so the cast is safe.
+      const wanted = getAllByAria(docEl, {
+        kind: 'role',
+        role: entry.role as import('aria-snapshot').AriaRole,
+        ...(entry.name !== undefined ? { name: entry.name } : {}),
+      });
+      if (wanted.length === 0) {
+        return verdict(
+          'oracle',
+          'gave-up',
+          `the known-good ${identity} no longer exists in the capture — the intended element is gone; a selector edit cannot resurrect it`,
+          started,
+        );
+      }
+
+      const notes: string[] = [];
+      for (const edit of edits) {
+        const healed = healedSiteForEdit(specSource, edit);
+        if (!healed) {
+          notes.push('could not locate the edited selector — unverified');
+          continue;
+        }
+        const { site } = healed;
+        if (site.call === 'contains') {
+          if (!wanted.some((el) => el.textContent?.includes(site.value))) {
+            return verdict(
+              'oracle',
+              'fail',
+              `contains("${site.value}") does not select the known-good ${identity} — impostor guard`,
+              started,
+            );
+          }
+          continue;
+        }
+        let matched: Element[];
+        try {
+          matched = Array.from(window.document.querySelectorAll(site.value));
+        } catch {
+          notes.push(`"${site.value}" not statically checkable — unverified`);
+          continue;
+        }
+        if (!matched.some((el) => wanted.includes(el))) {
+          return verdict(
+            'oracle',
+            'fail',
+            `healed selector "${site.value}" targets a different element than the known-good ${identity} — impostor guard`,
+            started,
+          );
+        }
+      }
+      return verdict(
+        'oracle',
+        'pass',
+        `healed selector targets the known-good ${identity}${notes.length ? ` (${notes.join('; ')})` : ''}`,
+        started,
+      );
+    });
+  },
+};
+
 // The rerun rungs drive Cypress through the Module API from the target
 // project. `cypress` is a peer dependency resolved from the project.
 interface CypressRunResult {
@@ -324,6 +449,7 @@ export const STAGES: Record<string, HealStage> = {
   triage: triageStage,
   propose: proposeStage,
   resolve: resolveStage,
+  oracle: oracleStage,
   'rerun-test': rerunTestStage,
   'rerun-spec': rerunSpecStage,
 };

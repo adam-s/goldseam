@@ -138,10 +138,13 @@ with no network egress.
 
 ### M6 — Oracle rung + the benchmark (the launch asset)
 
-- `oracle` rung: healed selector must resolve to the element the mutation
-  intended — `matchesAriaTree` from `aria-snapshot` against the
-  pre-mutation capture; mutation branches record oracle selectors as
-  ground truth.
+- `oracle` rung **shipped 2026-07** (known-good identity from
+  `.goldseam/oracle.json`, resolved via `getAllByAria` against the
+  capture; impostors rejected offline). Remaining M6 work: mutation
+  branches record oracle identities as ground truth, benchmark
+  integration, and the green-run identity manifest (record each
+  selector's aria identity while tests pass) so real projects get oracle
+  coverage without hand-written files.
 - Benchmark harness: N mutation branches × the selector-style axis from
   usage-catalog cluster F (`data-cy` / `id` / role+text / `:contains()`
   chains / brittle auto-generated descendant CSS); results are artifacts;

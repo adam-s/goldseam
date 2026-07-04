@@ -42,7 +42,7 @@ ladder and the heal is reported, not delivered. PR bodies render the ladder.
 | `propose` | RepairRunner: capture in, strict-JSON minimal edit out | blueprint |
 | `rerun-test` | Module API + grep: the healed test alone must pass | curriculum M5 |
 | `rerun-spec` | Full spec rerun: blast-radius check | curriculum M5 |
-| `oracle` | Healed selector must resolve to the intended element (aria identity vs capture; `matchesAriaTree`) | agent-spec `reviewer` — "diff proposed fix against known-good fix" |
+| `oracle` | **Shipped 2026-07.** Healed selector must land on the known-good aria identity (role + accessible name, `.goldseam/oracle.json`) resolved via `getAllByAria` against the capture — offline, before any rerun. Skips with evidence when no identity is on file | agent-spec `reviewer` — "diff proposed fix against known-good fix" |
 | Outer loop | Retry propose with feedback, **hard attempt cap**, all-green stop condition | **agent-spec `iterate`** — recursive propose→verify with deterministic PASS/FAIL and max depth. Phase 1 is this loop with N=1 candidate |
 
 ### Phase 2 — trust hardening (the anti-false-green rungs)
@@ -60,6 +60,18 @@ ladder and the heal is reported, not delivered. PR bodies render the ladder.
 | `adversary` | A second, independent model call whose only goal is to **refute the heal**: "the most dangerous heal produces a correct-looking green. Prove this one is false." Refuted ⇒ no PR | **detectauto `provenance-adversary`** ("assume a violation exists until you've tried hard and failed") + **claudodidact `adversary-agent`** ("prior checks test what the builders thought to test; you test what they didn't") |
 | `review` | Rubric-scored review of the heal diff: selector-priority compliance, assertion integrity, minimality; scores below floor block | **detectauto `quote-reviewer`** ("a score without a cited path/value is just an opinion") + **intercept `reviewer-agent`** (0–2 rubric) + **Archon `pr-test-analyzer`** (behavioral coverage, 1–10 criticality) |
 | `regression-pin` | Every delivered heal ships with a pinned regression artifact: the exact failure it fixed, replayable | **rubiks-cube-mcp-2 `user-journey`** ("pin a regression test for every fix that escaped to runtime") |
+
+## The inversion the oracle enables
+
+Today the model authors a selector string and four rungs verify it. With
+the aria tree as an addressing space (`getAllByAria` resolves an identity
+to elements; `deriveSelector` turns an element back into the best native
+selector), the model's untrusted output can shrink from "a selector" to
+"which tree node" — code derives and verifies the string. The deterministic
+tier that skips the model entirely for pure renames (identity → element →
+derived selector → ladder) is designed on this base; identity provenance
+(a green-run manifest instead of a hand-written oracle file) is the
+missing half.
 
 ## Benchmark loop (M6) — the eval harness pattern
 

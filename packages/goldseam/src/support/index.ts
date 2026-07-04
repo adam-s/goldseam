@@ -93,7 +93,10 @@ export function installGoldseam(options: GoldseamSupportOptions = {}): void {
           stash.domHtml = domHtml;
         }
         if (includeAria) {
-          const aria = ariaSnapshot(doc.body);
+          // frames: same-origin iframe content nests under its iframe node
+          // (cross-origin frames stay opaque leaves), matching the DOM
+          // capture's <template data-frame-content> inlining.
+          const aria = ariaSnapshot(doc.body, { frames: true });
           stash.ariaSnapshot = redact ? maskText(aria) : aria;
         }
       }

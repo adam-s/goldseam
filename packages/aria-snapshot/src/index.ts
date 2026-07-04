@@ -11,8 +11,10 @@
 //   const yaml = ariaSnapshot(document.body);
 //
 // Caveats inherited from the walk: open shadow roots are included; closed
-// shadow roots are not; iframes appear as opaque leaf nodes (`role: iframe`)
-// and are not descended into.
+// shadow roots are not. Iframes are opaque leaves by default; pass
+// `{ frames: true }` to descend same-origin frames (live DOM). Serialized
+// captures are traversed too: declarative shadow templates and the
+// `<template data-frame-content>` iframe convention (see targeting.ts).
 
 export {
   generateAriaTree,
@@ -21,8 +23,16 @@ export {
   getAllByAria,
   type AriaNode,
   type AriaSnapshot,
+  type AriaTreeOptions,
   type MatcherReceived,
 } from './ariaSnapshot';
+
+export {
+  queryAllDeep,
+  expandSerializedTemplates,
+  deriveSelector,
+  type DerivedTarget,
+} from './targeting';
 
 export type {
   AriaRole,
@@ -30,9 +40,9 @@ export type {
   AriaTemplateNode,
 } from './isomorphic/ariaSnapshot';
 
-import { generateAriaTree, renderAriaTree } from './ariaSnapshot';
+import { generateAriaTree, renderAriaTree, type AriaTreeOptions } from './ariaSnapshot';
 
 /** One-call convenience: element → rendered YAML accessibility tree. */
-export function ariaSnapshot(root: Element): string {
-  return renderAriaTree(generateAriaTree(root));
+export function ariaSnapshot(root: Element, options?: AriaTreeOptions): string {
+  return renderAriaTree(generateAriaTree(root, options));
 }

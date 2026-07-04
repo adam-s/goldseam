@@ -449,9 +449,12 @@ function belongsToDisplayNoneOrAriaHiddenOrNonSlotted(element: Element): boolean
     // display:none and aria-hidden=true are considered hidden for aria.
     if (!hidden) {
       const style = getElementComputedStyle(element);
+      // Divergence from upstream: an element in an inert document (template
+      // content — no browsing context) has no computed style at all. That
+      // is "no rendering info", not "hidden"; serialized captures walk such
+      // content deliberately, upstream never does.
       hidden =
-        !style ||
-        style.display === 'none' ||
+        (style ? style.display === 'none' : false) ||
         getAriaBoolean(element.getAttribute('aria-hidden')) === true;
     }
 

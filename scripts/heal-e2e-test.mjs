@@ -1,7 +1,7 @@
 // End-to-end heal test (M3+M4 done-when), model-free via the cmd: stub:
 //   1. a spec with a drifted selector fails → capture artifact
 //   2. `goldseam heal` proposes, applies, and verifies through the full
-//      ladder (triage → propose → resolve → rerun-test → rerun-spec)
+//      ladder (triage → propose → resolve → oracle → rerun-test → rerun-spec)
 //   3. the spec file is edited, the heal artifact records the ladder
 //   4. an unhealable capture produces a clean, reported give-up
 //
@@ -65,7 +65,10 @@ try {
   const rungs = healArtifact.attempts.at(-1).ladder.map((r) => `${r.stage}:${r.verdict}`);
   check(
     JSON.stringify(rungs) ===
-      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'rerun-test:pass', 'rerun-spec:pass']),
+      JSON.stringify([
+        'triage:pass', 'propose:pass', 'resolve:pass', 'oracle:pass',
+        'rerun-test:pass', 'rerun-spec:pass',
+      ]),
     `full ladder recorded (${rungs.join(' → ')})`,
   );
   check(healArtifact.tier === 'model' && healArtifact.model.startsWith('cmd:'), 'tier + model recorded');
@@ -203,8 +206,58 @@ try {
   const impostorRungs = impostorArtifact.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`);
   check(
     JSON.stringify(impostorRungs) ===
-      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'rerun-test:fail']),
-    `resolve passed (element exists) but rerun caught the behavior (${impostorRungs.join(' → ')})`,
+      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'oracle:pass', 'rerun-test:fail']),
+    `resolve+oracle passed (element exists, no identity on file) but rerun caught the behavior (${impostorRungs.join(' → ')})`,
+  );
+
+  console.log('\n— oracle teeth: with a known-good identity, the impostor dies OFFLINE —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  writeFileSync(
+    TMP_SPEC,
+    `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+  );
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  writeFileSync(
+    '.goldseam/oracle.json',
+    JSON.stringify([
+      {
+        specPath: TMP_SPEC,
+        title: 'healable adds a mug to the cart',
+        role: 'button',
+        name: 'Add to cart',
+      },
+    ]),
+  );
+  const oracleImpostor = spawnSync(
+    'node',
+    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1'],
+    { encoding: 'utf8' },
+  );
+  check(oracleImpostor.status === 0 && oracleImpostor.stdout.includes('[failed]'), 'impostor fails with oracle on file');
+  const oracleImpostorArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  const oracleImpostorRungs = oracleImpostorArtifact.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`);
+  check(
+    JSON.stringify(oracleImpostorRungs) ===
+      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'oracle:fail']),
+    `oracle rejected the impostor offline, no rerun spent (${oracleImpostorRungs.join(' → ')})`,
+  );
+  // Same capture, honest proposal: the oracle should CONFIRM identity.
+  const oracleFix = spawnSync('node', [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs fix'], {
+    encoding: 'utf8',
+  });
+  check(oracleFix.status === 0 && oracleFix.stdout.includes('[healed]'), 'honest heal passes with oracle on file');
+  check(
+    oracleFix.stdout.includes('targets the known-good button "Add to cart"'),
+    'oracle confirmed the identity, not just existence',
   );
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');

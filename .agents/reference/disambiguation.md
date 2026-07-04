@@ -33,8 +33,8 @@ and the heal E2E.
 | --- | --- | --- | --- |
 | 1 | Pure locator drift — same element, selector string broke | heal | the whole ladder (worked pre-guards) |
 | 2 | Hallucinated target — proposed selector matches nothing | reject → retry | `resolve` rung: zero matches in the captured DOM fails with feedback |
-| 3 | Plausible impostor — real target gone, look-alike present | never heal silently | `resolve` (impostor absent from DOM) + rerun assertions + weak-assertion flag when assertions can't tell |
-| 4 | Identity/label change (Submit→Save) behind a stable hook | flag | weak-assertion review flag; full answer is the Phase-2 `oracle` rung |
+| 3 | Plausible impostor — real target gone, look-alike present | never heal silently | `oracle` rung (shipped 2026-07) when an identity is on file; else rerun assertions + weak-assertion flag |
+| 4 | Identity/label change (Submit→Save) behind a stable hook | flag | `oracle` rung when an identity is on file; else weak-assertion review flag |
 | 5 | Target removed from the app | give up | rerun fails every attempt → `failed`, spec untouched; model told give-up is a correct answer |
 
 ### Target ambiguity
@@ -89,11 +89,13 @@ and the heal E2E.
 
 Honest limits, kept in view rather than papered over:
 
-- **The impostor behind strong-enough-looking assertions** (#3/#4): if a
-  look-alike element exists in the capture *and* satisfies every surviving
-  assertion, resolve and rerun both pass. The weak-assertion flag catches
-  the common form; the full answer is the Phase-2 `oracle` rung
-  (known-good aria identity), which needs an anchor we don't capture yet.
+- **The impostor is caught only when an identity is on file** (#3/#4):
+  the `oracle` rung (shipped 2026-07) rejects a healed selector that does
+  not land on the known-good aria identity — but identities come from
+  `.goldseam/oracle.json`, written by hand or by the benchmark. The open
+  half is provenance: a green-run manifest that records each selector's
+  aria identity while tests pass. Without an entry, the weak-assertion
+  flag and rerun assertions remain the only impostor defenses.
 - **Scoped selectors get existence-only checks** (#6): `.find()` counts
   against the whole document, so uniqueness within the parent scope is
   deferred to the rerun.

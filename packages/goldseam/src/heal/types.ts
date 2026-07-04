@@ -27,6 +27,18 @@ export interface RepairRunner {
   repair(prompt: string): Promise<string>;
 }
 
+/** One test's known-good target identity: the aria role + accessible name
+ * of the element its selector pointed at while the test was green. The
+ * oracle rung requires a healed selector to land on an element matching
+ * this identity — the guard against plausible impostors. */
+export interface OracleEntry {
+  specPath: string;
+  title: string;
+  role: string;
+  /** Exact accessible name; omit to match by role alone. */
+  name?: string;
+}
+
 export type Verdict = 'pass' | 'fail' | 'gave-up';
 
 export interface StageVerdict {
@@ -50,6 +62,9 @@ export interface HealOptions {
   healsDir: string;
   /** Heal-memory file; null disables the cache tier. */
   cacheFile: string | null;
+  /** Known-good identity file for the oracle rung; the rung skips (with
+   * evidence) when unset or missing. */
+  oracleFile?: string | null;
   /** Cypress config file for the rerun rungs (monorepo per-app configs). */
   configFile?: string;
   /** Titles of OTHER captures still awaiting heals in the same spec —

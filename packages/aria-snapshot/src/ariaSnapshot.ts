@@ -58,9 +58,18 @@ type AriaRef = {
 
 let lastRef = 0;
 
+export type AriaTreeOptions = {
+  forAI?: boolean;
+  refPrefix?: string;
+  /** Descend into same-origin iframes (live DOM only): their content
+   * nests under the `iframe` node instead of an opaque leaf. Cross-origin
+   * frames stay leaves — that wall is real. */
+  frames?: boolean;
+};
+
 export function generateAriaTree(
   rootElement: Element,
-  options?: { forAI?: boolean; refPrefix?: string },
+  options?: AriaTreeOptions,
 ): AriaSnapshot {
   const visited = new Set<Node>();
 
@@ -102,6 +111,21 @@ export function generateAriaTree(
     }
 
     const element = node as Element;
+
+    // Serialized captures carry shadow-root and iframe content in inert
+    // <template> elements (declarative shadow DOM / the data-frame-content
+    // convention). Templates are display:none by UA default, so without
+    // this branch that content would be skipped as hidden.
+    if (element.nodeName === 'TEMPLATE') {
+      if (element.hasAttribute('shadowrootmode') || element.hasAttribute('data-frame-content')) {
+        const content = (element as HTMLTemplateElement).content;
+        for (let child = content.firstChild; child; child = child.nextSibling) {
+          visit(ariaNode, child, parentElementVisible);
+        }
+      }
+      return;
+    }
+
     const isElementHiddenForAria = roleUtils.isElementHiddenForAria(element);
     if (isElementHiddenForAria && !options?.forAI) {
       return;
@@ -165,6 +189,18 @@ export function generateAriaTree(
 
     for (const child of ariaChildren) {
       visit(ariaNode, child, parentElementVisible);
+    }
+
+    if (element.nodeName === 'IFRAME' && options?.frames) {
+      let frameDoc: Document | null = null;
+      try {
+        frameDoc = (element as HTMLIFrameElement).contentDocument;
+      } catch {
+        // cross-origin — stays an opaque leaf
+      }
+      if (frameDoc?.documentElement) {
+        visit(ariaNode, frameDoc.documentElement, parentElementVisible);
+      }
     }
 
     ariaNode.children.push(roleUtils.getCSSContent(element, '::after') || '');
@@ -376,8 +412,9 @@ export type MatcherReceived = {
 export function matchesAriaTree(
   rootElement: Element,
   template: AriaTemplateNode,
+  options?: AriaTreeOptions,
 ): { matches: AriaNode[]; received: MatcherReceived } {
-  const snapshot = generateAriaTree(rootElement);
+  const snapshot = generateAriaTree(rootElement, options);
   const matches = matchesNodeDeep(snapshot.root, template, false, false);
   return {
     matches,
@@ -388,8 +425,12 @@ export function matchesAriaTree(
   };
 }
 
-export function getAllByAria(rootElement: Element, template: AriaTemplateNode): Element[] {
-  const root = generateAriaTree(rootElement).root;
+export function getAllByAria(
+  rootElement: Element,
+  template: AriaTemplateNode,
+  options?: AriaTreeOptions,
+): Element[] {
+  const root = generateAriaTree(rootElement, options).root;
   const matches = matchesNodeDeep(root, template, true, false);
   return matches.map(n => n.element);
 }

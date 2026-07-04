@@ -116,14 +116,14 @@ npx goldseam heal --model "cmd:./my-model.sh"   # any executable: prompt on stdi
 ```
 
 The app under test must be reachable (same requirement as `cypress run`).
-Each capture runs the ladder — `triage → propose → resolve → rerun-test →
-rerun-spec` — under a hard attempt cap (default 3, retrying `propose` with
-feedback). Every rung's verdict lands in
+Each capture runs the ladder — `triage → propose → resolve → oracle →
+rerun-test → rerun-spec` — under a hard attempt cap (default 3, retrying
+`propose` with feedback). Every rung's verdict lands in
 `.goldseam/heals/<capture>-heal.json`; verdicts are `healed`, `gave-up`,
 or `failed`, and give-up is a first-class, reported outcome (page never
 loaded, degraded capture, low confidence, or the model's own judgment).
 
-Two rungs judge offline, against the captured DOM, before any rerun:
+Three rungs judge offline, against the captured DOM, before any rerun:
 
 - **`triage`** (pre-model): if the "missing" selector still matches the
   capture, the element appeared after Cypress stopped retrying or is
@@ -134,6 +134,15 @@ Two rungs judge offline, against the captured DOM, before any rerun:
   where the call chain expects one element (ambiguity) reject the
   proposal with feedback before an expensive rerun. Selectors static
   analysis can't evaluate are deferred to the rerun rungs, with evidence.
+- **`oracle`** (post-resolve): identity, not just existence. When
+  `.goldseam/oracle.json` (or `--oracle-file`) records the known-good aria
+  identity of the test's target —
+  `[{ "specPath": "…", "title": "…", "role": "button", "name": "Add to cart" }]`
+  — the healed selector must land on an element matching it. A look-alike
+  that would pass every assertion is rejected offline (the impostor
+  guard); an identity that no longer exists in the capture is an honest
+  give-up. No entry on file means a skip, with evidence, never a silent
+  verdict.
 
 Verified is not the same as correct: a rerun proves the healed test
 *passes*, not that the selector points at the intended element. A heal
@@ -205,6 +214,10 @@ Known walls (documented, not hidden):
 - **Open shadow roots are captured** (as declarative
   `<template shadowrootmode="open">` markup, redacted like everything
   else); **closed shadow roots** are unreachable by design.
+- **Same-origin iframe documents are captured** — inlined as sibling
+  `<template data-frame-content>` markup (redacted like everything else)
+  with the frame content nested under its `iframe` node in the aria
+  snapshot; **cross-origin frames** stay opaque, honestly.
 - **`cy.origin`** blocks: the support file cannot reach cross-origin
   documents; captures there degrade to error + URL (`captureError` set).
 - If another *plugin* also registers a non-throwing `fail` listener, the

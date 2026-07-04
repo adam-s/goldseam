@@ -18,7 +18,7 @@ import {
 } from './types';
 
 export const DEFAULT_HEAL_OPTIONS: Omit<HealOptions, 'projectRoot' | 'healsDir' | 'cacheFile'> = {
-  stages: ['triage', 'propose', 'resolve', 'rerun-test', 'rerun-spec'],
+  stages: ['triage', 'propose', 'resolve', 'oracle', 'rerun-test', 'rerun-spec'],
   maxAttempts: 3,
   minConfidence: 0.5,
   selectorPriority: ['data-cy', 'data-testid', 'role', 'text', 'css'],

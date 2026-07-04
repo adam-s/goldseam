@@ -133,9 +133,11 @@ of what else improves:
   registry entries, never engine refactors. Every rung's verdict lands in
   the heal artifact.
 - **The offline rungs are sound, not complete**
-  ([heal/resolve.ts](packages/goldseam/src/heal/resolve.ts)) — `triage`
-  and `resolve` judge only the captured DOM; a selector they cannot
-  statically evaluate defers to the rerun rungs with evidence, never a
+  ([heal/resolve.ts](packages/goldseam/src/heal/resolve.ts),
+  `oracle` in [heal/stages.ts](packages/goldseam/src/heal/stages.ts)) —
+  `triage`, `resolve`, and `oracle` judge only the captured DOM; a
+  selector they cannot statically evaluate — or an oracle with no
+  identity on file — defers to the rerun rungs with evidence, never a
   silent verdict. Stripped-pseudo match counts are over-approximations:
   valid for absence (and triage's still-present check), never for
   uniqueness. Review flags (`reviewFlags`) route human attention and
@@ -217,7 +219,9 @@ Tradeoffs, not oversights:
   declarative `<template shadowrootmode>` markup; `{ mode: 'closed' }`
   is unreachable by design. Documented in the package README.
 - **`cy.origin` blocks degrade** — the support file can't reach
-  cross-origin documents; capture falls back to error + URL.
+  cross-origin documents; capture falls back to error + URL. Same-origin
+  iframes ARE captured (inlined `<template data-frame-content>`);
+  cross-origin frames inside a page stay opaque leaves.
 - **Dual failure-hooking plugins can mutually defer.** Our sole-listener
   re-throw rule means goldseam + another non-throwing `fail`-listener
   plugin could swallow real failures. Documented; audit support files.
@@ -250,11 +254,13 @@ Tradeoffs, not oversights:
 - **`failedSelector` derives from the MASKED error message** — a selector
   containing a 7+ digit run gets masked before extraction, costing a
   cache key. Correctness unaffected (the model path still heals).
-- **An impostor that satisfies every surviving assertion still heals.**
-  `resolve` proves existence/uniqueness and the rerun proves passing;
-  neither proves identity. The weak-assertion flag catches the common
-  form; the oracle rung (known-good aria identity) is the designed fix
-  ([.agents/reference/disambiguation.md](.agents/reference/disambiguation.md), residual floor).
+- **Oracle identities are hand- or benchmark-supplied today.** The
+  oracle rung (shipped 2026-07) rejects impostors when
+  `.goldseam/oracle.json` has an identity for the test; the green-run
+  manifest that would record identities automatically is designed, not
+  built ([disambiguation.md](.agents/reference/disambiguation.md),
+  residual floor). Without an entry, an impostor satisfying every
+  surviving assertion still heals (weak-assertion flag is the fallback).
 - **Scoped calls (`.find()` etc.) get existence-only resolution** — a
   whole-document count over-approximates within-parent uniqueness, so
   ambiguity there is deferred to the rerun rungs.

@@ -1,6 +1,6 @@
 {
   "name": "aria-snapshot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Playwright's ariaSnapshot (accessibility-tree walk + YAML renderer) as a standalone, pure-DOM package. Runs in any page context \u2014 no CDP, no Playwright runtime.",
   "license": "Apache-2.0",
   "main": "dist/index.js",
@@ -12,10 +12,13 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepare": "tsc -p tsconfig.json"
+    "prepare": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "jsdom": "^24.0.0",
     "typescript": "^6.0.3",
+    "vitest": "^3.0.0",
     "yaml": "^2.9.0"
   },
   "repository": {

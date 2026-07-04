@@ -28,6 +28,8 @@ heal options:
   --only <substr>         heal only captures whose spec path or title matches
   --skip <substr>         skip captures whose spec path or title matches
   --no-cache              skip heal memory (.goldseam/heal-cache.json); always ask the model
+  --oracle-file <path>    known-good aria identities for the oracle rung
+                          (default: .goldseam/oracle.json; rung skips if absent)
   --config-file <path>    Cypress config for reruns (monorepo per-app configs)
   --max-attempts <n>      hard attempt cap (default: ${DEFAULT_HEAL_OPTIONS.maxAttempts})
   --min-confidence <x>    give up below this confidence (default: ${DEFAULT_HEAL_OPTIONS.minConfidence})
@@ -101,6 +103,7 @@ async function heal(): Promise<number> {
     projectRoot,
     healsDir: arg('--heals-dir') ?? join('.goldseam', 'heals'),
     cacheFile: process.argv.includes('--no-cache') ? null : join('.goldseam', 'heal-cache.json'),
+    oracleFile: arg('--oracle-file') ?? join('.goldseam', 'oracle.json'),
     configFile: arg('--config-file'),
   };
   const runner = resolveRunner(arg('--model') ?? 'claude');
