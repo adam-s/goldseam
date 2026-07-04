@@ -12,7 +12,7 @@ becomes a fix + pinned test + one conventional commit.
 | --- | --- | --- |
 | PrairieLearn | Bootstrap prod monorepo, data-testid | done 2026-07-03 (2 real bugs) |
 | TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
-| Juice Shop | Angular Material, id/class/aria soup | installing |
+| Juice Shop | Angular Material, id/class/aria soup | DONE: aria-label heal, honest give-up; 3 bugs fixed |
 | Shoelace docs | web components, shadow DOM | installing |
 | Cypress RWA | React, data-test everywhere | installing |
 
@@ -50,3 +50,11 @@ moments, never CI.
   proof. Authoring: 3 English steps → Sonnet translated to
   visit/type/assert(have.length), green in one run, cache committed
   (replays are free). TodoMVC leg complete.
+- 2026-07-04 Juice Shop leg: #loginButton drift healed by Sonnet to
+  [aria-label="Login"] across both spec sites (~500KB Angular DOMs).
+  Bugs: comment-defeated sibling probe (includes → string-literal-aware),
+  stale-capture model burn + healed-artifact overwrite (same root), jsdom
+  CSS spam (VirtualConsole in parseDom). Hygiene lesson: spec comments
+  are model-visible — the first give-up proof was contaminated by its own
+  scenario comment; reran hint-free and the model refused independently
+  ("no plausible target element to remap").

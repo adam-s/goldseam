@@ -22,10 +22,16 @@ import { RepairEdit } from './types';
 interface JsdomInstance {
   window: { document: Document };
 }
-// jsdom ships no types; loaded lazily so propose-only paths never pay for it.
+// jsdom ships no types; loaded lazily so propose-only paths never pay for
+// it. VirtualConsole swallows jsdom's CSS-parse chatter — Angular
+// Material's @layer stylesheets flooded the CLI output on Juice Shop
+// (proving-campaign finding).
 const parseDom = (html: string): Document => {
-  const { JSDOM } = require('jsdom') as { JSDOM: new (html: string) => JsdomInstance };
-  return new JSDOM(html).window.document;
+  const jsdom = require('jsdom') as {
+    JSDOM: new (html: string, opts?: { virtualConsole?: unknown }) => JsdomInstance;
+    VirtualConsole: new () => unknown;
+  };
+  return new jsdom.JSDOM(html, { virtualConsole: new jsdom.VirtualConsole() }).window.document;
 };
 
 export interface MatchCount {
@@ -242,6 +248,21 @@ export function assertionsAfter(source: string, from: number, wholeFile = false)
   for (let m = re.exec(window); m; m = re.exec(window)) found.push(m[2]);
   if (/\bexpect\s*\(/.test(window)) found.push('expect(…)');
   return found;
+}
+
+/**
+ * Does `selector` occur in the spec AS CODE — inside a string literal —
+ * rather than only in comments? The sibling-heal probe keyed on plain
+ * substring inclusion, and a header comment mentioning the broken
+ * selector defeated it (proving-campaign finding, Juice Shop: healed
+ * captures re-burned model calls and overwrote healed artifacts with
+ * gave-ups).
+ */
+export function selectorOccursInCode(source: string, selector: string): boolean {
+  for (let i = source.indexOf(selector); i !== -1; i = source.indexOf(selector, i + 1)) {
+    if (stringSiteAt(source, i)) return true;
+  }
+  return false;
 }
 
 export const isWeaklyAsserted = (assertions: string[]): boolean =>

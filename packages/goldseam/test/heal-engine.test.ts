@@ -185,6 +185,35 @@ describe('infrastructure failures', () => {
   });
 });
 
+describe('sibling-heal detection', () => {
+  it('a comment mentioning the broken selector does not defeat the probe (proving-campaign)', async () => {
+    // spec is ALREADY healed; the selector survives only in a comment
+    writeFileSync(
+      join(root, SPEC_REL),
+      `// legacy id: #add-to-basket\nit('adds', () => {\n  cy.get('#add-to-cart').click();\n});\n`,
+    );
+    const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+    writeFileSync(artifactPath, JSON.stringify({ ...artifact, failedSelector: '#add-to-basket' }));
+    const { STAGES } = await import('../src/heal/stages');
+    const realRerun = STAGES['rerun-test'];
+    STAGES['rerun-test'] = {
+      name: 'rerun-test',
+      async run() {
+        return { stage: 'rerun-test', verdict: 'pass', evidence: 'probe green', durationMs: 0 };
+      },
+    };
+    try {
+      const runner = stubRunner([GOOD_REPLY]);
+      const heal = await healArtifactFile(artifactPath, runner, makeOptions());
+      expect(heal.tier).toBe('sibling');
+      expect(heal.verdict).toBe('healed');
+      expect(runner.calls).toBe(0); // no model call for an already-healed break
+    } finally {
+      STAGES['rerun-test'] = realRerun;
+    }
+  });
+});
+
 describe('retry economics', () => {
   it('stops after an identical proposal fails identically twice (no third model call)', async () => {
     const { STAGES } = await import('../src/heal/stages');

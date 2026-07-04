@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
 import { FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
-import { HOOK_TITLE_RE, reviewFlagsFor } from './resolve';
+import { HOOK_TITLE_RE, reviewFlagsFor, selectorOccursInCode } from './resolve';
 import { STAGES } from './stages';
 import {
   HEAL_SCHEMA_VERSION,
@@ -81,7 +81,11 @@ export async function healArtifactFile(
   // A multi-edit heal earlier in this run may have already fixed this
   // capture's break (shared selector across tests). Verify — never assume:
   // the test must actually pass before we call it healed.
-  if (!options.dryRun && artifact.failedSelector && !originalSpec.includes(artifact.failedSelector)) {
+  if (
+    !options.dryRun &&
+    artifact.failedSelector &&
+    !selectorOccursInCode(originalSpec, artifact.failedSelector)
+  ) {
     try {
       const probe = await STAGES['rerun-test'].run(ctx); // no proposal ⇒ nothing applied
       attempts.push({ attempt: 0, ladder: [probe], source: undefined });

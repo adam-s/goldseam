@@ -150,6 +150,16 @@ describe('impliesCollection', () => {
   });
 });
 
+describe('selectorOccursInCode', () => {
+  it('sees selectors in string literals, not in comments (proving-campaign)', async () => {
+    const { selectorOccursInCode } = await import('../src/heal/resolve');
+    const healed = `// culture note: #loginButton was the old id\ncy.get('[aria-label="Login"]').click();`;
+    expect(selectorOccursInCode(healed, '#loginButton')).toBe(false);
+    const unhealed = `cy.get('#loginButton').click();`;
+    expect(selectorOccursInCode(unhealed, '#loginButton')).toBe(true);
+  });
+});
+
 describe('assertion strength', () => {
   it('collects assertions to the end of the enclosing test only', () => {
     const spec = `it('a', () => {
