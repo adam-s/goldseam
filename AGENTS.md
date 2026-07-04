@@ -164,7 +164,7 @@ of what else improves:
   user fail-handler transparency.
 - `npm run test:heal` — full heal loop with the deterministic `cmd:` stub
   ([scripts/stub-model.mjs](scripts/stub-model.mjs)). No model calls.
-- `npm run demo` + `npm run cy:run` — the dogfood suite (17 tests) against
+- `npm run demo` + `npm run cy:run` — the dogfood suite against
   the demo shop on port 4173.
 - Real-model heal: `goldseam heal --model claude` (Sonnet). Costs money;
   never in CI.

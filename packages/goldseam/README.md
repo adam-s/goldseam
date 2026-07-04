@@ -3,11 +3,14 @@
 Self-healing for the Cypress suites you already have. When a selector
 breaks, the failure becomes a rich capture (DOM + accessibility tree +
 error); your model — local or API, never a vendor cloud — proposes a
-minimal fix; the suite verifies it; the repair arrives as a pull request.
+minimal fix; the suite verifies it through a six-rung ladder; the repair
+lands as a reviewed diff in your working tree — never a runtime
+substitution.
 
-> Status: capture + the Phase-1 heal ladder (`triage → propose → resolve →
-> rerun-test → rerun-spec`) work end to end. `goldseam pr` and the oracle
-> rung are next — see the [build plan](../../docs/plan.md).
+> `goldseam pr` (heal delivered as a ready-made pull request) is the next
+> milestone — the
+> [roadmap](https://github.com/adam-s/goldseam/blob/main/docs/plan.md)
+> has the rest.
 
 ## Install
 
@@ -150,7 +153,7 @@ whose enclosing test asserts only existence/visibility carries
 `reviewFlags: ["weak-assertions…"]` in its artifact, a ⚠ in the CLI, and
 a Flags column in `goldseam report` — flags route review, they never
 block. The full catalog of these judgment calls and their guards:
-[.agents/reference/disambiguation.md](../../.agents/reference/disambiguation.md).
+[the disambiguation catalog](https://github.com/adam-s/goldseam/blob/main/.agents/reference/disambiguation.md).
 
 Proposals are validated mechanically before touching disk: exact-string
 edits in the failing spec only (one per occurrence of the broken
