@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'path';
 import { resolveRunner } from '../heal/runners';
 import { parseJsonBlock } from '../heal/parse';
+import { TRANSLATE_RULES } from './translate-rules';
 import {
   InvalidTranslation,
   MAX_PROMPT_STEPS,
@@ -56,14 +57,7 @@ export function buildTranslatePrompt(payload: TranslatePayload): string {
 {"action":"wait","ms":number}
 
 Rules:
-- Prefer selectors in this order: data-cy > data-testid > id > role/text > css.
-- \`{{name}}\` tokens in steps are placeholders — copy them through verbatim into command text; never invent their values.
-- One or more commands per step, in step order. Steps saying "with a timeout of Ns" or "force click" map to the matching option.
-- Selectors must be COPIED from the provided page HTML — verify the id/class/attribute you emit appears there verbatim. Never use a selector remembered from similar sites: if you cannot locate the step's target in the HTML, give up and say what's missing.
-- Web components: to target something INSIDE a specific component's shadow root, set "shadow" to the host selector and "selector" to the element within it (e.g. {"action":"click","shadow":"sl-details","selector":"[part='header']"}). CSS cannot cross a shadow boundary with a descendant combinator.
-- Ground selectors in the provided page HTML when the element is there. For expectations about elements that do NOT exist yet (an error after a failed submit, a toast, a result list), use a text assert — {"action":"assert","contains":"<expected text>","should":"be.visible"} — never a guessed container selector.
-- A step must map to ONE unambiguous target. If the page offers several plausible targets and the step doesn't say which ("the checkbox" when there are three), or no plausible target exists, reply {"giveUp":{"reason":"<what was ambiguous or missing>"}} instead of guessing — a wrong guess silently tests the wrong thing.
-- Reply with ONLY a JSON object: {"commands":[…]} or {"giveUp":{"reason":…}} — no prose, no fences.
+${TRANSLATE_RULES}
 
 ## Steps
 ${payload.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}

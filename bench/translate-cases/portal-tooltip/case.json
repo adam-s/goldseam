@@ -1,0 +1,18 @@
+{
+  "steps": [
+    "Hover over the pricing info button",
+    "A tooltip should say 'Prices include VAT'"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "trigger",
+        "target": "#tip-trigger"
+      },
+      {
+        "action": "assert",
+        "containsIncludes": "Prices include VAT"
+      }
+    ]
+  }
+}

@@ -118,3 +118,15 @@ moments, never CI.
   prompt change must hold it. Caveats recorded: fixtures are
   author-written; 16 cases is a floor, grown by adding every future
   failure as a case.
+- 2026-07-04 hazard catalog + recursive tuning: .agents/reference/
+  hazard-catalog.md (the intercept2 fake-sites move, goldseam-shaped:
+  every hazard names ONE runnable example across demo/hazards.html, eval
+  fixtures, and unit pins — walls are rows too). Eval grew to 20 cases
+  (virtualized-list refusal, dynamic-id stable-hook discipline with
+  forbidden-selector grading, split text, portal tooltip). bench/
+  translate-tune.mjs closes the intercept2 loop: eval → model revises its
+  OWN rules block (generalize-only discipline, keep-only-if-better,
+  converge on perfect×2). First run: two hand rules (positional
+  legitimacy, label assembly) + one self-tuned rule (interaction-
+  triggered content → text asserts, portals named) took 18/20 → 20/20
+  held twice. Baseline frozen at 20/20.

@@ -1,0 +1,21 @@
+{
+  "steps": [
+    "Type 'SAVE10' into the coupon field",
+    "Click the apply button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": ".coupon-input",
+        "textIncludes": "SAVE10",
+        "forbidSelector": "coupon-8f3a"
+      },
+      {
+        "action": "click",
+        "target": ".apply-btn",
+        "forbidSelector": "apply-7d2e"
+      }
+    ]
+  }
+}

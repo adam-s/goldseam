@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>goldseam demo — hazards</title>
+  <link rel="stylesheet" href="css/shop.css">
+  <style>
+    .hazard { border: 1px solid #ccc; padding: 1rem; margin: 1rem 0; }
+    .hazard h2 { margin-top: 0; font-size: 1rem; }
+    #portal-root { position: fixed; bottom: 8px; right: 8px; }
+  </style>
+</head>
+<body>
+  <!-- One widget per row of .agents/reference/hazard-catalog.md that
+       needs a LIVE example. Deliberately small; the selector texture is
+       part of each hazard — don't "clean it up". -->
+  <main>
+    <h1>Hazard gallery</h1>
+
+    <section class="hazard" id="frame-widget">
+      <h2>Same-origin iframe (payment widget)</h2>
+      <iframe id="pay-frame" src="hazard-frame.html" title="payment"></iframe>
+    </section>
+
+    <section class="hazard" id="dsd-card">
+      <h2>Declarative shadow DOM</h2>
+      <hazard-card>
+        <template shadowrootmode="open">
+          <div class="card"><button class="card-buy">Buy inside shadow</button></div>
+        </template>
+      </hazard-card>
+    </section>
+
+    <section class="hazard" id="portal-widget">
+      <h2>Portal / teleported tooltip</h2>
+      <button id="tip-trigger" aria-describedby="portal-tip">Hover target</button>
+      <!-- tooltip is rendered into #portal-root at body end, see below -->
+    </section>
+
+    <section class="hazard" id="slow-widget">
+      <h2>Delayed render (skeleton, 3s)</h2>
+      <div id="slow-panel"><span class="skeleton">loading…</span></div>
+    </section>
+
+    <section class="hazard" id="split-widget">
+      <h2>Split text</h2>
+      <button id="split-text">Add<span> to </span><b>cart</b></button>
+    </section>
+
+    <section class="hazard" id="twins-widget">
+      <h2>Identical siblings</h2>
+      <div><h3>Profile</h3><button class="save-btn">Save</button></div>
+      <div><h3>Billing</h3><button class="save-btn">Save</button></div>
+    </section>
+
+    <section class="hazard" id="dynamic-widget">
+      <h2>Dynamic ids (random per load)</h2>
+      <label>Coupon <input data-field="coupon" class="coupon-input"></label>
+    </section>
+  </main>
+
+  <div id="portal-root"></div>
+  <script src="js/hazards.js"></script>
+</body>
+</html>

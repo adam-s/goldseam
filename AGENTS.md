@@ -166,6 +166,9 @@ of what else improves:
   ([scripts/stub-model.mjs](scripts/stub-model.mjs)). No model calls.
 - `npm run demo` + `npm run cy:run` — the dogfood suite against
   the demo shop on port 4173.
+- `node bench/translate-eval.mjs` — 20 graded authoring cases (real
+  Sonnet calls, ~1/case); `bench/translate-tune.mjs` — the recursive
+  rules tuner. Both local-only; baseline in bench/ must hold.
 - Real-model heal: `goldseam heal --model claude` (Sonnet). Costs money;
   never in CI.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): build → unit

@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the add to cart button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": "main button.cta:first-of-type"
+      }
+    ]
+  }
+}

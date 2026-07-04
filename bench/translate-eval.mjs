@@ -73,6 +73,9 @@ function grade(caseDef, document, outcome) {
         else if (got.length > 1 && got[0] !== wanted[0]) failures.push(`${exp.action}: "${found.selector}" is ambiguous (${got.length}) and first match isn't the target`);
       }
     }
+    if (exp.forbidSelector && new RegExp(exp.forbidSelector).test(found.selector ?? '')) {
+      failures.push(`${exp.action}: "${found.selector}" uses a forbidden (unstable) hook`);
+    }
     if (exp.textIncludes && !(found.text ?? '').includes(exp.textIncludes)) {
       failures.push(`${exp.action}: text "${found.text}" missing "${exp.textIncludes}"`);
     }

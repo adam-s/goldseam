@@ -1,8 +1,8 @@
 {
   "model": "claude:sonnet",
-  "ranAt": "2026-07-04T06:32:29.981Z",
-  "score": "16/16",
-  "mustRefuse": "3/3",
+  "ranAt": "2026-07-04T06:56:17.824Z",
+  "score": "20/20",
+  "mustRefuse": "4/4",
   "results": [
     {
       "name": "aria-icon-buttons",
@@ -28,6 +28,25 @@
           {
             "action": "click",
             "selector": ".checkout-button"
+          }
+        ]
+      }
+    },
+    {
+      "name": "dynamic-ids",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "type",
+            "selector": "[data-field=\"coupon\"]",
+            "text": "SAVE10"
+          },
+          {
+            "action": "click",
+            "selector": ".apply-btn"
           }
         ]
       }
@@ -80,12 +99,13 @@
         "commands": [
           {
             "action": "type",
-            "selector": "[data-test=\"signin-username\"]",
+            "selector": "[data-test='signin-username']",
             "text": "kate"
           },
           {
             "action": "click",
-            "selector": "[data-test=\"signin-submit\"]"
+            "selector": "[data-test='signin-submit']",
+            "force": true
           }
         ]
       }
@@ -140,6 +160,26 @@
       }
     },
     {
+      "name": "portal-tooltip",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "trigger",
+            "selector": "#tip-trigger",
+            "event": "mouseenter"
+          },
+          {
+            "action": "assert",
+            "contains": "Prices include VAT",
+            "should": "be.visible"
+          }
+        ]
+      }
+    },
+    {
       "name": "positional-list",
       "pass": true,
       "failures": [],
@@ -159,7 +199,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: No export to CSV button found in the page HTML. The page contains buttons for Print, Share, Menu, and Contact, but none for CSV export. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: No export to CSV button found in the page HTML. The available buttons are #menu-btn, #print, #share, and .btn (Contact). — make the step specific enough to name one target"
       }
     },
     {
@@ -168,7 +208,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: Two 'Save' buttons exist on the page (one in #profile, one in #billing) and the step does not specify which. Cannot determine the unambiguous target. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: Two 'Save' buttons exist — one in #profile and one in #billing — and the step does not specify which. — make the step specific enough to name one target"
       }
     },
     {
@@ -177,7 +217,16 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: Step says 'the button' but the page has three buttons (OK, Cancel, Retry) — no indication of which one to click. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: Three buttons exist (OK, Cancel, Retry) and the step does not specify which one to click. — make the step specific enough to name one target"
+      }
+    },
+    {
+      "name": "refuse-virtualized",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "refused",
+        "reason": "the model declined to translate: 'Zoe Z.' is not present in the rendered DOM — it lives in the virtualized list beyond the initially rendered rows. There is no data-cy, id, or stable selector to target it, and scrolling to it programmatically is not possible without knowing its index or a search mechanism. Cannot ground a selector without the element being in the DOM. — make the step specific enough to name one target"
       }
     },
     {
@@ -206,6 +255,20 @@
             "action": "click",
             "shadow": "x-card#pricing",
             "selector": ".buy"
+          }
+        ]
+      }
+    },
+    {
+      "name": "split-text-button",
+      "pass": true,
+      "failures": [],
+      "outcome": {
+        "kind": "commands",
+        "commands": [
+          {
+            "action": "click",
+            "selector": "button.cta:first-of-type"
           }
         ]
       }

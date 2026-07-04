@@ -1,0 +1,8 @@
+{
+  "steps": [
+    "Click the row for 'Zoe Z.'"
+  ],
+  "expect": {
+    "refuse": true
+  }
+}
