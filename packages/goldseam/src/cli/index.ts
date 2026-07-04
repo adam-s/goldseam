@@ -58,6 +58,38 @@ function arg(flag: string): string | undefined {
   return value?.startsWith('--') ? undefined : value;
 }
 
+/** Flags each command accepts. An unknown flag must FAIL, not be ignored:
+ * `heal --help` used to run a real, paid heal and edit the working tree
+ * (round-2 consumer walkthrough). Help is answered for every command. */
+const COMMAND_FLAGS: Record<string, Set<string>> = {
+  init: new Set<string>(),
+  heal: new Set([
+    '--model', '--dry-run', '--only', '--skip', '--no-cache', '--oracle-file',
+    '--config-file', '--max-attempts', '--min-confidence', '--stages',
+    '--failures-dir', '--heals-dir',
+  ]),
+  report: new Set(['--format', '--out', '--failures-dir', '--heals-dir']),
+  eject: new Set(['--prompts-dir']),
+};
+
+/** Print usage on --help/-h; reject unknown flags. Returns an exit code to
+ * use, or null to proceed with the command. */
+function checkFlags(command: string): number | null {
+  const rest = process.argv.slice(3);
+  if (rest.includes('--help') || rest.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+  const allowed = COMMAND_FLAGS[command];
+  for (const token of rest) {
+    if (token.startsWith('-') && !allowed.has(token)) {
+      console.error(`goldseam ${command}: unknown flag "${token}" — run \`goldseam\` for usage`);
+      return 1;
+    }
+  }
+  return null;
+}
+
 function init(): number {
   const configPath = ['cypress.config.ts', 'cypress.config.js', 'cypress.config.mjs', 'cypress.config.cjs'].find(
     (p) => existsSync(p),
@@ -331,6 +363,10 @@ const runAsync = (name: string, fn: () => Promise<number>): void => {
 };
 
 const command = process.argv[2];
+if (command !== undefined && command in COMMAND_FLAGS) {
+  const code = checkFlags(command);
+  if (code !== null) process.exit(code);
+}
 switch (command) {
   case 'init':
     process.exit(init());

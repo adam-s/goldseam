@@ -108,10 +108,10 @@ npx goldseam report               # per-test summary of captures + heals (--form
 The app under test must be reachable (same requirement as `cypress run`).
 
 Captures outlive their heal: a successful heal edits your spec but leaves
-the capture in `.goldseam/failures/` (your next Cypress run refreshes or
-removes it). Re-running `heal` on a stale capture costs nothing — goldseam
-detects that the broken selector is gone from the spec and reports it
-without a model call.
+the capture in `.goldseam/failures/` — a later failing run refreshes it;
+delete the file once the heal is committed. Re-running `heal` on a stale
+capture is cheap: goldseam detects that the broken selector is gone from
+the spec and reports it without a model call.
 
 ### What it actually does
 
@@ -231,6 +231,10 @@ page and are refused.
 - `npx goldseam eject` renders any cached translation as plain Cypress
   code — and unlike the incumbent, **ejected code still heals**: it goes
   through the normal capture → heal pipeline (Tool 1).
+- If the app changes under an authored test, the cached translation is
+  what breaks — and healing edits spec code, not caches. Delete that
+  cache file (or edit the steps) to retranslate against the new page, or
+  eject first and let the pasted code heal like any other spec.
 - Translation model: the plugin's `promptModel` option (default `claude` →
   Sonnet), or the `GOLDSEAM_PROMPT_MODEL` env var.
 
