@@ -10,7 +10,7 @@
 // - The captured DOM is redacted by default; the model never needs field
 //   values to fix a selector.
 
-import { ariaSnapshot } from '@adam-s/aria-snapshot';
+import { ariaSnapshot } from 'aria-snapshot';
 import { CAPTURE_TASK, FailureCapture } from '../shared/types';
 import { registerAuthoringCommand } from './authoring';
 import { maskText, redactedOuterHtml } from './redact';
