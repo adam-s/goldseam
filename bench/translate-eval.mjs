@@ -133,6 +133,10 @@ console.log(`\nscore: ${summary.score}   must-refuse: ${summary.mustRefuse}   (r
 const baselinePath = new URL('./translate-baseline.json', import.meta.url).pathname;
 if (existsSync(baselinePath)) {
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  if (baseline.model !== model) {
+    console.log(`baseline is for ${baseline.model} — informational run, no gate`);
+    process.exit(0);
+  }
   const basePassed = Number(baseline.score.split('/')[0]);
   if (passed < basePassed) {
     console.error(`REGRESSION vs baseline ${baseline.score} (${baseline.ranAt})`);

@@ -1,0 +1,25 @@
+{
+  "steps": [
+    "Type 'octocat' into the username field",
+    "Type 'wrong-pw' into the password field",
+    "Click the sign in button"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "#login_field",
+        "textIncludes": "octocat"
+      },
+      {
+        "action": "type",
+        "target": "#password",
+        "textIncludes": "wrong-pw"
+      },
+      {
+        "action": "click",
+        "target": "input[name=\"commit\"]"
+      }
+    ]
+  }
+}

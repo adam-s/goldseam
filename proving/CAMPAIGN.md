@@ -130,3 +130,8 @@ moments, never CI.
   legitimacy, label assembly) + one self-tuned rule (interaction-
   triggered content → text asserts, portals named) took 18/20 → 20/20
   held twice. Baseline frozen at 20/20.
+- 2026-07-04 legs B+C: three external-DOM eval fixtures (GitHub login,
+  HN nav, HN two-identical-forms scoping) — 23/23 first try, Sonnet
+  baseline refrozen. Haiku column: 23/23, must-refuse 4/4 — the hardened
+  prompt holds a full model tier down. Green-run manifest (leg A) closed
+  the oracle provenance floor the same day.

@@ -22,3 +22,16 @@ Case layout: `<name>/dom.html`, `<name>/case.json`
 textIncludes?, containsIncludes?, shadowHost?}]}}) — `target` is the
 grader's canonical selector for the intended element; extra trailing
 asserts emitted by the model are tolerated, wrong targets are not.
+
+## Measured (2026-07-04, 23 cases)
+
+| model | score | must-refuse |
+| --- | --- | --- |
+| claude:sonnet | 23/23 | 4/4 |
+| claude:haiku | 23/23 | 4/4 |
+
+Three cases use real external DOMs (GitHub login, Hacker News front +
+login pages, fetched and stripped) — the rest are authored. Haiku
+matching Sonnet says the prompt contract (grounding, refusal, text
+asserts) carries the accuracy, not model horsepower; the gate baseline
+stays Sonnet's.

@@ -1,0 +1,13 @@
+{
+  "steps": [
+    "Click the 'new' link in the top navigation"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "click",
+        "target": ".pagetop a[href=\"newest\"]"
+      }
+    ]
+  }
+}

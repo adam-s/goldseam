@@ -1,0 +1,14 @@
+{
+  "steps": [
+    "Type 'pg' into the login form's username field (not the create-account form)"
+  ],
+  "expect": {
+    "commands": [
+      {
+        "action": "type",
+        "target": "form:nth-of-type(1) input[name=\"acct\"]",
+        "textIncludes": "pg"
+      }
+    ]
+  }
+}

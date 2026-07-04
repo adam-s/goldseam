@@ -1,6 +1,6 @@
 {
-  "model": "claude:sonnet",
-  "ranAt": "2026-07-04T07:26:09.830Z",
+  "model": "claude:haiku",
+  "ranAt": "2026-07-04T07:30:27.184Z",
   "score": "23/23",
   "mustRefuse": "4/4",
   "results": [
@@ -13,7 +13,7 @@
         "commands": [
           {
             "action": "click",
-            "selector": "button[aria-label='Print report']"
+            "selector": "button[aria-label=\"Print report\"]"
           }
         ]
       }
@@ -84,7 +84,7 @@
         "commands": [
           {
             "action": "click",
-            "selector": "a[href='newest']"
+            "selector": "a[href=\"newest\"]"
           }
         ]
       }
@@ -98,7 +98,7 @@
         "commands": [
           {
             "action": "type",
-            "selector": "form:first-of-type input[name='acct']",
+            "selector": "input[name=\"acct\"][autofocus]",
             "text": "pg"
           }
         ]
@@ -138,7 +138,7 @@
           },
           {
             "action": "click",
-            "selector": "button[type='submit'].radius"
+            "selector": ".radius"
           }
         ]
       }
@@ -186,8 +186,8 @@
           {
             "action": "assert",
             "selector": "#note-count",
-            "should": "have.text",
-            "value": "2 notes"
+            "contains": "2 notes",
+            "should": "be.visible"
           }
         ]
       }
@@ -221,7 +221,7 @@
           {
             "action": "trigger",
             "selector": "#tip-trigger",
-            "event": "mouseenter"
+            "event": "mouseover"
           },
           {
             "action": "assert",
@@ -240,7 +240,7 @@
         "commands": [
           {
             "action": "click",
-            "selector": ".cart-item:nth-child(2) .remove"
+            "selector": ".cart li:nth-child(2) .remove"
           }
         ]
       }
@@ -251,7 +251,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: No export to CSV button found in the page HTML. The page contains only Print, Share, Menu, and Contact buttons. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: No 'export to CSV' button found in the page HTML. Buttons present: Menu, Print, Share, Contact. — make the step specific enough to name one target"
       }
     },
     {
@@ -260,7 +260,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: Two 'Save' buttons exist — one in #profile and one in #billing — and the step does not specify which to click. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: Two 'Save' buttons on the page (Profile section, Billing section) — step does not specify which one to click — make the step specific enough to name one target"
       }
     },
     {
@@ -269,7 +269,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: Three buttons exist (OK, Cancel, Retry) and the step does not specify which one to click. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: Three buttons present (OK, Cancel, Retry) — step does not specify which one — make the step specific enough to name one target"
       }
     },
     {
@@ -278,7 +278,7 @@
       "failures": [],
       "outcome": {
         "kind": "refused",
-        "reason": "the model declined to translate: 'Zoe Z.' is not rendered in the current HTML — the virtual list only materialises rows 3–4999 when scrolled into view, so no selector for that row exists in the provided markup. Scrolling to the bottom and clicking by text content would require Cypress `cy.contains()` semantics, which the click command's CSS selector field cannot express. The step needs either a `contains`-capable click command or a guarantee the row is visible before this step runs. — make the step specific enough to name one target"
+        "reason": "the model declined to translate: 'Zoe Z.' is not visible in the provided HTML. The page displays a virtual list with only rows 0–2 rendered (Aaron A., Abby B., Adam C.); rows 3–4999 appear only on scroll. The target 'Zoe Z.' is not in the static HTML and its position in the list cannot be determined without additional information. — make the step specific enough to name one target"
       }
     },
     {
@@ -305,7 +305,7 @@
         "commands": [
           {
             "action": "click",
-            "shadow": "x-card#pricing",
+            "shadow": "#pricing",
             "selector": ".buy"
           }
         ]
