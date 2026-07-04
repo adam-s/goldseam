@@ -56,7 +56,7 @@ heal a reviewed commit. Then the trust rungs nobody else ships.
 - Port the proven capture pipeline: `Cypress.on('fail')` stash (no `cy.*`;
   `finally { throw err }`) → `afterEach` + namespaced `cy.task` → Node
   writer → `.goldseam/failures/<slug>-<hash6>.json`, `schemaVersion: 1`,
-  aria snapshot via `@goldseam/aria-snapshot`.
+  aria snapshot via `@goldseam-ai/aria-snapshot`.
 - Options: `failuresDir`, `ariaSnapshot`, `maxDomBytes` (+ truncation
   flag), `redact` (strip value-bearing attributes, mask email/number-like
   text — the model consumes this DOM, so redaction is a capture concern,
@@ -138,7 +138,7 @@ with no network egress.
 ### M6 — Oracle rung + the benchmark (the launch asset)
 
 - `oracle` rung: healed selector must resolve to the element the mutation
-  intended — `matchesAriaTree` from `@goldseam/aria-snapshot` against the
+  intended — `matchesAriaTree` from `@goldseam-ai/aria-snapshot` against the
   pre-mutation capture; mutation branches record oracle selectors as
   ground truth.
 - Benchmark harness: N mutation branches × the selector-style axis from

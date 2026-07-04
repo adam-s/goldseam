@@ -1,5 +1,5 @@
 {
-  "name": "@goldseam/aria-snapshot",
+  "name": "@goldseam-ai/aria-snapshot",
   "version": "0.1.0",
   "description": "Playwright's ariaSnapshot (accessibility-tree walk + YAML renderer) as a standalone, pure-DOM package. Runs in any page context \u2014 no CDP, no Playwright runtime.",
   "license": "Apache-2.0",

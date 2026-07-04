@@ -1,4 +1,4 @@
-// Public API of @goldseam/aria-snapshot.
+// Public API of @goldseam-ai/aria-snapshot.
 //
 // This package is a lift of Playwright's injected-script aria snapshot
 // implementation (via the cordyceps project): a pure-DOM accessibility-tree
