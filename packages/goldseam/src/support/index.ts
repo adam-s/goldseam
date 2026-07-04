@@ -34,8 +34,16 @@ let installed = false;
 
 export function installGoldseam(userOptions: GoldseamSupportOptions = {}): void {
   // Config-file-only wiring: Cypress env `goldseam` merges under explicit
-  // options (also how the E2E toggles recordOracles per run).
-  const envOptions = (Cypress.env('goldseam') ?? {}) as GoldseamSupportOptions;
+  // options (also how the E2E toggles recordOracles per run). Cypress 15's
+  // `allowCypressEnv: false` makes Cypress.env() THROW — a projects-may-set
+  // (and future-default) hardening we must survive: env options are
+  // optional sugar, never worth failing the whole suite over.
+  let envOptions: GoldseamSupportOptions = {};
+  try {
+    envOptions = (Cypress.env('goldseam') ?? {}) as GoldseamSupportOptions;
+  } catch {
+    // allowCypressEnv: false — fall back to explicit options only.
+  }
   const options: GoldseamSupportOptions = { ...envOptions, ...userOptions };
   // Guard across module COPIES too (monorepo dupes/version skew): two
   // installed instances would each defer re-throwing to the other and

@@ -154,3 +154,21 @@ describe('idempotent install', () => {
     expect(onCallCount).toBe(before);
   });
 });
+
+describe('allowCypressEnv: false compatibility', () => {
+  it('survives a Cypress.env() that throws (env options are optional sugar)', () => {
+    // Cypress 15's allowCypressEnv: false makes Cypress.env() throw; a
+    // support file that dies on it fails the whole suite at load
+    // (demo-video finding — and Cypress plans to make false the default).
+    const cypressGlobal = (globalThis as any).Cypress;
+    const realEnv = cypressGlobal.env;
+    cypressGlobal.env = () => {
+      throw new Error('Cypress.env() is disabled by allowCypressEnv: false');
+    };
+    try {
+      expect(() => installGoldseam()).not.toThrow();
+    } finally {
+      cypressGlobal.env = realEnv;
+    }
+  });
+});
