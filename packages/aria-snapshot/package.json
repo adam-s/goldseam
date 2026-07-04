@@ -1,13 +1,14 @@
 {
   "name": "@goldseam/aria-snapshot",
   "version": "0.1.0",
-  "description": "Playwright's ariaSnapshot (accessibility-tree walk + YAML renderer) as a standalone, pure-DOM package. Runs in any page context — no CDP, no Playwright runtime.",
+  "description": "Playwright's ariaSnapshot (accessibility-tree walk + YAML renderer) as a standalone, pure-DOM package. Runs in any page context \u2014 no CDP, no Playwright runtime.",
   "license": "Apache-2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -16,5 +17,18 @@
   "devDependencies": {
     "typescript": "^6.0.3",
     "yaml": "^2.9.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adam-s/goldseam.git",
+    "directory": "packages/aria-snapshot"
+  },
+  "keywords": [
+    "aria",
+    "accessibility",
+    "a11y",
+    "aria-snapshot",
+    "playwright",
+    "yaml"
+  ]
 }
