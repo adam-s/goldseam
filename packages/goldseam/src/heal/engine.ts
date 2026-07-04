@@ -99,6 +99,7 @@ export async function healArtifactFile(
     ctx.proposalSource = undefined;
 
     let attemptFailed = false;
+    let infraFailed = false;
     for (const stage of stages) {
       const v = await stage.run(ctx);
       record.ladder.push(v);
@@ -109,6 +110,11 @@ export async function healArtifactFile(
       if (v.verdict === 'fail') {
         ctx.feedback = `Attempt ${attempt} was rejected at stage "${v.stage}": ${v.evidence}`;
         attemptFailed = true;
+        // Infrastructure failures (Cypress itself could not run) cannot be
+        // fixed by re-proposing — retrying just burns identical model
+        // calls (proving-campaign finding: 3× the same 0.97 edit against
+        // a broken runner). Abort the heal instead.
+        infraFailed = v.evidence.startsWith('cypress could not run');
         break;
       }
     }
@@ -125,6 +131,7 @@ export async function healArtifactFile(
       break; //       rerun stage ran (propose-only ladders, custom configs)
     }
     ctx.revert();
+    if (infraFailed) break; // failed, honestly — the runner is broken, not the proposal
   }
   if (outcome !== 'healed') ctx.revert();
 

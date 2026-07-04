@@ -1,0 +1,1 @@
+import 'goldseam/support/register';

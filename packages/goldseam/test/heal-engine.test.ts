@@ -154,6 +154,37 @@ describe('red-team regressions', () => {
   });
 });
 
+describe('infrastructure failures', () => {
+  it('aborts after one attempt when Cypress itself cannot run (no retry burn)', async () => {
+    const { STAGES } = await import('../src/heal/stages');
+    STAGES['broken-runner'] = {
+      name: 'broken-runner',
+      async run() {
+        return {
+          stage: 'broken-runner',
+          verdict: 'fail',
+          evidence: 'cypress could not run: Could not find Cypress test run results',
+          durationMs: 0,
+        };
+      },
+    };
+    try {
+      const runner = stubRunner([GOOD_REPLY]);
+      const heal = await healArtifactFile(
+        artifactPath,
+        runner,
+        makeOptions({ stages: ['propose', 'broken-runner'], maxAttempts: 3 }),
+      );
+      expect(heal.verdict).toBe('failed');
+      expect(heal.attempts).toHaveLength(1); // no identical re-proposals against a broken runner
+      expect(runner.calls).toBe(1);
+      expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC); // reverted
+    } finally {
+      delete STAGES['broken-runner'];
+    }
+  });
+});
+
 describe('heal memory (cache tier)', () => {
   // The capture's failedSelector must be derivable for caching; the
   // beforeEach artifact lacks one, so write it explicitly here.
