@@ -13,6 +13,7 @@ import { renderEntry } from './eject';
 import { ReportEntry, buildReport, renderMarkdown } from './report';
 import { FailureArtifact } from '../shared/types';
 import { HealArtifact } from '../heal/types';
+import { loadGoldseamConfig, resolveHealModel } from '../shared/config';
 
 const USAGE = `goldseam — self-healing for the Cypress suites you already have
 
@@ -23,8 +24,12 @@ Usage:
   goldseam eject            render cached cy.goldseam translations as plain Cypress code
   goldseam pr               open PR(s) from verified heals            (M5, not yet)
 
+Config: an optional goldseam.config.mjs at the project root supplies
+defaults for both this CLI and cy.goldseam(); every flag below overrides it.
+
 heal options:
-  --model <spec>          claude | claude:<model> | cmd:<executable>   (default: claude → Sonnet)
+  --model <spec>          claude | claude:<model> | ollama:<model> | openai:<model> | cmd:<exe>
+                          (default: GOLDSEAM_MODEL env, then config, then claude → Sonnet)
   --dry-run               propose + validate only; touch nothing, skip reruns
   --only <substr>         heal only captures whose spec path or title matches
   --skip <substr>         skip captures whose spec path or title matches
@@ -99,20 +104,28 @@ async function heal(): Promise<number> {
   // nothing; an exotic cmd: Electron runner is the documented tradeoff).
   delete process.env.ELECTRON_RUN_AS_NODE;
   const projectRoot = process.cwd();
-  const failuresDir = arg('--failures-dir') ?? join('.goldseam', 'failures');
+  // goldseam.config.mjs (if any) supplies defaults BELOW every flag: a
+  // flag always wins, the config fills what the flag left unset.
+  const cfg = await loadGoldseamConfig(projectRoot);
+  const cacheDisabled = process.argv.includes('--no-cache') || cfg.heal?.cache === false;
+  const failuresDir =
+    arg('--failures-dir') ?? cfg.heal?.failuresDir ?? join('.goldseam', 'failures');
   const options: HealOptions = {
     ...DEFAULT_HEAL_OPTIONS,
-    stages: arg('--stages')?.split(',').map((s) => s.trim()) ?? DEFAULT_HEAL_OPTIONS.stages,
-    maxAttempts: Number(arg('--max-attempts') ?? DEFAULT_HEAL_OPTIONS.maxAttempts),
-    minConfidence: Number(arg('--min-confidence') ?? DEFAULT_HEAL_OPTIONS.minConfidence),
+    stages:
+      arg('--stages')?.split(',').map((s) => s.trim()) ??
+      cfg.heal?.stages ??
+      DEFAULT_HEAL_OPTIONS.stages,
+    maxAttempts: Number(arg('--max-attempts') ?? cfg.heal?.maxAttempts ?? DEFAULT_HEAL_OPTIONS.maxAttempts),
+    minConfidence: Number(arg('--min-confidence') ?? cfg.heal?.minConfidence ?? DEFAULT_HEAL_OPTIONS.minConfidence),
     dryRun: process.argv.includes('--dry-run'),
     projectRoot,
-    healsDir: arg('--heals-dir') ?? join('.goldseam', 'heals'),
-    cacheFile: process.argv.includes('--no-cache') ? null : join('.goldseam', 'heal-cache.json'),
-    oracleFile: arg('--oracle-file') ?? join('.goldseam', 'oracle.json'),
-    configFile: arg('--config-file'),
+    healsDir: arg('--heals-dir') ?? cfg.heal?.healsDir ?? join('.goldseam', 'heals'),
+    cacheFile: cacheDisabled ? null : join('.goldseam', 'heal-cache.json'),
+    oracleFile: arg('--oracle-file') ?? cfg.heal?.oracleFile ?? join('.goldseam', 'oracle.json'),
+    configFile: arg('--config-file') ?? cfg.heal?.configFile,
   };
-  const runner = resolveRunner(arg('--model') ?? 'claude');
+  const runner = resolveRunner(resolveHealModel(arg('--model'), process.env, cfg));
 
   if (!existsSync(failuresDir)) {
     console.log(`goldseam heal: no captures found in ${failuresDir} — nothing to do.`);
@@ -178,9 +191,10 @@ async function heal(): Promise<number> {
   return 0;
 }
 
-function report(): number {
-  const failuresDir = arg('--failures-dir') ?? join('.goldseam', 'failures');
-  const healsDir = arg('--heals-dir') ?? join('.goldseam', 'heals');
+async function report(): Promise<number> {
+  const cfg = await loadGoldseamConfig(process.cwd());
+  const failuresDir = arg('--failures-dir') ?? cfg.heal?.failuresDir ?? join('.goldseam', 'failures');
+  const healsDir = arg('--heals-dir') ?? cfg.heal?.healsDir ?? join('.goldseam', 'heals');
   const format = arg('--format') ?? 'md';
 
   const captureFiles = existsSync(failuresDir)
@@ -211,6 +225,23 @@ function report(): number {
   return 0;
 }
 
+async function eject(): Promise<number> {
+  const cfg = await loadGoldseamConfig(process.cwd());
+  const dir = arg('--prompts-dir') ?? cfg.author?.promptsDir ?? '.goldseam-prompts';
+  if (!existsSync(dir)) {
+    console.log(`goldseam eject: no translations in ${dir}.`);
+    return 0;
+  }
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const entry = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+    console.log(`\n// ─── ${f} ───`);
+    console.log(renderEntry(entry.steps, entry.commands));
+  }
+  console.log('\n// Paste into your spec to replace the cy.goldseam(...) call.');
+  console.log('// Ejected code keeps healing — it goes through the normal capture → heal pipeline.');
+  return 0;
+}
+
 const command = process.argv[2];
 switch (command) {
   case 'init':
@@ -226,24 +257,23 @@ switch (command) {
     );
     break;
   case 'report':
-    process.exit(report());
+    report().then(
+      (code) => process.exit(code),
+      (err) => {
+        console.error(`goldseam report: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      },
+    );
     break;
-  case 'eject': {
-    const dir = arg('--prompts-dir') ?? '.goldseam-prompts';
-    if (!existsSync(dir)) {
-      console.log(`goldseam eject: no translations in ${dir}.`);
-      process.exit(0);
-    }
-    for (const f of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-      const entry = JSON.parse(readFileSync(join(dir, f), 'utf8'));
-      console.log(`\n// ─── ${f} ───`);
-      console.log(renderEntry(entry.steps, entry.commands));
-    }
-    console.log('\n// Paste into your spec to replace the cy.goldseam(...) call.');
-    console.log('// Ejected code keeps healing — it goes through the normal capture → heal pipeline.');
-    process.exit(0);
+  case 'eject':
+    eject().then(
+      (code) => process.exit(code),
+      (err) => {
+        console.error(`goldseam eject: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      },
+    );
     break;
-  }
   case 'pr':
     console.error(`goldseam ${command}: not implemented yet (see docs/plan.md, M5)`);
     process.exit(1);

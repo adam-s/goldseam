@@ -1,4 +1,4 @@
-# The verification ladder — folding Adam's QA patterns into goldseam
+# The verification ladder — folding real-world QA patterns into goldseam
 
 Catalog date: 2026-07-03. Source: survey of `.claude/skills` and
 `.claude/agents` across ~/Projects (agent-spec, job-hunter, waypoint,

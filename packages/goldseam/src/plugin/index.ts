@@ -7,6 +7,7 @@ import { writeCaptureArtifact } from './artifacts';
 import { TranslatePayload, loadPromptCache, translateSteps } from './translate';
 import { OracleRecordPayload, recordOracleEntries } from './oracle';
 import { ORACLE_TASK } from '../shared/types';
+import { GoldseamConfig, loadGoldseamConfig, resolvePromptModel } from '../shared/config';
 
 export interface GoldseamPluginOptions {
   /** Where failure artifacts land. Default `.goldseam/failures`. */
@@ -30,9 +31,14 @@ export function goldseam(
   // `goldseam heal` (run from the repo root) can't find it. Surfaced by
   // the PrairieLearn proving ground, 2026-07-03.
   const root = config.projectRoot ?? process.cwd();
+  // goldseam.config.mjs loads async (ESM), but goldseam() is synchronous —
+  // so kick the load off now and await it lazily inside the translate task
+  // (itself async). A broken config surfaces there, not by failing setup.
+  const configReady: Promise<GoldseamConfig> = loadGoldseamConfig(root).catch((error) => {
+    console.error(`[goldseam] ${error instanceof Error ? error.message : error}`);
+    return {};
+  });
   const failuresDir = options.failuresDir ?? join(root, '.goldseam', 'failures');
-  const promptsDir = options.promptsDir ?? join(root, '.goldseam-prompts');
-  const promptModel = options.promptModel ?? process.env.GOLDSEAM_PROMPT_MODEL ?? 'claude';
 
   on('task', {
     [CAPTURE_TASK]: (capture: FailureCapture) => {
@@ -44,9 +50,17 @@ export function goldseam(
       }
       return null;
     },
-    'goldseam:prompt:load': ({ key }: { key: string }) => loadPromptCache(promptsDir, key),
-    'goldseam:prompt:translate': (payload: TranslatePayload) =>
-      translateSteps(payload, promptModel, promptsDir),
+    'goldseam:prompt:load': async ({ key }: { key: string }) => {
+      const cfg = await configReady;
+      const promptsDir = options.promptsDir ?? cfg.author?.promptsDir ?? join(root, '.goldseam-prompts');
+      return loadPromptCache(promptsDir, key);
+    },
+    'goldseam:prompt:translate': async (payload: TranslatePayload) => {
+      const cfg = await configReady;
+      const promptsDir = options.promptsDir ?? cfg.author?.promptsDir ?? join(root, '.goldseam-prompts');
+      const promptModel = resolvePromptModel(options.promptModel, process.env, cfg);
+      return translateSteps(payload, promptModel, promptsDir);
+    },
     [ORACLE_TASK]: (payload: OracleRecordPayload) =>
       recordOracleEntries(join(root, '.goldseam', 'oracle.json'), payload),
   });

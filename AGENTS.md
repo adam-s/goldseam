@@ -26,8 +26,8 @@ every file is held to the open-source bar.**
 ## The iteration process
 
 1. **Plan first.** Work maps to a milestone in [docs/plan.md](docs/plan.md);
-   each has a "done when" gate. Don't start roadmap items Adam hasn't asked
-   for.
+   each has a "done when" gate. Don't start roadmap items the maintainer
+   hasn't asked for.
 2. **Probe before fixing.** When behavior is uncertain (Cypress internals
    especially), write an empirical probe and observe — the specs in
    [cypress/hardening/](cypress/hardening/) exist because probing found two
@@ -44,8 +44,8 @@ every file is held to the open-source bar.**
 
 ### Autonomous iteration campaigns
 
-When Adam explicitly authorizes unattended iteration ("keep iterating
-while I'm out"), run this loop, one commit per iteration:
+When the maintainer explicitly authorizes unattended iteration ("keep
+iterating while I'm out"), run this loop, one commit per iteration:
 
 1. **Mine reality.** Search the incumbents' issue queues and docs
    (cypress-io/cypress cy.prompt label, healenium/*, codeceptjs heal,
@@ -66,7 +66,8 @@ while I'm out"), run this loop, one commit per iteration:
    [.agents/skills/](.agents/skills/) and fix what survives scrutiny.
 
 The demo shop may grow arbitrarily complex in service of covering real
-use cases — realism outranks minimalism there (Adam's standing license).
+use cases — realism outranks minimalism there (a standing license from the
+maintainer).
 Publishing to npm and renaming stay out of scope for autonomous runs.
 
 ## Durable knowledge — no memory systems
@@ -79,8 +80,8 @@ references), [docs/](docs/) (plans, research), or code comments
 version-controlled. If you learn something worth keeping, put it in the
 right file before the session ends; if it only matters to the current
 conversation, it doesn't need keeping. Pasted context (handoffs,
-roadmaps, notes) is briefing, not a work order — Adam directs what gets
-built and when.
+roadmaps, notes) is briefing, not a work order — the maintainer directs
+what gets built and when.
 
 ## Hard rules
 

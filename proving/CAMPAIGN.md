@@ -1,150 +1,99 @@
-# Proving campaign — 2026-07-04 overnight run
+# Proving campaign — 2026-07
 
-Recursive iteration over real open-source apps (Adam's authorization:
-"choose 4 more candidates and run the iterations"). Pattern per app:
-clone to `/tmp/goldseam-proving/<app>`, boot locally, write specs in the
-app's native selector culture, green baseline, induce realistic drift in
-the /tmp copy, drive capture → heal (stub for mechanics, real Sonnet for
-proving moments) and `cy.goldseam` authoring — every goldseam stumble
-becomes a fix + pinned test + one conventional commit.
+Recursive iteration over real open-source apps. Pattern per app: clone to
+`/tmp/goldseam-proving/<app>`, boot locally, write specs in the app's native
+selector culture, take a green baseline, induce realistic drift in the copy,
+then drive capture → heal (stub for mechanics, real Sonnet for proving
+moments) and `cy.goldseam` authoring. Every goldseam stumble becomes a fix +
+pinned test + one conventional commit. Real-model calls happen only at
+proving moments, never in CI.
 
-| App | Culture | Status |
+| App | Culture | Result |
 | --- | --- | --- |
-| PrairieLearn | Bootstrap prod monorepo, data-testid | done 2026-07-03 (2 real bugs) |
-| TodoMVC (js-es6) | semantic classes, zero hooks | DONE: 2 real heals, give-up, authoring ✓; 5 bugs fixed |
-| Juice Shop | Angular Material, id/class/aria soup | DONE: aria-label heal, honest give-up; 3 bugs fixed |
-| Shoelace docs | web components, shadow DOM | DONE: shadow heal to [part] API; 185-shadow-root capture |
-| Cypress RWA | React, data-test everywhere | DONE: 3-edit heal + sibling (0 calls) |
+| PrairieLearn | Bootstrap prod monorepo, data-testid | 2 real bugs |
+| TodoMVC (js-es6) | semantic classes, zero hooks | 2 heals, 1 give-up, authoring ✓; 5 bugs |
+| Juice Shop | Angular Material, id/class/aria soup | aria-label heal, honest give-up; 3 bugs |
+| Shoelace docs | web components, shadow DOM | shadow heal to `[part]` API; 185-root capture |
+| Cypress RWA | React, data-test everywhere | 3-edit heal + sibling heal (0 calls) |
 
-Boot notes:
-- TodoMVC: `npx http-server /tmp/goldseam-proving/todomvc/examples/javascript-es6/dist -p 4180 -c-1`
-- Juice Shop: `npm start` in the clone (port 3000, sqlite in-memory)
-- Shoelace: `npm start` in the clone (docs dev server; note real port here)
-- CRWA: `yarn dev` (UI 3000, API 3001) — boot AFTER Juice Shop is done (port clash)
-
-Learnings land here as they happen; fixes land in the main packages with
-pinned tests. Real-model calls: heals + translations only at proving
-moments, never CI.
+**Totals:** 4 new apps + PrairieLearn · 6 real Sonnet heals · 2 honest
+give-ups · authoring proved on 3 apps · 10 goldseam bugs found, fixed, and
+pinned.
 
 ## Log
 
-- 2026-07-04: campaign scaffolded; TodoMVC served, baseline suite written.
-- 2026-07-04 TodoMVC leg 1: `.clear-completed→.purge-done` drift healed by
-  Sonnet (0.97, one attempt) AFTER fixing two goldseam bugs it exposed:
-  CLI must strip ELECTRON_RUN_AS_NODE (VS Code terminals break the rerun
-  rungs), and infra failures must abort instead of re-proposing (3×
-  identical model calls burned). Both pinned.
-- 2026-07-04 TodoMVC leg 2 (hook drift): `.new-todo` drift broke beforeEach
-  → Cypress aborts the whole describe, ONE capture titled `todos "before
-  each" hook`. Exposed a correctness bug: rerunVerdictFor matched by test
-  title, so hook heals could NEVER verify ("did not run" while all 4 gated
-  tests passed). Fixed: hook-title verdicts judge the suite running past
-  the hook; grep skipped for hook titles; identical-proposal dedup stops
-  the retry burn (post-propose failures only — parse/validation keep the
-  feedback budget); weak-assertion window widens to the whole suite for
-  hook heals (the flag misfired on strongly-asserted gated tests). All
-  pinned; Sonnet healed the 2-edit hook drift through the full ladder.
-- 2026-07-04 TodoMVC leg 3: state-gated scenario (input hidden 3s,
-  `.new-todo:visible` timeout) → triage gave up honestly with ZERO model
-  calls ("state-gated, not selector drift") — the cypress#7306-class
-  proof. Authoring: 3 English steps → Sonnet translated to
-  visit/type/assert(have.length), green in one run, cache committed
-  (replays are free). TodoMVC leg complete.
-- 2026-07-04 Juice Shop leg: #loginButton drift healed by Sonnet to
-  [aria-label="Login"] across both spec sites (~500KB Angular DOMs).
-  Bugs: comment-defeated sibling probe (includes → string-literal-aware),
-  stale-capture model burn + healed-artifact overwrite (same root), jsdom
-  CSS spam (VirtualConsole in parseDom). Hygiene lesson: spec comments
-  are model-visible — the first give-up proof was contaminated by its own
-  scenario comment; reran hint-free and the model refused independently
-  ("no plausible target element to remap").
-- 2026-07-04 Shoelace leg: source-level shadow drift (esbuild watch beats
-  chunk edits); capture carried 185 serialized shadow roots; Sonnet healed
-  .dialog__panel to [part="panel"] — the PUBLIC component API, better than
-  chasing the renamed internal. Cypress's own shadow limits documented
-  live (no cross-boundary combinators; #33046 visibility). healenium#81 +
-  cypress#8843 rows proved.
-- 2026-07-04 mid-campaign red-team over the fix batch: 2 HIGHs in the
-  hook verdict (after-hooks vacuous pass; pending-only pass) fixed —
-  verdicts now require >=1 PASSED test; HOOK_TITLE_RE anchored to mocha's
-  title shape (user tests mentioning hooks no longer misclassified);
-  dedup scoped to deterministic rungs (rerun flake keeps its budget);
-  ELECTRON strip scoped to the heal path. CI reworked into the gauntlet:
-  parallel rungs + package-hygiene + suite-bites (deterministic mutation
-  smoke — found a missing unit pin for apply-then-revert on day one) +
-  the showcase job (break -> capture -> heal -> report in the job summary,
-  artifacts uploaded).
-- 2026-07-04 CRWA leg: data-test drift broke 2 tests; Sonnet healed with
-  a 3-edit multi-site heal to button[type=submit]; the second capture
-  sibling-healed with zero model calls. Guidance: default selectorPriority
-  lacks data-test — adopters using it should configure it. CI gauntlet
-  verified fully green via gh (9/9 jobs incl. suite-bites + showcase).
-  Campaign totals: 4 new apps + PrairieLearn, 6 real Sonnet heals, 2
-  honest give-ups, 1 authored test, 10 goldseam bugs found+fixed+pinned.
-- 2026-07-04 authoring sweep: cy.goldseam proved on Juice Shop and
-  Shoelace (TodoMVC already done). Two product improvements it forced:
-  (1) translate prompt now grounds selectors in the live DOM and uses
-  text-contains asserts for elements that don't exist yet (the model had
-  guessed a Material snackbar container for a not-yet-rendered error —
-  honest red, then green after the prompt fix); (2) the vocabulary gained
-  an optional `shadow` host field (cy.get(host).shadow().find(selector))
-  because CSS cannot cross shadow boundaries — plain English now drives
-  web components, which is open-issue territory for cy.prompt (#33042).
-  Note: translation caches key on step text alone — a prompt/model change
-  needs the cache file deleted to retranslate (by design; recorded).
-- 2026-07-04 live-site probes (throwaway, deleted): example.com,
-  Wikipedia, the-internet.herokuapp.com. Verified vague-but-unambiguous
-  steps translate grounded; positional language ("the second checkbox")
-  disambiguates; and a genuinely ambiguous step ("the checkbox", two
-  present) is REFUSED with a precise reason — repeatedly, and from cache
-  once refused. Product changes it forced: translation give-up (prompt +
-  parse + cached refusal), copy-from-DOM grounding rule (the model had
-  emitted legacy-Wikipedia #searchButton from priors), text-contains
-  asserts for unseen elements, and translationDom (head/script/style
-  stripped — a live Wikipedia head alone blew the 40k budget and forced
-  an honest refusal). Learning: fresh translations wobble run-to-run;
-  the committable cache pinning a reviewed-good translation is the
-  design working as intended. Hidden-state preconditions (Vector's
-  display:none search input) still need the toggle step spelled out —
-  honest failure, actionable message.
-- 2026-07-04 translation eval harness (bench/translate-eval.mjs): 16
-  fixture cases across selector cultures (bare ids, data-test, semantic
-  classes, aria-labels, Material-style class soup), scoping (table rows,
-  positional, shadow DSD), placeholders, unseen-element asserts, and 3
-  must-refuse traps — deterministically graded (emitted selectors must
-  resolve to the INTENDED element; refusals required where ambiguity
-  exists; no LLM judge). Sonnet with the hardened prompt: 16/16 twice
-  consecutively, must-refuse 3/3 both runs. Baseline committed; any
-  prompt change must hold it. Caveats recorded: fixtures are
-  author-written; 16 cases is a floor, grown by adding every future
-  failure as a case.
-- 2026-07-04 hazard catalog + recursive tuning: .agents/reference/
-  hazard-catalog.md (the intercept2 fake-sites move, goldseam-shaped:
-  every hazard names ONE runnable example across demo/hazards.html, eval
-  fixtures, and unit pins — walls are rows too). Eval grew to 20 cases
-  (virtualized-list refusal, dynamic-id stable-hook discipline with
-  forbidden-selector grading, split text, portal tooltip). bench/
-  translate-tune.mjs closes the intercept2 loop: eval → model revises its
-  OWN rules block (generalize-only discipline, keep-only-if-better,
-  converge on perfect×2). First run: two hand rules (positional
-  legitimacy, label assembly) + one self-tuned rule (interaction-
-  triggered content → text asserts, portals named) took 18/20 → 20/20
-  held twice. Baseline frozen at 20/20.
-- 2026-07-04 legs B+C: three external-DOM eval fixtures (GitHub login,
-  HN nav, HN two-identical-forms scoping) — 23/23 first try, Sonnet
-  baseline refrozen. Haiku column: 23/23, must-refuse 4/4 — the hardened
-  prompt holds a full model tier down. Green-run manifest (leg A) closed
-  the oracle provenance floor the same day.
-- 2026-07-04 runner matrix (Adam: "we have a qwen model, also use
-  ollama"): ollama:/openai: runners shipped with HTTP-shape unit pins
-  (the openai runner covers a Modal/vLLM serve endpoint whenever one is
-  deployed — the detect-study modal_qwen.py is batch-mode today). The
-  air-gapped proof took SIX probe iterations, each finding something
-  real: qwen found the right heal but flubbed JSON escaping (→ ollama
-  format:json constrained decoding); then truncated newString at inner
-  quotes (→ prompt teaches unquoted [attr=value] form); then nested
-  confidence/reasoning inside edits (→ lenient hoist, strict validation
-  kept). Final: qwen2.5:14b healed #cart-count→[data-testid=nav-cart]
-  span through the full ladder, one attempt, zero egress. Recorded
-  limitation: long attribute-quoted selectors can still defeat 14B-class
-  JSON escaping — the validator rejects the mangled edit honestly.
+- **TodoMVC.** (1) `.clear-completed→.purge-done` healed by Sonnet (0.97,
+  one attempt) after fixing two bugs it exposed: the CLI must strip
+  `ELECTRON_RUN_AS_NODE` (VS Code terminals break the rerun rungs), and infra
+  failures must abort instead of re-proposing (3× identical model calls
+  burned). (2) Hook drift: `.new-todo` broke `beforeEach`, yielding one
+  capture titled `todos "before each" hook`. This exposed a correctness bug —
+  `rerunVerdictFor` matched by test title, so hook heals could never verify.
+  Fixed: hook-title verdicts judge the suite running past the hook, grep is
+  skipped for hook titles, identical-proposal dedup stops the retry burn, and
+  the weak-assertion window widens to the whole suite for hook heals. (3)
+  State-gated scenario (`.new-todo:visible` timeout): triage gave up with
+  zero model calls ("state-gated, not selector drift"). Authoring: 3 English
+  steps translated to visit/type/assert, green in one run, cache committed.
+- **Juice Shop.** `#loginButton` healed to `[aria-label="Login"]` across two
+  spec sites (~500 KB Angular DOMs). Bugs fixed: comment-defeated sibling
+  probe, stale-capture model burn + healed-artifact overwrite, jsdom CSS
+  spam. Lesson: spec comments are model-visible — a give-up proof was
+  contaminated by its own scenario comment; rerun hint-free, the model
+  refused independently ("no plausible target element to remap").
+- **Shoelace.** Source-level shadow drift; the capture carried 185 serialized
+  shadow roots; Sonnet healed `.dialog__panel` to `[part="panel"]` — the
+  public component API, better than chasing the renamed internal. Cypress's
+  shadow limits documented live (no cross-boundary combinators).
+- **Mid-campaign red-team.** Two HIGHs in the hook verdict fixed: verdicts
+  now require ≥1 PASSED test, and `HOOK_TITLE_RE` is anchored to mocha's title
+  shape (user tests mentioning hooks no longer misclassified). Dedup scoped to
+  deterministic rungs (rerun flake keeps its budget); the `ELECTRON` strip
+  scoped to the heal path. CI reworked into the gauntlet: parallel rungs +
+  package-hygiene + suite-bites (deterministic mutation smoke) + a showcase
+  job (break → capture → heal → report in the summary).
+- **Cypress RWA.** data-test drift broke 2 tests; Sonnet healed with a 3-edit
+  multi-site edit to `button[type=submit]`; the second capture sibling-healed
+  with zero model calls. Guidance: the default `selectorPriority` lacks
+  data-test — adopters using it should configure it.
+- **Authoring sweep.** `cy.goldseam` proved on Juice Shop and Shoelace. Two
+  product improvements it forced: the translate prompt now grounds selectors
+  in the live DOM and uses text-contains asserts for not-yet-rendered
+  elements; and the vocabulary gained an optional `shadow` host field
+  (`cy.get(host).shadow().find(selector)`), so plain English drives web
+  components — open-issue territory for cy.prompt (#33042).
+- **Live-site probes** (throwaway: example.com, Wikipedia, the-internet).
+  Vague-but-unambiguous steps translate grounded; positional language ("the
+  second checkbox") disambiguates; a genuinely ambiguous step is refused with
+  a precise reason, and from cache once refused. Forced: translation give-up,
+  a copy-from-DOM grounding rule, text-contains asserts for unseen elements,
+  and `translationDom` (head/script/style stripped — a live Wikipedia head
+  alone blew the 40k budget).
+- **Translation eval** (`bench/translate-eval.mjs`). 16 fixture cases across
+  selector cultures, scoping, placeholders, and unseen-element asserts, plus
+  3 must-refuse traps — deterministically graded (no LLM judge). Sonnet with
+  the hardened prompt: 16/16 twice, must-refuse 3/3 both runs. Baseline
+  committed; any prompt change must hold it.
+- **Hazard catalog + recursive tuning.** `hazard-catalog.md` names one
+  runnable example per hazard across the demo, eval fixtures, and unit pins.
+  The eval grew to 20 cases (virtualized-list refusal, dynamic-id discipline,
+  split text, portal tooltip). `bench/translate-tune.mjs` has the model
+  revise its own rules block under generalize-only, keep-only-if-better
+  discipline: 18/20 → 20/20, held twice. Baseline frozen at 20/20.
+- **External-DOM fixtures.** GitHub login, HN nav, HN two-identical-forms
+  scoping — 23/23 first try, Sonnet baseline refrozen. Haiku column: 23/23,
+  must-refuse 4/4 — the hardened prompt holds a full model tier down. The
+  green-run manifest closed the oracle provenance floor.
+- **Runner matrix.** `ollama:` and `openai:` runners shipped with HTTP-shape
+  unit pins. The `openai:` runner is proven end-to-end against real OpenAI
+  (gpt-4o-mini: request → response → JSON-block parse ✓). A copy-paste Modal
+  self-host recipe lives in `selfhost/modal/`, unproven until run on a Modal account
+  (CI makes no cloud calls). The air-gapped proof took six probe iterations,
+  each finding something real: qwen found the right heal but flubbed JSON
+  escaping (→ ollama `format:json` constrained decoding); then truncated
+  newString at inner quotes (→ prompt teaches the unquoted `[attr=value]`
+  form); then nested confidence inside edits (→ lenient hoist, strict
+  validation kept). Final: qwen2.5:14b healed `#cart-count` →
+  `[data-testid=nav-cart]` through the full ladder, one attempt, zero egress.
+  Limitation: long attribute-quoted selectors can still defeat 14B-class JSON
+  escaping — the validator rejects the mangled edit honestly.

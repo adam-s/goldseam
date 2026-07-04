@@ -27,7 +27,18 @@ schema v1, prompt-cache schema v1).
   Studio, OpenAI). Parse leniency for smaller models, strictness kept:
   stringified confidence coerced, metadata nested inside edits hoisted;
   repair prompt teaches the unquoted CSS attribute form. Proved: local
-  Qwen 2.5 14B healed an id drift through the full six-rung ladder.
+  Qwen 2.5 14B healed an id drift through the full six-rung ladder; the
+  `openai:` runner proven end-to-end against real OpenAI (gpt-4o-mini:
+  request → response → JSON-block parse). A copy-paste Modal self-host
+  recipe lives in `selfhost/modal/` (deploy unproven in CI, which makes no
+  cloud calls).
+- Config: optional `goldseam.config.mjs` at the project root, read by both
+  the CLI and the plugin, sets the model — and heal/author defaults — in
+  one committable, reviewable place instead of split across a CLI flag and
+  a plugin option. Precedence: CLI flag / plugin option > env
+  (`GOLDSEAM_MODEL`, `GOLDSEAM_PROMPT_MODEL`) > config file > built-in
+  default. Secrets stay in env. `.mjs` so the standalone CLI loads it with
+  no bundler.
 - Green-run identity manifest (`recordOracles`, opt-in): passing tests
   record each `cy.get` selector's aria identity (role + accessible name)
   into `.goldseam/oracle.json` — the oracle rung then rejects any heal
