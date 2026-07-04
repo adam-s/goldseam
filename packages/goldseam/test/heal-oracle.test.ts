@@ -82,6 +82,12 @@ function makeCtx(
 
 const IDENTITY: OracleEntry = { specPath: SPEC_REL, title: 'adds', role: 'button', name: 'Add to cart' };
 
+function makeCtxWithSpec(newString: string, oracleFile: string | null, a: FailureArtifact, spec: string): HealContext {
+  const ctx = makeCtx(newString, oracleFile, a);
+  writeFileSync(join(root, a.specPath), spec);
+  return ctx;
+}
+
 describe('oracle stage (plain-Node — the CLI path)', () => {
   it('skips with evidence when no oracle file is configured', async () => {
     const v = await oracleStage.run(makeCtx(`cy.get('#add-to-cart')`, null));
@@ -128,6 +134,35 @@ describe('oracle stage (plain-Node — the CLI path)', () => {
     const file = writeOracle([{ ...IDENTITY, name: 'Pay now' }]);
     const v = await oracleStage.run(makeCtx(`cy.get('#shadow-pay')`, file));
     expect(v.verdict).toBe('pass');
+  });
+
+  it('judges the element a positional chain ACTS on, not "any match" (red-team)', async () => {
+    // two .btn buttons: doc-order first is the impostor
+    const dom = `<html><body>
+      <button class="btn" id="save">Save draft</button>
+      <button class="btn" id="add">Add to cart</button>
+    </body></html>`;
+    const file = writeOracle([IDENTITY]);
+    const spec = `it('adds', () => {\n  cy.get('#add-to-basket').first().click();\n});\n`;
+    const a = artifact({ domHtml: dom });
+    const ctx = makeCtx(`cy.get('.btn')`, file, a);
+    writeFileSync(join(root, SPEC_REL), spec);
+    const v = await oracleStage.run(ctx); // .first() acts on #save — impostor
+    expect(v.verdict).toBe('fail');
+
+    const specEq = `it('adds', () => {\n  cy.get('#add-to-basket').eq(1).click();\n});\n`;
+    writeFileSync(join(root, SPEC_REL), specEq);
+    const v2 = await oracleStage.run(makeCtxWithSpec(`cy.get('.btn')`, file, a, specEq));
+    expect(v2.verdict).toBe('pass'); // .eq(1) acts on #add — the real target
+  });
+
+  it('never blesses a selector that only matches by crossing a boundary (red-team)', async () => {
+    // '#host #shadow-pay' crosses the serialized shadow boundary: the live
+    // page (and boundary-respecting queries) resolve it to nothing.
+    const file = writeOracle([{ ...IDENTITY, name: 'Pay now' }]);
+    const v = await oracleStage.run(makeCtx(`cy.get('#host #shadow-pay')`, file));
+    expect(v.verdict).toBe('fail');
+    expect(v.evidence).toMatch(/matches nothing/);
   });
 
   it('judges cy.contains edits by the identity text', async () => {

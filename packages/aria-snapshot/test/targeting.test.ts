@@ -133,13 +133,25 @@ describe('deriveSelector', () => {
     expect(queryAllDeep(body, t!.selector)).toHaveLength(1);
   });
 
-  it('derives selectors for elements inside serialized frame content', () => {
+  it('derives selectors for elements inside serialized frame content, boundary-labeled', () => {
     const body = page(
       '<iframe></iframe><template data-frame-content><button data-testid="pay">Pay</button></template>',
     );
     const el = queryAllDeep(body, '[data-testid="pay"]')[0];
     const t = deriveSelector(el, { root: body });
-    expect(t).toMatchObject({ selector: '[data-testid="pay"]', matches: 1 });
+    expect(t).toMatchObject({ selector: '[data-testid="pay"]', matches: 1, boundary: 'frame' });
+  });
+
+  it('labels boundaries: document, shadow, frame', () => {
+    const body = page(
+      '<button data-cy="top">T</button>' +
+        '<div><template shadowrootmode="open"><button data-cy="sh">S</button></template></div>' +
+        '<iframe></iframe><template data-frame-content><button data-cy="fr">F</button></template>',
+    );
+    const by = (v: string) => queryAllDeep(body, `[data-cy="${v}"]`)[0];
+    expect(deriveSelector(by('top'), { root: body })?.boundary).toBe('document');
+    expect(deriveSelector(by('sh'), { root: body })?.boundary).toBe('shadow');
+    expect(deriveSelector(by('fr'), { root: body })?.boundary).toBe('frame');
   });
 
   it('returns null when nothing unique exists within the cap', () => {

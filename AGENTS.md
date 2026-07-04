@@ -264,6 +264,13 @@ Tradeoffs, not oversights:
 - **Scoped calls (`.find()` etc.) get existence-only resolution** — a
   whole-document count over-approximates within-parent uniqueness, so
   ambiguity there is deferred to the rerun rungs.
+- **Frame-content matches are noted, not rejected.** A healed selector
+  whose only matches live inside inlined iframe content may be legit (a
+  suite with frame-entry helpers) or unreachable (bare `cy.get`); the
+  resolve rung notes it and lets the rerun decide, while triage names
+  frame-scoping honestly instead of calling it timing. Positional oracle
+  judgment models `.first()/.last()/.eq(n)` only; other collection chains
+  require every match to carry the identity (red-team, accepted).
 
 ## Noise
 

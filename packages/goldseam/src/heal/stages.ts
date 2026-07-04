@@ -6,7 +6,7 @@
 import { createRequire } from 'module';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { expandSerializedTemplates, getAllByAria } from 'aria-snapshot';
+import { getAllByAria, queryAllDeep } from 'aria-snapshot';
 import { buildCacheEdit, loadCache, lookup } from './cache';
 import { withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
@@ -49,6 +49,16 @@ export const triageStage: HealStage = {
     const match = countSelectorMatches(artifact.domHtml, selector, 'state');
     if (match === null) {
       return verdict('triage', 'pass', `selector not statically checkable ("${selector}") — triage skipped`, started);
+    }
+    if (match.count > 0 && match.count === match.frameCount) {
+      return verdict(
+        'triage',
+        'gave-up',
+        `the "missing" selector matches ${match.count} element(s) only inside a same-origin iframe in the ` +
+          'capture — bare cy.get does not reach into frames; this is a frame-scoping problem, not selector ' +
+          'drift, and a selector edit cannot fix it',
+        started,
+      );
     }
     if (match.count > 0) {
       return verdict(
@@ -225,7 +235,8 @@ export const resolveStage: HealStage = {
       }
       notes.push(
         `"${site.value}": ${match.count} match(es)` +
-          `${match.approximate ? ' (approximate)' : ''}${scoped ? ' (scoped call — existence only)' : ''}`,
+          `${match.approximate ? ' (approximate)' : ''}${scoped ? ' (scoped call — existence only)' : ''}` +
+          `${match.count > 0 && match.count === match.frameCount ? ' (all inside iframe content — reachable only through a frame-entry helper; the rerun decides)' : ''}`,
       );
     }
     return verdict('resolve', 'pass', notes.join('; '), started);
@@ -291,9 +302,12 @@ export const oracleStage: HealStage = {
 
     return withDomGlobals(window, () => {
       const docEl = window.document.documentElement;
-      // Serialized shadow/frame content becomes plain-queryable, so the
-      // identity query and the selector query see the SAME elements.
-      expandSerializedTemplates(docEl);
+      // Judge on the UNEXPANDED capture: the aria walk descends serialized
+      // templates natively and queryAllDeep respects boundaries, so both
+      // queries see the same element objects WITHOUT collapsing shadow and
+      // frame boundaries the live page enforces (red-team finding: an
+      // expanded DOM let selectors match across boundaries and shifted
+      // :nth-of-type positions with wrapper divs).
       // Oracle files are user data: an unknown role simply matches nothing
       // and lands in the gave-up path below, so the cast is safe.
       const wanted = getAllByAria(docEl, {
@@ -317,7 +331,7 @@ export const oracleStage: HealStage = {
           notes.push('could not locate the edited selector — unverified');
           continue;
         }
-        const { site } = healed;
+        const { site, healedSource } = healed;
         if (site.call === 'contains') {
           if (!wanted.some((el) => el.textContent?.includes(site.value))) {
             return verdict(
@@ -331,12 +345,38 @@ export const oracleStage: HealStage = {
         }
         let matched: Element[];
         try {
-          matched = Array.from(window.document.querySelectorAll(site.value));
+          matched = queryAllDeep(window.document, site.value);
         } catch {
           notes.push(`"${site.value}" not statically checkable — unverified`);
           continue;
         }
-        if (!matched.some((el) => wanted.includes(el))) {
+        if (matched.length === 0) {
+          // resolve should have caught this; stay honest either way
+          return verdict(
+            'oracle',
+            'fail',
+            `healed selector "${site.value}" matches nothing in the capture — cannot target the known-good ${identity}`,
+            started,
+          );
+        }
+        // Judge the element Cypress would ACT on, not "any match": a
+        // multi-match selector behind .first()/.last()/.eq(n) acts
+        // positionally, and blessing "some match is the right one" lets an
+        // impostor ride first in document order (red-team finding).
+        const chain = healedSource.slice(site.end, site.end + 200);
+        const eq = chain.match(/^[^;]*?\.(?:eq\((\d+)\)|(first)\(\)|(last)\(\))/);
+        let judged: Element[];
+        if (eq) {
+          const index = eq[2] ? 0 : eq[3] ? matched.length - 1 : Number(eq[1]);
+          judged = matched[index] ? [matched[index]] : [];
+        } else if (matched.length === 1) {
+          judged = matched;
+        } else {
+          // other collection chains (.each/.filter/have.length) act on
+          // several elements — require them ALL to carry the identity
+          judged = matched;
+        }
+        if (judged.length === 0 || !judged.every((el) => wanted.includes(el))) {
           return verdict(
             'oracle',
             'fail',

@@ -44,13 +44,13 @@ const artifact = (overrides: Partial<FailureArtifact> = {}): FailureArtifact => 
 
 describe('countSelectorMatches', () => {
   it('counts exact CSS matches', () => {
-    expect(countSelectorMatches(DOM, '#add-to-cart', 'none')).toEqual({ count: 1, approximate: false });
-    expect(countSelectorMatches(DOM, '.item', 'none')).toEqual({ count: 3, approximate: false });
-    expect(countSelectorMatches(DOM, '#nope', 'none')).toEqual({ count: 0, approximate: false });
+    expect(countSelectorMatches(DOM, '#add-to-cart', 'none')).toMatchObject({ count: 1, approximate: false });
+    expect(countSelectorMatches(DOM, '.item', 'none')).toMatchObject({ count: 3, approximate: false });
+    expect(countSelectorMatches(DOM, '#nope', 'none')).toMatchObject({ count: 0, approximate: false });
   });
 
   it('descends into declarative shadow templates', () => {
-    expect(countSelectorMatches(DOM, '.shadow-buy', 'none')).toEqual({ count: 1, approximate: false });
+    expect(countSelectorMatches(DOM, '.shadow-buy', 'none')).toMatchObject({ count: 1, approximate: false });
   });
 
   it('returns null for jQuery-only selectors without stripping', () => {
@@ -58,19 +58,19 @@ describe('countSelectorMatches', () => {
   });
 
   it("strips state pseudo-classes in 'state' mode, marked approximate", () => {
-    expect(countSelectorMatches(DOM, '.item:visible', 'state')).toEqual({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, '.item:visible', 'state')).toMatchObject({ count: 3, approximate: true });
     // content filters are NOT strippable in state mode — the text may be the drift
     expect(countSelectorMatches(DOM, 'li:contains("Mug")', 'state')).toBeNull();
   });
 
   it("strips content/position filters only in 'all' mode", () => {
-    expect(countSelectorMatches(DOM, 'li:contains("Mug")', 'all')).toEqual({ count: 3, approximate: true });
-    expect(countSelectorMatches(DOM, '.item:eq(1)', 'all')).toEqual({ count: 3, approximate: true });
-    expect(countSelectorMatches(DOM, '.item:first', 'all')).toEqual({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, 'li:contains("Mug")', 'all')).toMatchObject({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, '.item:eq(1)', 'all')).toMatchObject({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, '.item:first', 'all')).toMatchObject({ count: 3, approximate: true });
   });
 
   it('does not confuse :first with :first-child', () => {
-    expect(countSelectorMatches(DOM, '.item:first-child', 'all')).toEqual({ count: 1, approximate: false });
+    expect(countSelectorMatches(DOM, '.item:first-child', 'all')).toMatchObject({ count: 1, approximate: false });
   });
 
   it('returns null when stripping leaves nothing', () => {
@@ -242,6 +242,15 @@ describe('triage stage', () => {
     expect(v.evidence).toMatch(/scoped/);
   });
 
+  it('names frame-scoping, not timing, when the match lives only in an iframe (red-team)', async () => {
+    const dom = '<html><body><iframe></iframe><template data-frame-content><button class="pay-btn">Pay</button></template></body></html>';
+    const a = artifact({ domHtml: dom, failedSelector: '.pay-btn' });
+    const v = await triageStage.run(makeCtx('', a));
+    expect(v.verdict).toBe('gave-up');
+    expect(v.evidence).toMatch(/only inside a same-origin iframe/);
+    expect(v.evidence).not.toMatch(/timing/);
+  });
+
   it('skips selectors it cannot statically check', async () => {
     const a = artifact({ failedSelector: 'li:contains("Gone")' });
     const v = await triageStage.run(makeCtx('', a));
@@ -325,6 +334,17 @@ describe('resolve stage', () => {
     const v = await resolveStage.run(ctx);
     // jsdom may or may not support :has — either an exact count or a deferral, never a throw
     expect(['pass', 'fail']).toContain(v.verdict);
+  });
+
+  it('notes frame-only healed matches instead of failing them (frame-entry helpers exist)', async () => {
+    const dom = '<html><body><iframe></iframe><template data-frame-content><button class="pay-btn">Pay</button></template></body></html>';
+    const spec = `it('pays', () => {\n  cy.get('#old-btn').click();\n});\n`;
+    const ctx = makeCtx(spec, artifact({ domHtml: dom }), [
+      { oldString: `cy.get('#old-btn')`, newString: `cy.get('.pay-btn')` },
+    ]);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/inside iframe content/);
   });
 
   it('passes through when there are no edits (give-up upstream)', async () => {

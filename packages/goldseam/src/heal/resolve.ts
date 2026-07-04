@@ -17,7 +17,6 @@
 // these functions cannot evaluate produces a pass-with-evidence and is
 // deferred to the rerun rungs, never a silent verdict either way.
 
-import { queryAllDeep } from 'aria-snapshot';
 import { RepairEdit } from './types';
 
 interface JsdomInstance {
@@ -34,6 +33,12 @@ export interface MatchCount {
   /** True when unsupported pseudo-classes were stripped before matching —
    * the count over-approximates: safe for absence checks, not uniqueness. */
   approximate: boolean;
+  /** How many of `count` live inside inlined same-origin iframe content
+   * (`template[data-frame-content]`) — bare cy.get cannot reach those;
+   * a frame-only match deserves different evidence than a main-document
+   * one. Shadow-root matches are NOT counted here (reachable with
+   * `includeShadowDom`). */
+  frameCount: number;
 }
 
 /** State-only jQuery pseudo-classes: presence of the base element still
@@ -47,10 +52,30 @@ const JQUERY_PSEUDOS =
 /** Count matches under `root`, descending into serialized shadow roots
  * (`<template shadowrootmode>`) and same-origin iframe content
  * (`<template data-frame-content>`) — a healed selector targeting either
- * must not read as absent. Boundary-safe: queryAllDeep never lets a
- * combinator cross into template content. */
-const countIn = (root: ParentNode, selector: string): number =>
-  queryAllDeep(root, selector).length;
+ * must not read as absent. Boundary-safe (a combinator never crosses into
+ * template content), and frame-content matches are tallied separately
+ * because bare cy.get cannot reach them. */
+function countIn(
+  root: ParentNode,
+  selector: string,
+  inFrame = false,
+): { total: number; frame: number } {
+  const own = root.querySelectorAll(selector).length;
+  let total = own;
+  let frame = inFrame ? own : 0;
+  for (const t of Array.from(
+    root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+  )) {
+    const sub = countIn(
+      (t as HTMLTemplateElement).content,
+      selector,
+      inFrame || t.hasAttribute('data-frame-content'),
+    );
+    total += sub.total;
+    frame += sub.frame;
+  }
+  return { total, frame };
+}
 
 /**
  * How many elements `selector` matches in the captured DOM. `strip`
@@ -72,7 +97,8 @@ export function countSelectorMatches(
   for (const attempt of attempts) {
     try {
       document ??= parseDom(domHtml);
-      return { count: countIn(document, attempt.sel), approximate: attempt.approximate };
+      const { total, frame } = countIn(document, attempt.sel);
+      return { count: total, approximate: attempt.approximate, frameCount: frame };
     } catch {
       // invalid selector — try the stripped form, else not checkable
     }

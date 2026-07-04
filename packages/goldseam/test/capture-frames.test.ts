@@ -59,10 +59,23 @@ describe('same-origin iframe capture', () => {
     expect(html).toContain('id="deep"');
   });
 
+  it('captures a same-origin iframe INSIDE a shadow root (red-team)', () => {
+    document.body.innerHTML = '<div id="host"></div>';
+    const shadow = document.getElementById('host')!.attachShadow({ mode: 'open' });
+    const frame = document.createElement('iframe');
+    shadow.appendChild(frame);
+    if (!frame.contentDocument) return; // jsdom limitation guard — browser E2E covers it
+    frame.contentDocument.body.innerHTML = '<button class="pay-btn">Pay now</button>';
+    const html = cloneWithShadow(document.documentElement).outerHTML;
+    expect(html).toContain('shadowrootmode="open"');
+    expect(html).toContain('data-frame-content');
+    expect(html).toContain('Pay now');
+  });
+
   it('the resolve rung sees frame content in the serialized capture', () => {
     pageWithFrame('<button class="pay-btn">Pay now</button>');
     const captured = cloneWithShadow(document.documentElement).outerHTML;
-    expect(countSelectorMatches(captured, '.pay-btn', 'none')).toEqual({ count: 1, approximate: false });
+    expect(countSelectorMatches(captured, '.pay-btn', 'none')).toMatchObject({ count: 1, approximate: false });
     expect(countTextMatches(captured, 'Pay now')).toBe(1);
   });
 

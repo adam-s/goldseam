@@ -70,6 +70,11 @@ export interface DerivedTarget {
   strategy: string;
   /** Matches in `root` at derivation time; always 1 (uniqueness is required). */
   matches: number;
+  /** Where the element lives: 'document' is directly targetable; 'shadow'
+   * needs shadow-piercing (Cypress `includeShadowDom`); 'frame' selectors
+   * only resolve inside their iframe document — a bare top-level query
+   * cannot reach them. */
+  boundary: 'document' | 'shadow' | 'frame';
 }
 
 const DEFAULT_PRIORITY = ['data-cy', 'data-testid', 'id', 'text', 'css'];
@@ -89,17 +94,41 @@ export function deriveSelector(
 ): DerivedTarget | null {
   const root = options?.root ?? element.ownerDocument;
   const priority = options?.priority ?? DEFAULT_PRIORITY;
+  const boundary = boundaryOf(root, element);
   roleUtils.beginAriaCaches();
   try {
     for (const strategy of priority) {
       const target = tryStrategy(element, root, strategy);
-      if (target) return target;
+      if (target) return { ...target, boundary };
     }
   } finally {
     roleUtils.endAriaCaches();
   }
   return null;
 }
+
+/** Which boundary encloses `element` under `root`: serialized frame
+ * content ('frame') wins over shadow content ('shadow'); anything
+ * directly under root (or live shadow/frame — caller's document) is
+ * 'document'. */
+function boundaryOf(root: ParentNode, element: Element): DerivedTarget['boundary'] {
+  const find = (
+    node: ParentNode,
+    current: DerivedTarget['boundary'],
+  ): DerivedTarget['boundary'] | null => {
+    if (node.contains(element)) return current;
+    for (const t of Array.from(node.querySelectorAll(SERIALIZED_TEMPLATES))) {
+      const kind = t.hasAttribute('data-frame-content') ? 'frame' : current === 'frame' ? 'frame' : 'shadow';
+      const found = find((t as HTMLTemplateElement).content, kind);
+      if (found) return found;
+    }
+    return null;
+  };
+  return find(root, 'document') ?? 'document';
+}
+
+/** Internal candidate before the boundary is stamped on. */
+type DerivedCandidate = Omit<DerivedTarget, 'boundary'>;
 
 const escapeAttrValue = (value: string): string =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -112,7 +141,7 @@ function uniqueCss(
   selector: string,
   element: Element,
   strategy: string,
-): DerivedTarget | null {
+): DerivedCandidate | null {
   const matches = queryAllDeep(root, selector);
   if (matches.length === 1 && matches[0] === element) {
     return { kind: 'css', selector, strategy, matches: 1 };
@@ -120,7 +149,7 @@ function uniqueCss(
   return null;
 }
 
-function tryStrategy(element: Element, root: ParentNode, strategy: string): DerivedTarget | null {
+function tryStrategy(element: Element, root: ParentNode, strategy: string): DerivedCandidate | null {
   if (strategy === 'id') {
     const id = element.getAttribute('id');
     if (!id) return null;
@@ -155,7 +184,7 @@ function tryStrategy(element: Element, root: ParentNode, strategy: string): Deri
 /** Structural fallback: shortest `tag:nth-of-type` chain, growing upward
  * until unique. Capped depth — an element this hard to address is better
  * reported unaddressable than given a 12-hop selector. */
-function cssPath(element: Element, root: ParentNode): DerivedTarget | null {
+function cssPath(element: Element, root: ParentNode): DerivedCandidate | null {
   const segments: string[] = [];
   let current: Element | null = element;
   for (let depth = 0; current && depth < 10; depth++) {
