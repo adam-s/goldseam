@@ -81,3 +81,14 @@ moments, never CI.
   verified fully green via gh (9/9 jobs incl. suite-bites + showcase).
   Campaign totals: 4 new apps + PrairieLearn, 6 real Sonnet heals, 2
   honest give-ups, 1 authored test, 10 goldseam bugs found+fixed+pinned.
+- 2026-07-04 authoring sweep: cy.goldseam proved on Juice Shop and
+  Shoelace (TodoMVC already done). Two product improvements it forced:
+  (1) translate prompt now grounds selectors in the live DOM and uses
+  text-contains asserts for elements that don't exist yet (the model had
+  guessed a Material snackbar container for a not-yet-rendered error —
+  honest red, then green after the prompt fix); (2) the vocabulary gained
+  an optional `shadow` host field (cy.get(host).shadow().find(selector))
+  because CSS cannot cross shadow boundaries — plain English now drives
+  web components, which is open-issue territory for cy.prompt (#33042).
+  Note: translation caches key on step text alone — a prompt/model change
+  needs the cache file deleted to retranslate (by design; recorded).

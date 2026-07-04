@@ -23,6 +23,11 @@ export interface GoldseamPromptOptions {
 
 function execute(commands: StepCommand[], placeholders: Record<string, string>): void {
   const fill = (text: string) => resolvePlaceholders(text, placeholders);
+  // `shadow` scopes the selector inside a host's shadow root — the only
+  // way to target "the header of the FIRST sl-details", since CSS has no
+  // cross-boundary combinators.
+  const target = (cmd: { selector: string; shadow?: string }) =>
+    cmd.shadow ? cy.get(cmd.shadow).first().shadow().find(cmd.selector) : cy.get(cmd.selector);
   for (const cmd of commands) {
     switch (cmd.action) {
       case 'visit':
@@ -30,14 +35,14 @@ function execute(commands: StepCommand[], placeholders: Record<string, string>):
         break;
       case 'click':
       case 'dblclick':
-        cy.get(cmd.selector)[cmd.action]({ ...(cmd.force ? { force: true } : {}) });
+        target(cmd)[cmd.action]({ ...(cmd.force ? { force: true } : {}) });
         break;
       case 'type':
-        cy.get(cmd.selector).type(fill(cmd.text));
+        target(cmd).type(fill(cmd.text));
         break;
       case 'check':
       case 'uncheck':
-        cy.get(cmd.selector)[cmd.action]();
+        target(cmd)[cmd.action]();
         break;
       case 'select':
         cy.get(cmd.selector).select(fill(cmd.value));

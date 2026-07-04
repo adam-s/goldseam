@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "steps": [
+    "Force click the header of the first details example",
+    "The first sl-details element should have the open attribute"
+  ],
+  "commands": [
+    {
+      "action": "click",
+      "shadow": "sl-details:first-of-type",
+      "selector": "[part='header']",
+      "force": true
+    },
+    {
+      "action": "assert",
+      "selector": "sl-details:first-of-type",
+      "should": "have.attr",
+      "value": "open"
+    }
+  ],
+  "model": "claude:sonnet",
+  "translatedAt": "2026-07-04T05:35:28.863Z"
+}

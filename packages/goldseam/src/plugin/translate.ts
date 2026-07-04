@@ -32,8 +32,8 @@ export function buildTranslatePrompt(payload: TranslatePayload): string {
   return `You translate natural-language test steps into a constrained JSON command list for Cypress. You never write code — only commands from this vocabulary:
 
 {"action":"visit","url":string}
-{"action":"click"|"dblclick","selector":string,"force"?:boolean}
-{"action":"type","selector":string,"text":string}
+{"action":"click"|"dblclick","selector":string,"force"?:boolean,"shadow"?:string}
+{"action":"type","selector":string,"text":string,"shadow"?:string}
 {"action":"check"|"uncheck","selector":string}
 {"action":"select","selector":string,"value":string}
 {"action":"trigger","selector":string,"event":string}        // mouseenter, mouseover, drag…
@@ -46,6 +46,8 @@ Rules:
 - Prefer selectors in this order: data-cy > data-testid > id > role/text > css.
 - \`{{name}}\` tokens in steps are placeholders — copy them through verbatim into command text; never invent their values.
 - One or more commands per step, in step order. Steps saying "with a timeout of Ns" or "force click" map to the matching option.
+- Web components: to target something INSIDE a specific component's shadow root, set "shadow" to the host selector and "selector" to the element within it (e.g. {"action":"click","shadow":"sl-details","selector":"[part='header']"}). CSS cannot cross a shadow boundary with a descendant combinator.
+- Ground selectors in the provided page HTML when the element is there. For expectations about elements that do NOT exist yet (an error after a failed submit, a toast, a result list), use a text assert — {"action":"assert","contains":"<expected text>","should":"be.visible"} — never a guessed container selector.
 - Reply with ONLY a JSON object: {"commands":[…]} — no prose, no fences.
 
 ## Steps

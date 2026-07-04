@@ -21,7 +21,7 @@ proof, not an argument.
 | cypress#8843 (+25), #30438 | DOM snapshots don't include shadow DOM | `redactedOuterHtml` serializes open shadow roots as declarative templates | capture unit + system pins ✓; Shoelace ✓ 2026-07-04 (185 shadow roots in one capture) |
 | cypress#20458 (closed "use cy.prompt"), #30805 | heal EXISTING suites — demand Cypress redirected to a rewrite | the whole product: unmodified `cy.get` suites healed as reviewed commits | PrairieLearn ✓; TodoMVC ✓; Juice Shop ✓; Shoelace ✓; CRWA (the incumbent's own showcase) ✓ 2026-07-04 |
 | cypress#32673, #33927 | BYO model / air-gapped — cy.prompt phones home | RepairRunner: `claude`, `cmd:` today; HTTP/ollama planned (M5) | stub-driven E2E ✓; ollama leg is M5 |
-| cypress#32791 | prompt-authored steps: query without action | `cy.goldseam` constrained vocabulary includes assert-only steps | prompt E2E ✓; TodoMVC authored spec ✓ 2026-07-04 (Sonnet translation committed) |
+| cypress#32791 | prompt-authored steps: query without action | `cy.goldseam` constrained vocabulary includes assert-only steps | prompt E2E ✓; authored on TodoMVC + Juice Shop + Shoelace (shadow-DOM via the `shadow` field — cypress#33042 territory) ✓ 2026-07-04 |
 
 Rules for this file: a row may only claim ✓ with a named, runnable proof
 (test or proving-ground result). New mined issues get a row BEFORE any

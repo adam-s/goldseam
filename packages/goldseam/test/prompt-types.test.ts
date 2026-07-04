@@ -59,4 +59,15 @@ describe('renderEntry (eject)', () => {
     expect(code).toContain(`cy.get('[data-testid="add-to-cart-5"]').click();`);
     expect(code).toContain(`cy.get('#cart-count').should('have.text', '1');`);
   });
+
+  it('accepts shadow-scoped interactions and rejects empty hosts (Shoelace proving)', () => {
+    expect(
+      validateCommands([
+        { action: 'click', selector: "[part='header']", shadow: 'sl-details:first-of-type', force: true },
+      ]),
+    ).toHaveLength(1);
+    expect(() =>
+      validateCommands([{ action: 'click', selector: 'x', shadow: '' }]),
+    ).toThrow(/shadow must be a non-empty selector/);
+  });
 });
