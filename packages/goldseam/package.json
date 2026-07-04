@@ -55,7 +55,8 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adam-s/goldseam.git"
+    "url": "git+https://github.com/adam-s/goldseam.git",
+    "directory": "packages/goldseam"
   },
   "bugs": {
     "url": "https://github.com/adam-s/goldseam/issues"

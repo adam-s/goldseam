@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
-import { FailureArtifact } from '../shared/types';
+import { FAILURE_SCHEMA_VERSION, FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
 import { HOOK_TITLE_RE, reviewFlagsFor, selectorOccursInCode } from './resolve';
 import { STAGES } from './stages';
@@ -33,6 +33,14 @@ export async function healArtifactFile(
 ): Promise<HealArtifact> {
   const startedAt = Date.now();
   const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as FailureArtifact;
+  // The artifact schema is a public API with major-bump-on-breaking
+  // semantics; refuse a capture from a newer major rather than misparse it
+  // into confusing downstream verdicts.
+  if (Math.floor(artifact.schemaVersion) !== FAILURE_SCHEMA_VERSION) {
+    throw new Error(
+      `capture schema v${artifact.schemaVersion} is not supported (this goldseam reads capture schema v${FAILURE_SCHEMA_VERSION}) — regenerate the capture or match goldseam versions`,
+    );
+  }
   // Artifacts are attacker-influenceable JSON; specPath must stay inside
   // the project (red-team finding: traversal → arbitrary file overwrite).
   const specAbs = resolve(options.projectRoot, artifact.specPath);
@@ -142,6 +150,21 @@ export async function healArtifactFile(
       break;
     }
     if (!attemptFailed) {
+      const edits = (ctx.proposal as RepairReply | undefined)?.edits ?? [];
+      if (edits.length === 0) {
+        // The ladder completed without proposing an edit (e.g. a hand-written
+        // `stages` list with no `propose` rung). An empty edit is never a
+        // heal — record it honestly as failed, don't ship a lying artifact.
+        record.ladder.push({
+          stage: 'engine',
+          verdict: 'fail',
+          evidence: 'ladder produced no proposal to apply (is `propose` in your stages list?)',
+          durationMs: 0,
+        });
+        outcome = 'failed';
+        ctx.revert();
+        break;
+      }
       outcome = 'healed';
       ctx.apply(); // idempotent: ensures the edit is on disk even when no
       break; //       rerun stage ran (propose-only ladders, custom configs)

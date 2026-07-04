@@ -41,10 +41,10 @@ Use the `Agent` tool with:
 - `model: "opus"`
 - `isolation: "worktree"` — **mandatory as the outer guard**; the agent
   edits production code.
-- **Copies beat worktrees for the mutation work itself** (hnswered
-  incident, 2026-07-01: parallel agents resumed after transient errors
-  were re-pointed at a shared worktree and corrupted each other's
-  verdicts). The prompt template instructs the agent to snapshot the repo
+- **Copies beat worktrees for the mutation work itself** (learned the hard
+  way: parallel agents resumed after transient errors were re-pointed at a
+  shared worktree and corrupted each other's verdicts). The prompt template
+  instructs the agent to snapshot the repo
   into its own fresh temp dir and work there. A worktree alone is fine
   for a single, non-resumed agent.
 - `description`: 3–5 words (e.g. `"Mutation red-team validator"`)

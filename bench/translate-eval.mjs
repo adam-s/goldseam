@@ -2,10 +2,10 @@
 // Deterministic grading, real model calls (local-only, never CI). See
 // bench/translate-cases/README.md for the case format.
 
-import { execSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -18,7 +18,7 @@ const model = process.argv.includes('--model')
   ? process.argv[process.argv.indexOf('--model') + 1]
   : 'claude:sonnet';
 
-const casesDir = new URL('./translate-cases/', import.meta.url).pathname;
+const casesDir = fileURLToPath(new URL('./translate-cases/', import.meta.url));
 const names = readdirSync(casesDir).filter((n) => existsSync(join(casesDir, n, 'case.json')));
 
 function resolveEmitted(document, cmd) {
@@ -113,12 +113,12 @@ for (const name of names) {
   } catch (err) {
     failures = [`grader error: ${err.message}`];
   }
-  results.push({ name, pass: failures.length === 0, failures, outcome });
+  results.push({ name, pass: failures.length === 0, refuse: !!caseDef.expect.refuse, failures, outcome });
   console.log(`${failures.length === 0 ? '✔' : '✖'} ${name}${failures.length ? ` — ${failures.join('; ')}` : ''}`);
 }
 
 const passed = results.filter((r) => r.pass).length;
-const refuseCases = results.filter((r) => names.includes(r.name) && JSON.parse(readFileSync(join(casesDir, r.name, 'case.json'), 'utf8')).expect.refuse);
+const refuseCases = results.filter((r) => r.refuse);
 const refusePassed = refuseCases.filter((r) => r.pass).length;
 const summary = {
   model,
@@ -127,10 +127,10 @@ const summary = {
   mustRefuse: `${refusePassed}/${refuseCases.length}`,
   results,
 };
-writeFileSync(new URL('./translate-results.json', import.meta.url).pathname, JSON.stringify(summary, null, 2));
+writeFileSync(fileURLToPath(new URL('./translate-results.json', import.meta.url)), JSON.stringify(summary, null, 2));
 console.log(`\nscore: ${summary.score}   must-refuse: ${summary.mustRefuse}   (results in bench/translate-results.json)`);
 
-const baselinePath = new URL('./translate-baseline.json', import.meta.url).pathname;
+const baselinePath = fileURLToPath(new URL('./translate-baseline.json', import.meta.url));
 if (existsSync(baselinePath)) {
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
   if (baseline.model !== model) {
@@ -138,9 +138,12 @@ if (existsSync(baselinePath)) {
     process.exit(0);
   }
   const basePassed = Number(baseline.score.split('/')[0]);
-  if (passed < basePassed) {
-    console.error(`REGRESSION vs baseline ${baseline.score} (${baseline.ranAt})`);
+  const baseRefuse = Number(String(baseline.mustRefuse ?? '0/0').split('/')[0]);
+  if (passed < basePassed || refusePassed < baseRefuse) {
+    console.error(
+      `REGRESSION vs baseline ${baseline.score} (must-refuse ${baseline.mustRefuse}) from ${baseline.ranAt}`,
+    );
     process.exit(1);
   }
-  console.log(`baseline ${baseline.score} held`);
+  console.log(`baseline ${baseline.score} (must-refuse ${baseline.mustRefuse}) held`);
 }

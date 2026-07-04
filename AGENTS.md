@@ -17,17 +17,16 @@ Self-healing for existing Cypress suites: a failure becomes a rich capture
 (redacted DOM + aria tree + error), a self-hosted/BYO model proposes a
 minimal selector fix, the suite verifies it through a stage ladder, and it
 arrives as a reviewed commit. Plugin (`goldseam/support` +
-`goldseam/plugin`) + CLI (`goldseam heal|pr|report`) in
+`goldseam/plugin`) + CLI (`goldseam init|heal|report|eject`; `pr` planned) in
 [packages/goldseam/](packages/goldseam/); living design references
-(usage catalog, competition, ladder) in [.agents/reference/](.agents/reference/);
-execution order in [docs/plan.md](docs/plan.md). **This repo is a public portfolio artifact —
+(usage catalog, competition, ladder) in [.agents/reference/](.agents/reference/).
+**This repo is a public portfolio artifact —
 every file is held to the open-source bar.**
 
 ## The iteration process
 
-1. **Plan first.** Work maps to a milestone in [docs/plan.md](docs/plan.md);
-   each has a "done when" gate. Don't start roadmap items the maintainer
-   hasn't asked for.
+1. **Plan first.** Scope the work and define its "done when" gate before
+   starting. Don't start work the maintainer hasn't asked for.
 2. **Probe before fixing.** When behavior is uncertain (Cypress internals
    especially), write an empirical probe and observe — the specs in
    [cypress/hardening/](cypress/hardening/) exist because probing found two
@@ -75,7 +74,7 @@ Publishing to npm and renaming stay out of scope for autonomous runs.
 Do not use assistant memory (`~/.claude` memory or any equivalent) for
 anything about this project. Durable knowledge lives in exactly one of:
 AGENTS.md (rules, invariants, tradeoffs), [.agents/](.agents/) (skills,
-references), [docs/](docs/) (plans, research), or code comments
+references, plans, research), or code comments
 (constraints the code can't show) — inspectable, reviewable,
 version-controlled. If you learn something worth keeping, put it in the
 right file before the session ends; if it only matters to the current
@@ -170,11 +169,14 @@ of what else improves:
 - `node bench/translate-eval.mjs` — 20 graded authoring cases (real
   Sonnet calls, ~1/case); `bench/translate-tune.mjs` — the recursive
   rules tuner. Both local-only; baseline in bench/ must hold.
-- Real-model heal: `goldseam heal --model claude` (Sonnet). Costs money;
-  never in CI.
+- Real-model heal: `goldseam heal --model claude|ollama:<m>|openai:<m>`
+  (default `claude` → Sonnet, costs money; `ollama:` is local, zero egress).
+  Shared model + defaults live in an optional `goldseam.config.mjs` (example
+  at the repo root), read by both the CLI and the plugin. Self-host recipes
+  in [selfhost/](selfhost/) (Ollama, Modal). Real-model calls never in CI.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): build → unit
   → system → hardening → heal-with-stub. Remote:
-  `github.com/adam-s/goldseam` (private).
+  `github.com/adam-s/goldseam`.
 
 Gotchas that will burn you:
 

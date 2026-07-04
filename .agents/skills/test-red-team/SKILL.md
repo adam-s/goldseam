@@ -42,7 +42,7 @@ code. Rank findings CRITICAL / HIGH / MEDIUM / LOW.
 
 ## Setup
 
-Project: /Users/adamsohn/Projects/goldseam
+Project: the goldseam repo root (`git rev-parse --show-toplevel`).
 Read AGENTS.md §"Tests + build" for the four suites:
 - packages/goldseam/test/*.test.ts (vitest; jsdom for browser-side)
 - scripts/system-test.mjs, scripts/hardening-test.mjs,

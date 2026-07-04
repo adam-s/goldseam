@@ -2,7 +2,7 @@
 Deploy a PRIVATE, OpenAI-compatible LLM endpoint on Modal for goldseam.
 
 Serves Qwen2.5-14B-Instruct with vLLM. goldseam's `openai:` runner talks to
-it directly — no code change, just a base URL + an API key. Pay-per-second
+it directly — no code change, only a base URL and an API key. Pay-per-second
 while a heal is running, $0 while idle (Modal stops the container after
 `scaledown_window`).
 
@@ -34,8 +34,11 @@ MINUTES = 60  # seconds
 vllm_image = (
     modal.Image.from_registry("nvidia/cuda:12.9.0-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])  # drop the base image's entrypoint so Modal runs ours
-    .uv_pip_install("vllm==0.21.0", "huggingface_hub[hf_transfer]==0.26.2")
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})  # fast weight downloads
+    # vllm pulls a compatible huggingface_hub transitively; add hf_transfer
+    # alone for fast downloads (pinning the hub here would conflict with what
+    # vllm 0.21 / its transformers require).
+    .uv_pip_install("vllm==0.21.0", "hf_transfer==0.1.9")
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 )
 
 # Persist weights + vLLM's compile cache across runs: the first boot downloads
@@ -81,5 +84,7 @@ def serve():
         "--uvicorn-log-level", "info",
     ]
     # Popen (not run): return immediately so Modal's web_server health-check
-    # can start polling the port while vLLM finishes loading weights.
-    subprocess.Popen(" ".join(cmd), shell=True)
+    # can start polling the port while vLLM finishes loading weights. List
+    # form, no shell: the API key is an argv element, never spliced into a
+    # shell string where a space or `$`/`;` could break or execute it.
+    subprocess.Popen(cmd)

@@ -1,4 +1,4 @@
-// End-to-end heal test (M3+M4 done-when), model-free via the cmd: stub:
+// End-to-end heal test, model-free via the cmd: stub:
 //   1. a spec with a drifted selector fails → capture artifact
 //   2. `goldseam heal` proposes, applies, and verifies through the full
 //      ladder (triage → propose → resolve → oracle → rerun-test → rerun-spec)
@@ -7,8 +7,8 @@
 //
 // The real-model path is the same CLI with --model claude (Sonnet).
 
-import { spawnSync, spawn, execSync } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync, spawn } from 'node:child_process';
+import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import cypress from 'cypress';
 
 delete process.env.ELECTRON_RUN_AS_NODE;

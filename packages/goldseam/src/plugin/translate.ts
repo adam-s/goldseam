@@ -3,10 +3,11 @@
 // result as a committable JSON file, serve cache hits with zero model
 // calls.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { resolveRunner } from '../heal/runners';
 import { parseJsonBlock } from '../heal/parse';
+import { writeJsonAtomic } from '../shared/fs';
 import { TRANSLATE_RULES } from './translate-rules';
 import {
   InvalidTranslation,
@@ -21,7 +22,6 @@ export interface TranslatePayload {
   steps: string[];
   url: string;
   domHtml: string;
-  ariaSnapshot: string;
 }
 
 const MAX_TRANSLATE_DOM_CHARS = 40_000;
@@ -114,11 +114,7 @@ export const declineMessage = (reason: string): string =>
   `the model declined to translate: ${reason} — make the step specific enough to name one target`;
 
 function persist(promptsDir: string, key: string, entry: PromptCacheEntry): void {
-  mkdirSync(promptsDir, { recursive: true });
-  const file = join(promptsDir, `${key}.json`);
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(entry, null, 2));
-  renameSync(tmp, file);
+  writeJsonAtomic(join(promptsDir, `${key}.json`), entry);
 }
 
 export function loadPromptCache(promptsDir: string, key: string): PromptCacheEntry | null {

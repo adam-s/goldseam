@@ -1,8 +1,12 @@
 # Changelog
 
-All notable changes to the `goldseam` package. Conventional commits;
-artifact schema versions are named per release (capture schema v1, heal
-schema v1, prompt-cache schema v1).
+Notable changes to this repo's published packages (`goldseam`,
+`aria-snapshot`). Conventional commits; artifact schema versions are named
+per release (capture schema v1, heal schema v1, prompt-cache schema v1).
+
+The `0.0.x` versions on npm are pre-release development snapshots and are not
+separately catalogued here; the first stable release will be `0.1.0`.
+Everything below is unreleased work toward it.
 
 ## Unreleased
 

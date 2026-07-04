@@ -55,7 +55,7 @@ bundle alongside and reference:
 
 **Two patterns:**
 1. **Skill-as-prompt-template** (e.g. our `red-team-review`): the SKILL.md body is a template that Claude fills in and sends to an `Agent`. No external scripts.
-2. **Skill-as-shell-orchestrator** (e.g. our `audit`): the SKILL.md body documents how Claude should invoke external scripts via Bash with sane defaults and enforced caps.
+2. **Skill-as-shell-orchestrator**: the SKILL.md body documents how Claude should invoke external scripts via Bash with sane defaults and enforced caps.
 
 ---
 
@@ -155,8 +155,8 @@ This repo keeps agent-shared content in `.agents/` (canonical) so it works acros
 | `CLAUDE.md` (root) | ✓ aligned | Thin `@AGENTS.md` import + Claude-specific notes |
 | `.claude/skills` → `.agents/skills` | ✓ aligned | Symlink; skill folders keep the standard `SKILL.md` shape |
 | `.agents/skills/red-team-review/` | ✓ aligned | Frontmatter has `name` + `description`. Could add `allowed-tools` if we wanted to auto-approve the Agent invocation |
-| `.agents/skills/design-critique/` | ✓ aligned | Same shape |
-| `.agents/skills/audit/` | ✓ aligned | Shell-orchestrator pattern; uses `allowed-tools: Bash(node scripts/*.mjs *)` |
+| `.agents/skills/test-red-team/` | ✓ aligned | Same shape; adversarial audit of the test suite |
+| `.agents/skills/mutation-red-team/` | ✓ aligned | Same shape; `isolation: "worktree"` for the mutation agent |
 | `.claude/agents/` | not used | Nothing currently warrants a project-scoped subagent |
 | `.claude/hooks/` | not used | No automated lifecycle behaviors needed yet |
 

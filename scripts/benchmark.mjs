@@ -1,4 +1,4 @@
-// The benchmark (M6): apply each mutation from bench/mutations.json to the
+// The benchmark: apply each mutation from bench/mutations.json to the
 // demo app, capture the breakage, run `goldseam heal`, and score the
 // outcome against the mutation's expectation. Heal-rate by selector style
 // is the launch table — data no incumbent publishes.

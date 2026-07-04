@@ -13,8 +13,12 @@ describe('promptKey', () => {
     expect(promptKey(['a', 'b'])).not.toBe(promptKey(['a', 'c']));
   });
 
-  it('placeholder VALUES do not affect identity (tokens are part of the text)', () => {
-    expect(promptKey(['Type {{pwd}} in password'])).toBe(promptKey(['Type {{pwd}} in password']));
+  it('keys on the token text, not a substituted value (values never collapse into the token)', () => {
+    // The key is derived from the step text WITH `{{pwd}}` intact; a step
+    // carrying a literal value is a different step and must key differently.
+    // This is what lets the same authored steps share one cache entry no
+    // matter what a placeholder resolves to at runtime.
+    expect(promptKey(['Type {{pwd}} in password'])).not.toBe(promptKey(['Type hunter2 in password']));
   });
 });
 

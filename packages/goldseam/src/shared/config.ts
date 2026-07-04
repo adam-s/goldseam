@@ -63,31 +63,48 @@ export function firstDefined<T>(...values: (T | undefined | null)[]): T | undefi
   return undefined;
 }
 
+/** A blank string is treated as "unset" for model selection, so
+ * `GOLDSEAM_MODEL= npx goldseam heal` falls through to the config/default
+ * instead of resolving to `''` and dying later as `unknown model runner ""`. */
+const nonBlank = (v: string | undefined | null): string | undefined =>
+  typeof v === 'string' && v.trim() !== '' ? v : undefined;
+
 /** Resolve the heal model: `--model` flag > `GOLDSEAM_MODEL` env >
- * `healModel` > `model` > built-in default. */
+ * `healModel` > `model` > built-in default. Blank values are skipped. */
 export function resolveHealModel(
   flag: string | undefined,
   env: NodeJS.ProcessEnv,
   config: GoldseamConfig,
 ): string {
-  return firstDefined(flag, env.GOLDSEAM_MODEL, config.healModel, config.model, DEFAULT_MODEL)!;
+  return firstDefined(nonBlank(flag), nonBlank(env.GOLDSEAM_MODEL), nonBlank(config.healModel), nonBlank(config.model), DEFAULT_MODEL)!;
+}
+
+/** Human label for WHERE the heal model came from, for an at-a-glance echo so
+ * precedence is never a mystery. */
+export function healModelSource(flag: string | undefined, env: NodeJS.ProcessEnv, config: GoldseamConfig): string {
+  if (nonBlank(flag)) return '--model flag';
+  if (nonBlank(env.GOLDSEAM_MODEL)) return 'GOLDSEAM_MODEL env';
+  if (nonBlank(config.healModel)) return 'goldseam.config.mjs (healModel)';
+  if (nonBlank(config.model)) return 'goldseam.config.mjs (model)';
+  return 'built-in default';
 }
 
 /** Resolve the author (translation) model: plugin `promptModel` option >
  * `GOLDSEAM_PROMPT_MODEL` env > `GOLDSEAM_MODEL` env > `promptModel` >
  * `model` > built-in default. The per-tool env var (`GOLDSEAM_PROMPT_MODEL`)
- * stays supported and outranks the shared one for back-compat. */
+ * stays supported and outranks the shared one for back-compat. Blank values
+ * are skipped. */
 export function resolvePromptModel(
   option: string | undefined,
   env: NodeJS.ProcessEnv,
   config: GoldseamConfig,
 ): string {
   return firstDefined(
-    option,
-    env.GOLDSEAM_PROMPT_MODEL,
-    env.GOLDSEAM_MODEL,
-    config.promptModel,
-    config.model,
+    nonBlank(option),
+    nonBlank(env.GOLDSEAM_PROMPT_MODEL),
+    nonBlank(env.GOLDSEAM_MODEL),
+    nonBlank(config.promptModel),
+    nonBlank(config.model),
     DEFAULT_MODEL,
   )!;
 }
@@ -112,7 +129,10 @@ export async function loadGoldseamConfig(dir: string): Promise<GoldseamConfig> {
     );
   }
 
-  const value = mod.default ?? mod;
+  // Enforce the documented contract: a real default export that is an
+  // object. (A named-only export would otherwise sneak through via the module
+  // namespace — an accidental, undocumented second API.)
+  const value = mod.default;
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`goldseam: ${CONFIG_FILENAME} must \`export default\` an object`);
   }

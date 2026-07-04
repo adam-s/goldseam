@@ -14,9 +14,8 @@ docker run -d --rm --name pl-goldseam -p 3010:3000 prairielearn/prairielearn
 # app: http://127.0.0.1:3010/pl  (dev-admin auth via /pl/dev_login)
 ```
 
-(The `pl-debug:base` warm-boot stack from `~/Projects/Temp/
-prairielearn-debug` also works, but its baked node_modules must match the
-mounted checkout's commit — the upstream image avoids that drift.)
+(A pre-baked warm-boot image also works, but its baked node_modules must
+match the mounted checkout's commit — the upstream image avoids that drift.)
 
 ## Run
 

@@ -108,5 +108,9 @@ const REPLIES = {
 };
 
 process.stdin.on('end', () => {
+  if (!(mode in REPLIES)) {
+    console.error(`stub-model: unknown mode "${mode}" (have: ${Object.keys(REPLIES).join(', ')})`);
+    process.exit(1);
+  }
   console.log(JSON.stringify(REPLIES[mode]));
 });

@@ -15,6 +15,7 @@ import {
   promptKey,
   resolvePlaceholders,
 } from '../shared/prompt-types';
+import { PROMPT_LOAD_TASK, PROMPT_TRANSLATE_TASK } from '../shared/types';
 import { maskText, redactedOuterHtml } from './redact';
 
 export interface GoldseamPromptOptions {
@@ -45,10 +46,10 @@ function execute(commands: StepCommand[], placeholders: Record<string, string>):
         target(cmd)[cmd.action]();
         break;
       case 'select':
-        cy.get(cmd.selector).select(fill(cmd.value));
+        target(cmd).select(fill(cmd.value));
         break;
       case 'trigger':
-        cy.get(cmd.selector).trigger(cmd.event);
+        target(cmd).trigger(cmd.event);
         break;
       case 'scrollTo':
         if (cmd.selector) cy.get(cmd.selector).scrollTo(cmd.position as Cypress.PositionType);
@@ -80,7 +81,7 @@ export function registerAuthoringCommand(): void {
     const key = promptKey(steps);
     const placeholders = options.placeholders ?? {};
 
-    cy.task<PromptCacheEntry | null>('goldseam:prompt:load', { key }, { log: false }).then((cached) => {
+    cy.task<PromptCacheEntry | null>(PROMPT_LOAD_TASK, { key }, { log: false }).then((cached) => {
       // Key is a 32-bit hash — confirm the steps themselves before trusting
       // the entry (collision or hand-renamed file ⇒ retranslate).
       if (cached && JSON.stringify(cached.steps) === JSON.stringify(steps)) {
@@ -102,9 +103,8 @@ export function registerAuthoringCommand(): void {
           steps,
           url: maskText(doc.location.href),
           domHtml: redactedOuterHtml(doc.documentElement),
-          ariaSnapshot: '',
         };
-        cy.task<PromptCacheEntry>('goldseam:prompt:translate', payload, {
+        cy.task<PromptCacheEntry>(PROMPT_TRANSLATE_TASK, payload, {
           log: false,
           timeout: 120_000,
         }).then((entry) => execute(entry.commands, placeholders));

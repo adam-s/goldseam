@@ -4,8 +4,8 @@
 // land on the same identity. Pure merge logic here; the task wrapper in
 // plugin/index.ts is thin.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { dirname } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { writeJsonAtomic } from '../shared/fs';
 import { OracleEntry } from '../heal/types';
 
 export interface OracleRecordPayload {
@@ -46,9 +46,6 @@ export function recordOracleEntries(file: string, payload: OracleRecordPayload):
       // corrupt manifest regenerates — never break a green run over it
     }
   }
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(mergeOracles(existing, payload), null, 2));
-  renameSync(tmp, file);
+  writeJsonAtomic(file, mergeOracles(existing, payload));
   return null; // cy.task contract: undefined is an error, null is success
 }

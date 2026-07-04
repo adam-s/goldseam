@@ -149,6 +149,28 @@ describe('validateEdits', () => {
     ).toThrow(/never weaken assertions/);
   });
 
+  it("rejects rewriting an assertion's VALUE argument (bare string, second arg)", () => {
+    // The value is the SECOND argument of should(), so a lead-only check
+    // that scans the chars just before the string misses it. The call
+    // context must come from the spec, not the snippet. Rewriting '$42.00'
+    // to '$99.00' would silently mask a price regression through a green
+    // rerun.
+    const spec = `it('t', () => { cy.get('#total').should('have.text', '$42.00'); });\n`;
+    expect(() => validateEdits(reply(`$42.00`, `$99.00`), SPEC_PATH, spec)).toThrow(
+      /inside should\(…\); heals never weaken assertions/,
+    );
+  });
+
+  it("rejects an assertion-value edit whose snippet is cropped to hide the call name", () => {
+    // A quoted snippet cropped to start after `should(` carries no call
+    // context of its own — anchoring on the model's snippet would accept
+    // it. The spec at the exact (unique) position still names should().
+    const spec = `it('t', () => { cy.get('#total').should('have.text', '$42.00'); });\n`;
+    expect(() => validateEdits(reply(`, '$42.00'`, `, '$99.00'`), SPEC_PATH, spec)).toThrow(
+      /inside should\(…\); heals never weaken assertions/,
+    );
+  });
+
   it('accepts an attribute-selector style change (inner quotes differ from the outer delimiter)', () => {
     // data-testid → role: legit selector-style heal whose diff crosses the
     // INNER `"` of `[attr="val"]` but never the outer `'`. PrairieLearn

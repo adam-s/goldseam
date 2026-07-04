@@ -2,7 +2,7 @@
 
 First-party evidence gathered 2026-07-03 from the Cypress 15.18.0 binary
 installed at `~/Library/Caches/Cypress/15.18.0/`, plus official docs. This
-is the competitive reference for qa-relocator's design.
+is the competitive reference for goldseam's design.
 
 ## The headline: cy.prompt is not in the open-source product
 
@@ -47,8 +47,7 @@ module = await loadRemote('cy-prompt')
 2. Nobody can fork or extend it; the Module Federation channel is not a
    third-party extension point.
 3. Any open alternative must be built from public extension points — which
-   is exactly what qa-relocator does (see
-   [extension-points.md](extension-points.md)).
+   is exactly what goldseam does.
 
 ## Documented behavior (docs + blog + changelog + issue queue, July 2026)
 
@@ -76,7 +75,7 @@ module = await loadRemote('cy-prompt')
   **permanently forfeits healing**: healing only exists while the prompt
   remains in code. Their framing: eject when you "need strict
   predictability for review and auditing." (You can have healing or
-  reviewable code in the repo — never both. Goldseam's thesis is that this
+  reviewable code in the repo — never both — goldseam's thesis is that this
   is a false choice.)
 - **Reports:** Cloud prompt reports (JSON/YAML/Markdown) per recorded run.
 - **Limits:** E2E only; Chromium only (Chrome/Edge/Electron); **50 steps
@@ -113,14 +112,14 @@ Usage patterns extracted from the full issue sweep live in
 
 ## What we adopt, counter, and skip
 
-| cy.prompt capability | qa-relocator response |
+| cy.prompt capability | goldseam response |
 | --- | --- |
 | Heals prompt-authored steps only | **Counter:** heal existing unmodified `cy.get` suites — the installed base |
 | Cloud-hosted LLM, no BYO model | **Counter:** pluggable runner — `claude -p`, any API, or local (Ollama) |
 | Runtime selector substitution | **Counter:** build-time heal delivered as a reviewed PR (their "Get Code" validates the direction; we make it the product) |
 | Step-scoped regeneration | **Adopt:** minimal exact-string edit of the broken selector only |
 | Heal tiers (cache vs AI) + visibility | **Adopt:** tier labels in heal artifacts and PR bodies |
-| Placeholder/sensitive-data redaction | **Adopt:** capture-time redaction pass (M4 checklist) |
+| Placeholder/sensitive-data redaction | **Adopt:** capture-time redaction pass (shipped) |
 | Selector-priority config (ElementSelector) | **Adopt:** configurable priority for *proposed* selectors (`data-cy` > role > text > css) |
 | Prompt reports (JSON/YAML/MD) | **Adopt:** capture + heal artifacts are already JSON; add a summary report |
 | NL authoring vocabulary, refinement dialogs, Studio | **Skip:** authoring is a different product; don't fight a free incumbent there |

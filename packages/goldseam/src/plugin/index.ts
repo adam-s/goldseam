@@ -1,12 +1,17 @@
 // Node-side entry (`goldseam/plugin`). Registers the capture task and writes
 // failure artifacts — the contract between the run and `goldseam heal`.
 
-import { join } from 'path';
-import { CAPTURE_TASK, FailureCapture } from '../shared/types';
+import { isAbsolute, join, resolve } from 'path';
+import {
+  CAPTURE_TASK,
+  FailureCapture,
+  ORACLE_TASK,
+  PROMPT_LOAD_TASK,
+  PROMPT_TRANSLATE_TASK,
+} from '../shared/types';
 import { writeCaptureArtifact } from './artifacts';
 import { TranslatePayload, loadPromptCache, translateSteps } from './translate';
 import { OracleRecordPayload, recordOracleEntries } from './oracle';
-import { ORACLE_TASK } from '../shared/types';
 import { GoldseamConfig, loadGoldseamConfig, resolvePromptModel } from '../shared/config';
 
 export interface GoldseamPluginOptions {
@@ -31,18 +36,30 @@ export function goldseam(
   // `goldseam heal` (run from the repo root) can't find it. Surfaced by
   // the PrairieLearn proving ground, 2026-07-03.
   const root = config.projectRoot ?? process.cwd();
-  // goldseam.config.mjs loads async (ESM), but goldseam() is synchronous —
-  // so kick the load off now and await it lazily inside the translate task
-  // (itself async). A broken config surfaces there, not by failing setup.
+  // goldseam.config.mjs loads async (ESM), but goldseam() is synchronous, so
+  // kick the load off now and await it lazily inside each task. Keep the
+  // rejection: the prompt tasks re-throw it (a broken config fails LOUD, the
+  // way `loadGoldseamConfig` promises), while the best-effort capture task
+  // falls back to defaults so artifact writing never depends on config health.
+  let configError: unknown = null;
   const configReady: Promise<GoldseamConfig> = loadGoldseamConfig(root).catch((error) => {
-    console.error(`[goldseam] ${error instanceof Error ? error.message : error}`);
+    configError = error;
     return {};
   });
-  const failuresDir = options.failuresDir ?? join(root, '.goldseam', 'failures');
+  // Configured dirs are anchored to the project root (same monorepo reason as
+  // above): a relative path in goldseam.config.mjs must not resolve against
+  // Cypress's cwd, which is the config file's directory, not the repo root.
+  const anchored = (dir: string) => (isAbsolute(dir) ? dir : resolve(root, dir));
+  const promptsDirFor = (cfg: GoldseamConfig) =>
+    anchored(options.promptsDir ?? cfg.author?.promptsDir ?? join('.goldseam-prompts'));
 
   on('task', {
-    [CAPTURE_TASK]: (capture: FailureCapture) => {
-      // Best-effort: an artifact-write failure must never fail the run.
+    [CAPTURE_TASK]: async (capture: FailureCapture) => {
+      // Honor the SAME failuresDir the CLI reads from (`cfg.heal.failuresDir`),
+      // or captures land where `goldseam heal` never looks. Best-effort: a
+      // broken config falls back to the default and never fails the run.
+      const cfg = await configReady;
+      const failuresDir = anchored(options.failuresDir ?? cfg.heal?.failuresDir ?? join('.goldseam', 'failures'));
       try {
         writeCaptureArtifact(failuresDir, capture);
       } catch (error) {
@@ -50,16 +67,16 @@ export function goldseam(
       }
       return null;
     },
-    'goldseam:prompt:load': async ({ key }: { key: string }) => {
+    [PROMPT_LOAD_TASK]: async ({ key }: { key: string }) => {
       const cfg = await configReady;
-      const promptsDir = options.promptsDir ?? cfg.author?.promptsDir ?? join(root, '.goldseam-prompts');
-      return loadPromptCache(promptsDir, key);
+      if (configError) throw configError;
+      return loadPromptCache(promptsDirFor(cfg), key);
     },
-    'goldseam:prompt:translate': async (payload: TranslatePayload) => {
+    [PROMPT_TRANSLATE_TASK]: async (payload: TranslatePayload) => {
       const cfg = await configReady;
-      const promptsDir = options.promptsDir ?? cfg.author?.promptsDir ?? join(root, '.goldseam-prompts');
+      if (configError) throw configError;
       const promptModel = resolvePromptModel(options.promptModel, process.env, cfg);
-      return translateSteps(payload, promptModel, promptsDir);
+      return translateSteps(payload, promptModel, promptsDirFor(cfg));
     },
     [ORACLE_TASK]: (payload: OracleRecordPayload) =>
       recordOracleEntries(join(root, '.goldseam', 'oracle.json'), payload),

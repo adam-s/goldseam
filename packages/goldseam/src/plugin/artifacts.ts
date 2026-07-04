@@ -2,9 +2,9 @@
 // are unit-testable without a Cypress run.
 
 import { createHash } from 'crypto';
-import { mkdirSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { extractFailedSelector } from '../shared/selector';
+import { writeJsonAtomic } from '../shared/fs';
 import { FAILURE_SCHEMA_VERSION, FailureArtifact, FailureCapture } from '../shared/types';
 
 export const slugify = (s: string): string =>
@@ -28,16 +28,8 @@ export function toArtifact(capture: FailureCapture): FailureArtifact {
   };
 }
 
-/** Atomic write (tmp + rename): parallel runs must never see a torn artifact. */
-export function writeArtifactAtomic(filePath: string, data: unknown): void {
-  const tmp = `${filePath}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(data, null, 2));
-  renameSync(tmp, filePath);
-}
-
 export function writeCaptureArtifact(failuresDir: string, capture: FailureCapture): string {
   const filePath = join(failuresDir, artifactFileName(capture));
-  mkdirSync(failuresDir, { recursive: true });
-  writeArtifactAtomic(filePath, toArtifact(capture));
+  writeJsonAtomic(filePath, toArtifact(capture));
   return filePath;
 }

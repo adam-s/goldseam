@@ -35,26 +35,30 @@ That's the whole setup. Everything below is copy-paste.
 
 ---
 
-## Step 1 — Get this file
+## Step 1 — Get the deploy file
 
-This deploys [`goldseam_model.py`](goldseam_model.py) from this folder.
+You need [`goldseam_model.py`](goldseam_model.py) on your machine. Clone the
+repo, or download the single file:
+
+```bash
+curl -O https://raw.githubusercontent.com/adam-s/goldseam/main/selfhost/modal/goldseam_model.py
+```
+
+The `modal deploy` command in Step 3 takes the path to wherever you saved it.
 
 ## Step 2 — Create your private API key
 
-The endpoint is locked with a key so only you can call it. This command
-generates a random one and stores it as a Modal secret (it never touches
-your code):
+The endpoint is locked with a key so only you can call it. Generate one,
+store it as a Modal secret, and print it so you can paste it in Step 4:
 
 ```bash
-modal secret create goldseam-vllm GOLDSEAM_VLLM_API_KEY=$(openssl rand -hex 16)
+KEY=$(openssl rand -hex 16)
+modal secret create goldseam-vllm GOLDSEAM_VLLM_API_KEY=$KEY
+echo "$KEY"   # paste this into OPENAI_API_KEY in Step 4
 ```
 
-You'll pass this same key to goldseam in Step 4. To see it again later:
-`modal secret list` won't show the value — so if you need it, run the
-`openssl` part alone first and paste the result into both places.
-
-> Prefer to pick your own key? Replace `$(openssl rand -hex 16)` with any
-> string, e.g. `GOLDSEAM_VLLM_API_KEY=my-secret-key`.
+Lost the key later? `modal secret list` won't show the value — just recreate
+the secret with a new key (`modal secret create --force …`) and redeploy.
 
 ## Step 3 — Deploy
 
@@ -114,8 +118,8 @@ That's it — your suite now heals on a model you host.
 - **You pay per second the GPU is running**, not per token. A heal keeps the
   container warm for `scaledown_window` (15 min) after the last request, then
   Modal stops it and billing goes to **$0**. Check current GPU rates on
-  Modal's pricing page — an L40S is a low-single-digit dollars/hour, so a
-  burst of heals is cents.
+  Modal's pricing page — an L40S runs a few dollars an hour, so a burst of
+  heals costs cents.
 - **Stop it immediately** (don't wait for the idle window):
   ```bash
   modal app stop goldseam-model
@@ -155,9 +159,10 @@ That's it — your suite now heals on a model you host.
 
 ## Honest status
 
-This is a **deployment recipe**, pinned to Modal's API and vLLM 0.21 as of
-2026-07. It has **not** been run in goldseam's CI (CI makes no cloud model
-calls, by design). If Modal's API has changed, compare against their
+This is a **deployment recipe**, written against Modal's API and vLLM 0.21 as
+of 2026-07. It has **not yet been run end-to-end** — treat it as unproven
+until your first successful heal (CI makes no cloud model calls, by design).
+If Modal's API has changed, compare against their
 [vLLM example](https://modal.com/docs/examples/vllm_inference). Once you've
 run a heal through it, you've proven the `openai:` path end-to-end on a model
 you own — which is the whole point.

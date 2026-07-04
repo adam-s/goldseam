@@ -6,14 +6,14 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 
 import { dirname, join } from 'path';
 import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../heal/engine';
-import { resolveRunner } from '../heal/runners';
+import { preflightRunner, resolveRunner } from '../heal/runners';
 import { HealOptions } from '../heal/types';
 import { SUPPORT_SNIPPET, wireConfigSource, wireSupportSource } from './init';
 import { renderEntry } from './eject';
 import { ReportEntry, buildReport, renderMarkdown } from './report';
 import { FailureArtifact } from '../shared/types';
 import { HealArtifact } from '../heal/types';
-import { loadGoldseamConfig, resolveHealModel } from '../shared/config';
+import { healModelSource, loadGoldseamConfig, resolveHealModel } from '../shared/config';
 
 const USAGE = `goldseam — self-healing for the Cypress suites you already have
 
@@ -22,7 +22,7 @@ Usage:
   goldseam heal [options]   read failure artifacts, propose + verify selector fixes
   goldseam report [options] per-test summary of captures + heals
   goldseam eject            render cached cy.goldseam translations as plain Cypress code
-  goldseam pr               open PR(s) from verified heals            (M5, not yet)
+  goldseam pr               open PR(s) from verified heals            (not yet)
 
 Config: an optional goldseam.config.mjs at the project root supplies
 defaults for both this CLI and cy.goldseam(); every flag below overrides it.
@@ -107,6 +107,15 @@ async function heal(): Promise<number> {
   // goldseam.config.mjs (if any) supplies defaults BELOW every flag: a
   // flag always wins, the config fills what the flag left unset.
   const cfg = await loadGoldseamConfig(projectRoot);
+  // Numeric flags/config must be numbers: a NaN silently makes the attempt
+  // loop never run or the confidence floor never fire, so reject loudly.
+  const num = (label: string, raw: unknown, dflt: number): number => {
+    if (raw === undefined || raw === null) return dflt;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) throw new Error(`${label} must be a number, got "${raw}"`);
+    return n;
+  };
+
   const cacheDisabled = process.argv.includes('--no-cache') || cfg.heal?.cache === false;
   const failuresDir =
     arg('--failures-dir') ?? cfg.heal?.failuresDir ?? join('.goldseam', 'failures');
@@ -116,8 +125,8 @@ async function heal(): Promise<number> {
       arg('--stages')?.split(',').map((s) => s.trim()) ??
       cfg.heal?.stages ??
       DEFAULT_HEAL_OPTIONS.stages,
-    maxAttempts: Number(arg('--max-attempts') ?? cfg.heal?.maxAttempts ?? DEFAULT_HEAL_OPTIONS.maxAttempts),
-    minConfidence: Number(arg('--min-confidence') ?? cfg.heal?.minConfidence ?? DEFAULT_HEAL_OPTIONS.minConfidence),
+    maxAttempts: num('--max-attempts', arg('--max-attempts') ?? cfg.heal?.maxAttempts, DEFAULT_HEAL_OPTIONS.maxAttempts),
+    minConfidence: num('--min-confidence', arg('--min-confidence') ?? cfg.heal?.minConfidence, DEFAULT_HEAL_OPTIONS.minConfidence),
     dryRun: process.argv.includes('--dry-run'),
     projectRoot,
     healsDir: arg('--heals-dir') ?? cfg.heal?.healsDir ?? join('.goldseam', 'heals'),
@@ -125,7 +134,8 @@ async function heal(): Promise<number> {
     oracleFile: arg('--oracle-file') ?? cfg.heal?.oracleFile ?? join('.goldseam', 'oracle.json'),
     configFile: arg('--config-file') ?? cfg.heal?.configFile,
   };
-  const runner = resolveRunner(resolveHealModel(arg('--model'), process.env, cfg));
+  const modelSpec = resolveHealModel(arg('--model'), process.env, cfg);
+  const runner = resolveRunner(modelSpec);
 
   if (!existsSync(failuresDir)) {
     console.log(`goldseam heal: no captures found in ${failuresDir} — nothing to do.`);
@@ -137,11 +147,26 @@ async function heal(): Promise<number> {
     return 0;
   }
 
+  const readArtifact = (file: string): FailureArtifact | null => {
+    try {
+      return JSON.parse(readFileSync(join(failuresDir, file), 'utf8')) as FailureArtifact;
+    } catch {
+      return null;
+    }
+  };
+  // Every broken test in each spec, across ALL captures — knownBrokenTitles
+  // must include tests filtered out by --only/--skip, or rerun-spec reads a
+  // filtered-out failure as "the heal broke another test".
+  const allBroken = artifacts
+    .map((file) => ({ file, a: readArtifact(file) }))
+    .filter((x): x is { file: string; a: FailureArtifact } => x.a !== null);
+
   const only = arg('--only');
   const skip = arg('--skip');
   const selected = artifacts.filter((file) => {
     if (!only && !skip) return true;
-    const a = JSON.parse(readFileSync(join(failuresDir, file), 'utf8')) as FailureArtifact;
+    const a = readArtifact(file);
+    if (!a) return true; // let the loop surface the read error rather than silently drop it
     const haystack = `${a.specPath} ${a.title}`;
     if (only && !haystack.includes(only)) return false;
     if (skip && haystack.includes(skip)) return false;
@@ -151,40 +176,60 @@ async function heal(): Promise<number> {
     console.log(`goldseam heal: ${artifacts.length - selected.length} capture(s) filtered out by --only/--skip`);
   }
 
-  console.log(`goldseam heal: ${selected.length} capture(s), model ${runner.id}${options.dryRun ? ', dry-run' : ''}\n`);
-  // Several tests in one spec can break together; each heal's rerun must
-  // tolerate the OTHER still-pending breaks (and nothing else).
-  const pending = new Map(
-    selected.map((file) => {
-      const a = JSON.parse(readFileSync(join(failuresDir, file), 'utf8')) as FailureArtifact;
-      return [file, { specPath: a.specPath, title: a.title }];
-    }),
+  // Fail fast with ONE actionable message if the model is unreachable, rather
+  // than a cryptic error on every capture. (No model tokens spent — see
+  // preflightRunner.) Skip when there's nothing to heal.
+  if (selected.length > 0) {
+    try {
+      await preflightRunner(modelSpec);
+    } catch (e) {
+      console.error(`goldseam heal: ${e instanceof Error ? e.message : e}`);
+      return 1;
+    }
+  }
+
+  console.log(
+    `goldseam heal: ${selected.length} capture(s), model ${runner.id} (from ${healModelSource(arg('--model'), process.env, cfg)})${options.dryRun ? ', dry-run' : ''}\n`,
   );
+
   let healed = 0;
+  const healedFiles = new Set<string>();
   for (const file of selected) {
-    const me = pending.get(file)!;
-    const knownBrokenTitles = [...pending.entries()]
-      .filter(([f, p]) => f !== file && p.specPath === me.specPath)
-      .map(([, p]) => p.title);
-    // A capture can vanish mid-batch (a concurrent Cypress session
-    // rewriting .goldseam) — skip it, never abandon the rest of the batch.
+    // A capture can vanish mid-batch (a concurrent Cypress session rewriting
+    // .goldseam) — skip it, never abandon the rest of the batch.
     if (!existsSync(join(failuresDir, file))) {
-      console.log(`∅ [skipped] ${me.title} — capture disappeared during the run (concurrent Cypress session?)`);
+      console.log(`∅ [skipped] ${file} — capture disappeared during the run (concurrent Cypress session?)`);
       continue;
     }
-    const result = await healArtifactFile(join(failuresDir, file), runner, { ...options, knownBrokenTitles });
-    if (result.verdict === 'healed') pending.delete(file);
-    const mark = { healed: '✔', 'gave-up': '∅', failed: '✖' }[result.verdict];
-    console.log(`${mark} [${result.verdict}] ${result.title}`);
-    for (const attempt of result.attempts) {
-      for (const rung of attempt.ladder) {
-        console.log(`    attempt ${attempt.attempt} · ${rung.stage}: ${rung.verdict} — ${rung.evidence}`);
-      }
+    const me = allBroken.find((x) => x.file === file)?.a ?? readArtifact(file);
+    if (!me) {
+      console.log(`✖ [error] ${file} — could not read the capture (corrupt JSON?); skipping`);
+      continue;
     }
-    if (result.verdict === 'healed') {
-      healed++;
-      console.log(`    edit applied to ${result.specPath}${options.dryRun ? ' (dry-run: not written)' : ''}`);
-      for (const flag of result.reviewFlags ?? []) console.log(`    ⚠ ${flag}`);
+    // Other broken tests in the same spec still awaiting a heal (exclude the
+    // ones already healed this run, and this capture itself).
+    const knownBrokenTitles = allBroken
+      .filter((x) => x.file !== file && !healedFiles.has(x.file) && x.a.specPath === me.specPath)
+      .map((x) => x.a.title);
+    try {
+      const result = await healArtifactFile(join(failuresDir, file), runner, { ...options, knownBrokenTitles });
+      if (result.verdict === 'healed') healedFiles.add(file);
+      const mark = { healed: '✔', 'gave-up': '∅', failed: '✖' }[result.verdict];
+      console.log(`${mark} [${result.verdict}] ${result.title}`);
+      for (const attempt of result.attempts) {
+        for (const rung of attempt.ladder) {
+          console.log(`    attempt ${attempt.attempt} · ${rung.stage}: ${rung.verdict} — ${rung.evidence}`);
+        }
+      }
+      if (result.verdict === 'healed') {
+        healed++;
+        console.log(`    edit applied to ${result.specPath}${options.dryRun ? ' (dry-run: not written)' : ''}`);
+        for (const flag of result.reviewFlags ?? []) console.log(`    ⚠ ${flag}`);
+      }
+    } catch (e) {
+      // One corrupt capture or unexpected engine error must not abandon the
+      // rest of the batch.
+      console.log(`✖ [error] ${me.title} — ${e instanceof Error ? e.message : e}`);
     }
   }
   console.log(`\n${healed}/${selected.length} healed; heal artifacts in ${options.healsDir}`);
@@ -196,6 +241,21 @@ async function report(): Promise<number> {
   const failuresDir = arg('--failures-dir') ?? cfg.heal?.failuresDir ?? join('.goldseam', 'failures');
   const healsDir = arg('--heals-dir') ?? cfg.heal?.healsDir ?? join('.goldseam', 'heals');
   const format = arg('--format') ?? 'md';
+  if (format !== 'md' && format !== 'json') {
+    console.error(`goldseam report: unknown --format "${format}" (expected md or json)`);
+    return 1;
+  }
+
+  // One corrupt artifact must not brick the whole report — skip it with a
+  // warning to stderr and carry on.
+  const readJson = <T>(dir: string, file: string): T | null => {
+    try {
+      return JSON.parse(readFileSync(join(dir, file), 'utf8')) as T;
+    } catch (e) {
+      console.error(`goldseam report: skipping unreadable ${join(dir, file)} — ${e instanceof Error ? e.message : e}`);
+      return null;
+    }
+  };
 
   const captureFiles = existsSync(failuresDir)
     ? readdirSync(failuresDir).filter((f) => f.endsWith('.json'))
@@ -203,15 +263,16 @@ async function report(): Promise<number> {
   const healsByRef = new Map<string, HealArtifact>();
   if (existsSync(healsDir)) {
     for (const f of readdirSync(healsDir).filter((f) => f.endsWith('-heal.json'))) {
-      const heal = JSON.parse(readFileSync(join(healsDir, f), 'utf8')) as HealArtifact;
-      healsByRef.set(heal.captureRef, heal);
+      const heal = readJson<HealArtifact>(healsDir, f);
+      if (heal) healsByRef.set(heal.captureRef, heal);
     }
   }
-  const entries: ReportEntry[] = captureFiles.map((captureFile) => ({
-    captureFile,
-    capture: JSON.parse(readFileSync(join(failuresDir, captureFile), 'utf8')) as FailureArtifact,
-    heal: healsByRef.get(captureFile),
-  }));
+  const entries: ReportEntry[] = captureFiles
+    .map((captureFile): ReportEntry | null => {
+      const capture = readJson<FailureArtifact>(failuresDir, captureFile);
+      return capture ? { captureFile, capture, heal: healsByRef.get(captureFile) } : null;
+    })
+    .filter((e): e is ReportEntry => e !== null);
 
   const built = buildReport(entries);
   const output = format === 'json' ? `${JSON.stringify(built, null, 2)}\n` : renderMarkdown(built);
@@ -275,7 +336,7 @@ switch (command) {
     );
     break;
   case 'pr':
-    console.error(`goldseam ${command}: not implemented yet (see docs/plan.md, M5)`);
+    console.error(`goldseam ${command}: not implemented yet`);
     process.exit(1);
     break;
   default:

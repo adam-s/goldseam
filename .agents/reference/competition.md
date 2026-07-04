@@ -13,7 +13,7 @@ cy.prompt detail in [cy-prompt-anatomy.md](cy-prompt-anatomy.md) and
 | **Healenium** (OSS) | Selenium locators at runtime | Docker backend + PostgreSQL + proxy/driver wrap | Runtime substitution; report UI | Built-in ML (LCS-based), no BYO LLM |
 | **CodeceptJS `heal`** (OSS) | CodeceptJS steps at runtime on CI | Adopt CodeceptJS wholesale + recipes file + AI provider config | Runtime retry with suggested code | BYO (OpenAI/Claude/etc.) |
 | **mabl / Testim / Octomind / QA Wolf class** (commercial) | Tests recorded/generated inside their platform | Move testing into the platform (trainer/recorder), per-run pricing | Platform-managed; proactive re-fingerprinting | Vendor cloud |
-| **goldseam** | **Existing unmodified `cy.get`-style suites** | `npm i -D goldseam` + 2 lines (or `npx goldseam init`) | **A reviewed commit/PR in your repo** | **Self-hosted/BYO** (`claude`, `cmd:`, HTTP runners planned) |
+| **goldseam** | **Existing unmodified `cy.get`-style suites** | `npm i -D goldseam` + 2 lines (or `npx goldseam init`) | **A reviewed commit/PR in your repo** | **Self-hosted/BYO** (`claude`, `cmd:`, `ollama:`, `openai:`) |
 
 Status notes: Healenium is alive (backend updated 2026-06, AWS
 Marketplace listing) but Selenium-family only — it holds the OSS
@@ -47,8 +47,8 @@ queues (cypress#32673 BYO keys, cypress#33927 offline, cypress#20458
 - **CodeceptJS heal:** no framework migration — we meet suites where they
   are; heals become commits, not runtime retries that vanish.
 - **Commercial platforms:** no per-run pricing, no recorder, no data
-  leaving the machine (air-gapped `ollama:` runner is a roadmap
-  requirement, not a nice-to-have); the benchmark table
+  leaving the machine (the air-gapped `ollama:` runner is shipped and
+  proven, zero egress); the benchmark table
   (heal-rate by selector style) is published evidence they never show.
 
 ## What their issue queues teach (mined 2026-07-03)
@@ -59,7 +59,7 @@ evidence-backed:
 
 | Failure mode in the wild | Evidence | goldseam requirement |
 | --- | --- | --- |
-| **Heals the wrong element** — similarity picks "the next element of the same type" | healenium#40, #38, #56, #76, #46, #310 | Verification ladder (rerun rungs proven; oracle rung M6). Similarity without verification is the core sin — never ship an unverified heal |
+| **Heals the wrong element** — similarity picks "the next element of the same type" | healenium#40, #38, #56, #76, #46, #310 | Verification ladder (rerun rungs and oracle rung proven). Similarity without verification is the core sin — never ship an unverified heal |
 | **Heals what it shouldn't** — invisible/absent elements "healed" | healenium#88 | Give-up as first-class + rerun assertions; oracle confirms the *intended* element |
 | **Verdict/telemetry lies** — "healing occurs despite not-successful mark" | healenium#75 | Verdicts are artifacts, one source of truth; the PR body renders the same ladder the engine recorded |
 | **Reports unusable** — no test-case mapping, can't export, drowns at scale | healenium#43, #42, #73, #82 | `goldseam report`: per-test rows (title, spec, verdict, tier, confidence, edit), md + json, no server |
@@ -69,7 +69,7 @@ evidence-backed:
 | **Config not honored / silent no-op** | codeceptjs#4347, #3766 | Fail loud at setup; every run's options echoed in artifacts |
 | **Opaque algorithm** — users decompile jars to learn why it healed | healenium#56 | Reasoning + evidence in every heal artifact; open source end to end |
 | **Infra collapse** — Postgres, OOM, Jenkins/Azure connection failures | healenium#65, #57, #295, #297 | No infrastructure. Files in the repo, period |
-| **Auth inflexibility** — can't use Bearer-token AI endpoints | codeceptjs#4421 | `cmd:` escape hatch today; HTTP runners with custom headers/base URL (M5) |
+| **Auth inflexibility** — can't use Bearer-token AI endpoints | codeceptjs#4421 | `cmd:` escape hatch, plus HTTP runners with a custom base URL (`ollama:`/`openai:`) |
 | **Per-test opt-out wanted** (@DisableHealing) | healenium#308 | Planned: capture-side exclude + `goldseam heal --only/--skip` filters |
 
 ## The DX bar (what "simplest possible" means, measured)

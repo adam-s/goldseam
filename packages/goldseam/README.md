@@ -1,16 +1,19 @@
 # goldseam
 
 **goldseam is an open, bring-your-own-model alternative to Cypress's
-`cy.prompt()`** — the experimental, **Cypress Cloud–hosted** command that
-writes test steps from plain English and self-heals them (it needs a Cloud
-login or record key, and its model and cache live in Cypress's cloud).
-goldseam does the same two jobs — **write test steps in plain English** and
-**heal selectors that break** — except the model is **yours** and nothing
-runs in a vendor cloud. By default it drives the **Claude Code CLI you
-already have** (`claude -p`), so there's no API key to wire; or point it at
-a local Ollama, any OpenAI-compatible endpoint, or any command-line
-program. Every result lands as a **committed, reviewable file** instead of
-magic that happens behind your back.
+`cy.prompt()`.** `cy.prompt()` is Cypress's experimental, Cypress Cloud–hosted
+command that writes test steps from plain English and self-heals them; it
+needs a Cloud login or record key, and its model and cache live in Cypress's
+cloud.
+
+goldseam does the same two jobs — write test steps in plain English, and heal
+selectors that break — except the model is yours and nothing runs in a vendor
+cloud. By default it drives the Claude Code CLI you already have
+(`claude -p`), so there's no API key to wire; or point it at a local Ollama,
+any OpenAI-compatible endpoint, or any command-line program.
+
+Every result lands as a committed, reviewable file instead of magic that
+happens behind your back.
 
 goldseam is **two separate tools**, on purpose:
 
@@ -35,9 +38,9 @@ and the candidates are not the same kind of problem:
 
 Merged, those uncertainties **compound into a confident false green** — the
 worst outcome a test tool can produce, because the suite now lies while
-looking healthy. Avoiding it needs the machine to disambiguate intent under
-ambiguity, and we doubt a hosted inference model is consistent enough to do
-that safely, every time, unattended.
+looking healthy. Avoiding it means the model has to guess your intent
+correctly — safely, every time, unattended — and we doubt a hosted inference
+model clears that bar.
 
 So we keep them as two sharp tools. You iterate accurately and fast because
 the failure modes stay *separable*: a bad translation means the model
@@ -98,7 +101,8 @@ restructured the DOM).
 npx goldseam heal                 # propose + verify a fix for every capture
 npx goldseam heal --dry-run       # propose + validate only; touch nothing
 npx goldseam heal --model claude:opus
-npx goldseam heal --model "cmd:./my-model.sh"   # any executable: prompt on stdin, JSON on stdout
+npx goldseam heal --model "cmd:./my-model.sh"   # any executable: prompt on stdin, reply on stdout
+npx goldseam report               # per-test summary of captures + heals (--format json)
 ```
 
 The app under test must be reachable (same requirement as `cypress run`).
@@ -116,7 +120,7 @@ Three rungs judge **offline**, against the captured page, before spending a
 single test re-run:
 
 - **`triage`** (before the model): if the "missing" selector still matches
-  the snapshot, the element just appeared too late or is state-gated — a
+  the snapshot, the element appeared too late or is state-gated — a
   timing problem no selector edit can fix. Give-up, zero model calls.
 - **`resolve`** (after the model proposes): the healed selector must
   resolve in the DOM the model saw — zero matches (a hallucination) or too
@@ -160,7 +164,7 @@ the full verification ladder. `--no-cache` opts out.
   `OPENAI_BASE_URL` + `OPENAI_API_KEY`: OpenAI itself, or a self-hosted
   vLLM / LM Studio / GPU box. The runner is **proven against real OpenAI**
   (`gpt-4o-mini`: request → response → JSON-block parse, 2026-07-04) — it's
-  just not exercised in CI, which makes no cloud calls. To **self-host** the
+  not exercised in CI, which makes no cloud calls. To **self-host** the
   model on your own GPU, there's a copy-paste Modal recipe — deploy a
   private endpoint in a few commands:
   [`selfhost/modal/README.md`](https://github.com/adam-s/goldseam/blob/main/selfhost/modal/README.md).
@@ -196,7 +200,7 @@ cy.goldseam([
 - The **first run** sends your steps + the current page to your model,
   which turns them into a fixed list of real Cypress commands and saves it
   to `.goldseam-prompts/`.
-- **Every run after that** just replays that saved file — no model call, no
+- **Every run after that** replays that saved file — no model call, no
   cost, and you can read exactly what it will do in code review.
 
 Call `cy.goldseam(...)` **after the page under test has loaded**, or the
@@ -205,10 +209,10 @@ first-run translation sees a blank page.
 ### What it actually does
 
 - Steps translate ONCE into a **fixed command vocabulary** —
-  visit/click/type/check/select/trigger/scrollTo/viewport/assert/wait.
+  visit/click/dblclick/type/check/uncheck/select/trigger/scrollTo/viewport/assert/wait.
   Generated code is never `eval`'d; `trigger` means hover/tooltip flows
   work.
-- Translations cache in **`.goldseam-prompts/` — a committable file**, so
+- Translations cache as **files in `.goldseam-prompts/` — committable**, so
   the cache is code-reviewed, shared through git, and replays in CI with
   zero model calls. (The incumbent's cache lives in *their* cloud.)
 - `{{placeholder}}` values are filled in at execution time only — they
@@ -353,8 +357,6 @@ Known walls (documented, not hidden):
   exports `ELECTRON_RUN_AS_NODE=1`; prefix scripts with
   `env -u ELECTRON_RUN_AS_NODE`.
 
-> `goldseam pr` (heal delivered as a ready-made pull request) is the next
-> milestone — the
-> [roadmap](https://github.com/adam-s/goldseam/blob/main/docs/plan.md) has
-> the rest. The reasoning behind keeping heal and author separate lives in
+> `goldseam pr` (heal delivered as a ready-made pull request) is planned.
+> The reasoning behind keeping heal and author separate lives in
 > [authored-self-healing.md](https://github.com/adam-s/goldseam/blob/main/.agents/reference/authored-self-healing.md).

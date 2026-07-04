@@ -1,4 +1,4 @@
-// System test (M1 done-when): a green run stays quiet, a broken selector
+// System test: a green run stays quiet, a broken selector
 // produces a schema-valid capture artifact. Serves the demo shop itself and
 // drives Cypress through the Module API — the same API the heal ladder's
 // rerun rungs will use.

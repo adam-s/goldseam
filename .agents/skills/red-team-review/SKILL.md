@@ -12,7 +12,7 @@ of the production code (the capture plugin, the heal engine, the CLI).
 
 - User says: "red team", "bug hunt", "adversarial review", "find what's
   broken", "find real bugs"
-- A milestone from [docs/plan.md](../../../docs/plan.md) just landed
+- A significant batch of new production code just landed
 - Before publishing any release
 - Proactively at checkpoints during long coding tasks
 
@@ -22,7 +22,7 @@ Use the `Agent` tool with:
 
 - `subagent_type: "general-purpose"`
 - `model: "opus"`
-- `description`: 3–5 word description (e.g. `"Red-team review post-M4"`)
+- `description`: 3–5 word description (e.g. `"Red-team the heal engine"`)
 - `prompt`: follow the template below
 
 ## Prompt template
@@ -38,7 +38,7 @@ severity (CRITICAL / HIGH / MEDIUM / LOW).
 
 ## Project
 
-/Users/adamsohn/Projects/goldseam
+The goldseam repo root (`git rev-parse --show-toplevel`).
 
 npm-workspace monorepo. packages/goldseam has two worlds: a browser-side
 support entry (Cypress fail-event capture, redaction, aria snapshot) and

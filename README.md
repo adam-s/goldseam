@@ -3,17 +3,18 @@
 [![CI](https://github.com/adam-s/goldseam/actions/workflows/ci.yml/badge.svg)](https://github.com/adam-s/goldseam/actions/workflows/ci.yml)
 
 An open, **bring-your-own-model** alternative to Cypress's Cloud-hosted
-`cy.prompt()`. Your model — the Claude Code CLI you already have
-(`claude -p`) by default, or local Ollama / any OpenAI-compatible endpoint
-/ any CLI program — never a vendor cloud, and every result lands as a
-reviewable file. **Two tools, kept separate on purpose:**
+`cy.prompt()`. You bring the model: the Claude Code CLI you already have
+(`claude -p`) by default, a local Ollama, any OpenAI-compatible endpoint, or
+any command-line program. Nothing runs in a vendor cloud, and every result
+lands as a reviewable file. **Two tools, kept separate on purpose:**
 
-- **Heal** the Cypress suites you already have — when a selector breaks,
-  the failure becomes a rich capture (redacted DOM + accessibility tree +
+- **Heal** the Cypress suites you already have. When a selector breaks, the
+  failure becomes a rich capture (redacted DOM + accessibility tree +
   error), your model proposes a minimal fix, the suite verifies it, and the
   repair lands as a reviewed diff — never a runtime substitution.
 - **Author** new tests in plain English — `cy.goldseam([...])` translates
-  your steps once into real Cypress commands, cached as a committable file.
+  your steps once into real Cypress commands, cached as committable files in
+  `.goldseam-prompts/`.
 
 **Why not merge them into one self-healing prompt** (the loop `cy.prompt()`
 markets)? When a plain-English step breaks you can't tell whether the app
@@ -44,9 +45,9 @@ git diff                   # review the selector-only edit, then commit
 npx goldseam report        # per-test summary of captures and heals
 ```
 
-Every heal passes a six-rung verification ladder — the indigo rungs judge
-offline against the captured DOM; the cyan rungs re-run the app; give-up
-and fail are first-class, never hidden:
+Every heal passes a six-rung verification ladder. Triage, propose, resolve,
+and oracle judge offline against the captured DOM; the two rerun rungs
+re-run the app; give-up and fail are first-class, never hidden:
 
 ```mermaid
 flowchart TD
@@ -126,7 +127,7 @@ npm run test:unit && npm run test:system && npm run test:hardening && npm run te
 - `demo/` + `cypress/` — the fixture shop and the dogfood suite
 - `proving/` — real apps, induced drift, real heals
   ([receipts](proving/CAMPAIGN.md))
-- `docs/plan.md` — roadmap; `.agents/reference/` — design references
+- `.agents/reference/` — design references
 
 ## License
 

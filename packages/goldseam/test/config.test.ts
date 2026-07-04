@@ -56,6 +56,10 @@ describe('resolveHealModel precedence: flag > GOLDSEAM_MODEL > healModel > model
   it('falls back to the built-in default with an empty config', () => {
     expect(resolveHealModel(undefined, {}, {})).toBe(DEFAULT_MODEL);
   });
+  it('treats a blank env var as unset (GOLDSEAM_MODEL= falls through, never resolves to "")', () => {
+    expect(resolveHealModel(undefined, { GOLDSEAM_MODEL: '' }, cfg)).toBe('cfg-heal');
+    expect(resolveHealModel(undefined, { GOLDSEAM_MODEL: '   ' }, {})).toBe(DEFAULT_MODEL);
+  });
 });
 
 describe('resolvePromptModel precedence: option > GOLDSEAM_PROMPT_MODEL > GOLDSEAM_MODEL > promptModel > model > default', () => {
@@ -114,6 +118,11 @@ describe('loadGoldseamConfig', () => {
 
   it('rejects an array export (arrays are not config objects)', async () => {
     const dir = projectWith(`export default ['claude'];`);
+    await expect(loadGoldseamConfig(dir)).rejects.toThrow(/must `export default` an object/);
+  });
+
+  it('rejects a config with only named exports (the documented contract is a default export)', async () => {
+    const dir = projectWith(`export const model = 'ollama:qwen2.5:14b';`);
     await expect(loadGoldseamConfig(dir)).rejects.toThrow(/must `export default` an object/);
   });
 });

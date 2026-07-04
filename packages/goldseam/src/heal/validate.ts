@@ -104,14 +104,31 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
   }
 
   const { oldCore, newCore, prefix } = changedSpan(edit.oldString, edit.newString);
+  const pos = specSource.indexOf(edit.oldString);
+  // The changed span begins at pos + prefix.length in the spec.
+  const changePos = pos + prefix.length;
+
+  // Assertion guard, anchored on the SPEC (authoritative), never on the
+  // model's snippet. The snippet can be cropped to hide the enclosing call
+  // name, and an assertion's VALUE argument sits past any lead-only check
+  // (`should('have.text', '$42')` — the value is the second argument). The
+  // occurrence is unique (checked above), so the spec position is exact:
+  // ask the spec which call encloses the edit, and reject the assertion
+  // calls. A change inside cy.get() stays a selector edit even when its
+  // fragment reads like a word such as "value".
+  const call = enclosingCallName(specSource, changePos);
+  if (call && ASSERTION_CALLS.has(call)) {
+    throw new EditRejected(`the change is inside ${call}(…); heals never weaken assertions`);
+  }
+  if (!call && (ASSERTION_CORE.test(oldCore) || ASSERTION_CORE.test(newCore))) {
+    // No enclosing call at all (rare) — fall back to the fragment shape.
+    throw new EditRejected(`the change looks like an assertion edit ("${oldCore}" → "${newCore}"); heals never weaken assertions`);
+  }
 
   // Bare-string edits (cache tier: oldString IS the selector text, no
-  // quotes in the snippet): validate against the spec's surrounding
-  // characters instead — the occurrence must be a complete quoted string,
-  // not an assertion argument, and the replacement must not break out of
-  // the quotes.
+  // quotes in the snippet): the occurrence must be a complete quoted string
+  // and the replacement must not break out of the quotes.
   if (!/['"`]/.test(edit.oldString)) {
-    const pos = specSource.indexOf(edit.oldString);
     const open = specSource[pos - 1];
     const close = specSource[pos + edit.oldString.length];
     if (!(open === "'" || open === '"' || open === '`') || close !== open) {
@@ -119,10 +136,6 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
     }
     if (/['"`]|\$\{/.test(edit.newString)) {
       throw new EditRejected('replacement must stay inside the quoted string');
-    }
-    const lead = specSource.slice(Math.max(0, pos - 40), pos - 1);
-    if (/(should|and|expect|assert)\s*\(\s*$/.test(lead)) {
-      throw new EditRejected('the change is inside an assertion; heals never weaken assertions');
     }
     return edit;
   }
@@ -142,17 +155,6 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
   const outer = oldQuote;
   if (oldCore.includes(outer) || newCore.includes(newQuote) || /\$\{/.test(oldCore + newCore)) {
     throw new EditRejected('the change spans more than one quoted string; one edit per selector site');
-  }
-  // Context beats fragments: a change inside .should()/.and()/expect() is
-  // an assertion edit no matter what it says; a change inside cy.get() is
-  // a selector edit even when the diff fragment is a word like "value".
-  const call = enclosingCallName(edit.oldString, prefix.length);
-  if (call && ASSERTION_CALLS.has(call)) {
-    throw new EditRejected(`the change is inside ${call}(…); heals never weaken assertions`);
-  }
-  if (!call && (ASSERTION_CORE.test(oldCore) || ASSERTION_CORE.test(newCore))) {
-    // No call context in the snippet — fall back to the fragment check.
-    throw new EditRejected(`the change looks like an assertion edit ("${oldCore}" → "${newCore}"); heals never weaken assertions`);
   }
   if (edit.newString.split('\n').length !== edit.oldString.split('\n').length) {
     throw new EditRejected('the edit may not add or remove lines');

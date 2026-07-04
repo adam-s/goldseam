@@ -33,5 +33,10 @@
     "aria-snapshot",
     "playwright",
     "yaml"
-  ]
+  ],
+  "author": "Adam Sohn",
+  "bugs": {
+    "url": "https://github.com/adam-s/goldseam/issues"
+  },
+  "homepage": "https://github.com/adam-s/goldseam/tree/main/packages/aria-snapshot#readme"
 }

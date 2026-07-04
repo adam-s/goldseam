@@ -12,17 +12,33 @@
 // Local-only, real model calls (~21/iteration). Never CI.
 
 import { execSync, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const MAX_ITERS = Number(process.env.TUNE_ITERS ?? 4);
 const RULES_FILE = 'packages/goldseam/src/plugin/translate-rules.ts';
 const LOG = 'bench/tuning-log.md';
 
+const RESULTS = 'bench/translate-results.json';
 const runEval = () => {
+  // Delete first: a crashed eval must not leave the tuner grading the
+  // PREVIOUS run's results as if they were this candidate's. (translate-eval
+  // exits non-zero on a baseline regression too, so its exit code can't be
+  // the crash signal — the written-file presence is.)
+  try {
+    rmSync(RESULTS);
+  } catch {
+    /* not there yet */
+  }
   spawnSync('node', ['bench/translate-eval.mjs', '--model', 'claude:sonnet'], { encoding: 'utf8' });
-  return JSON.parse(readFileSync('bench/translate-results.json', 'utf8'));
+  if (!existsSync(RESULTS)) {
+    throw new Error('translate-eval wrote no results (crashed?) — aborting rather than grade stale data');
+  }
+  return JSON.parse(readFileSync(RESULTS, 'utf8'));
 };
 const score = (r) => Number(r.score.split('/')[0]);
+// mustRefuse is an "X/Y" string; compare numerators, not the strings, so an
+// IMPROVEMENT (3/4 → 4/4) is kept, not reverted.
+const refusePassed = (r) => Number(String(r.mustRefuse).split('/')[0]);
 const rebuild = () => execSync('npm run build:packages', { stdio: 'pipe' });
 
 let best = readFileSync(RULES_FILE, 'utf8');
@@ -82,7 +98,7 @@ ${failures.map((f) => `### ${f.name}\nsteps: ${JSON.stringify(JSON.parse(readFil
     continue;
   }
   const retest = runEval();
-  if (score(retest) >= score(result) && retest.mustRefuse === result.mustRefuse) {
+  if (score(retest) >= score(result) && refusePassed(retest) >= refusePassed(result)) {
     appendFileSync(LOG, `- iter ${iter}: candidate kept (${result.score} → ${retest.score})\n`);
     best = candidate;
   } else {
