@@ -274,5 +274,5 @@ Tradeoffs, not oversights:
 **goldseam**, always lowercase (npm name, task prefix `goldseam:`,
 artifact dir `.goldseam/`). Named for kintsugi: the repair is visible,
 reviewed, and part of the object's story — never hidden magic. The aria
-package is `@goldseam-ai/aria-snapshot` (Apache-2.0, NOTICE required — the
+package is `@adam-s/aria-snapshot` (Apache-2.0, NOTICE required — the
 lift carries attribution obligations).

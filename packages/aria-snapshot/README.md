@@ -1,11 +1,11 @@
-# @goldseam-ai/aria-snapshot
+# @adam-s/aria-snapshot
 
 Playwright's `ariaSnapshot` — the accessibility-tree walk and YAML
 renderer — as a standalone, pure-DOM package. Runs in any page context:
 no CDP, no Playwright runtime, no browser automation required.
 
 ```ts
-import { ariaSnapshot } from '@goldseam-ai/aria-snapshot';
+import { ariaSnapshot } from '@adam-s/aria-snapshot';
 
 const yaml = ariaSnapshot(document.body);
 // - banner:

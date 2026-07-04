@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@goldseam-ai/aria-snapshot": "^0.1.0",
+    "@adam-s/aria-snapshot": "^0.1.0",
     "jsdom": "^24.0.0"
   },
   "peerDependencies": {
