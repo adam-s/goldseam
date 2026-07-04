@@ -5,8 +5,8 @@ breaks, the failure becomes a rich capture (DOM + accessibility tree +
 error); your model — local or API, never a vendor cloud — proposes a
 minimal fix; the suite verifies it; the repair arrives as a pull request.
 
-> Status: capture + the Phase-1 heal ladder (`propose → rerun-test →
-> rerun-spec`) work end to end. `goldseam pr` / `report` and the oracle
+> Status: capture + the Phase-1 heal ladder (`triage → propose → resolve →
+> rerun-test → rerun-spec`) work end to end. `goldseam pr` and the oracle
 > rung are next — see the [build plan](../../docs/plan.md).
 
 ## Install
@@ -116,12 +116,32 @@ npx goldseam heal --model "cmd:./my-model.sh"   # any executable: prompt on stdi
 ```
 
 The app under test must be reachable (same requirement as `cypress run`).
-Each capture runs the ladder — `propose → rerun-test → rerun-spec` — under
-a hard attempt cap (default 3, retrying `propose` with feedback). Every
-rung's verdict lands in `.goldseam/heals/<capture>-heal.json`; verdicts
-are `healed`, `gave-up`, or `failed`, and give-up is a first-class,
-reported outcome (page never loaded, degraded capture, low confidence, or
-the model's own judgment).
+Each capture runs the ladder — `triage → propose → resolve → rerun-test →
+rerun-spec` — under a hard attempt cap (default 3, retrying `propose` with
+feedback). Every rung's verdict lands in
+`.goldseam/heals/<capture>-heal.json`; verdicts are `healed`, `gave-up`,
+or `failed`, and give-up is a first-class, reported outcome (page never
+loaded, degraded capture, low confidence, or the model's own judgment).
+
+Two rungs judge offline, against the captured DOM, before any rerun:
+
+- **`triage`** (pre-model): if the "missing" selector still matches the
+  capture, the element appeared after Cypress stopped retrying or is
+  state-gated — a timing problem no selector edit can fix. Give-up, zero
+  model calls.
+- **`resolve`** (post-propose): the healed selector must resolve in the
+  DOM the model saw — zero matches (a hallucination) or several matches
+  where the call chain expects one element (ambiguity) reject the
+  proposal with feedback before an expensive rerun. Selectors static
+  analysis can't evaluate are deferred to the rerun rungs, with evidence.
+
+Verified is not the same as correct: a rerun proves the healed test
+*passes*, not that the selector points at the intended element. A heal
+whose enclosing test asserts only existence/visibility carries
+`reviewFlags: ["weak-assertions…"]` in its artifact, a ⚠ in the CLI, and
+a Flags column in `goldseam report` — flags route review, they never
+block. The full catalog of these judgment calls and their guards:
+[.agents/reference/disambiguation.md](../../.agents/reference/disambiguation.md).
 
 Proposals are validated mechanically before touching disk: exact-string
 edits in the failing spec only (one per occurrence of the broken

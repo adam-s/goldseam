@@ -79,6 +79,9 @@ export interface HealArtifact {
   verdict: 'healed' | 'gave-up' | 'failed';
   attempts: HealAttempt[];
   finalEdits?: RepairEdit[];
+  /** Verified-but-review-me signals (e.g. weak-assertions). Additive;
+   * flags route human attention and never block a heal. */
+  reviewFlags?: string[];
   confidence?: number;
   reasoning?: string;
   durationMs: number;

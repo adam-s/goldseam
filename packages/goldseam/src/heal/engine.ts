@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
 import { FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
+import { reviewFlagsFor } from './resolve';
 import { STAGES } from './stages';
 import {
   HEAL_SCHEMA_VERSION,
@@ -17,7 +18,7 @@ import {
 } from './types';
 
 export const DEFAULT_HEAL_OPTIONS: Omit<HealOptions, 'projectRoot' | 'healsDir' | 'cacheFile'> = {
-  stages: ['propose', 'rerun-test', 'rerun-spec'],
+  stages: ['triage', 'propose', 'resolve', 'rerun-test', 'rerun-spec'],
   maxAttempts: 3,
   minConfidence: 0.5,
   selectorPriority: ['data-cy', 'data-testid', 'role', 'text', 'css'],
@@ -146,6 +147,11 @@ export async function healArtifactFile(
     }
   }
 
+  // Verified ≠ correct: a heal whose surviving assertions are weak passed
+  // the rerun without proving it points at the intended element. Flag it
+  // for the human — flags route attention, they never block.
+  const reviewFlags = outcome === 'healed' && finalEdits ? reviewFlagsFor(originalSpec, finalEdits) : [];
+
   const heal: HealArtifact = {
     schemaVersion: HEAL_SCHEMA_VERSION,
     captureRef: basename(artifactPath),
@@ -156,6 +162,7 @@ export async function healArtifactFile(
     verdict: outcome,
     attempts,
     finalEdits,
+    ...(reviewFlags.length > 0 ? { reviewFlags } : {}),
     confidence: outcome === 'healed' ? ctx.proposal?.confidence : undefined,
     reasoning: ctx.proposal?.reasoning,
     durationMs: Date.now() - startedAt,

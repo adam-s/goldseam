@@ -166,6 +166,10 @@ real break; 0.1.0 is live.
 ## Post-v0.1 — already designed, inserted as stages
 
 Full designs in [verification-ladder.md](plugins/verification-ladder.md).
+The disambiguation catalog — every case where "not found" or "which
+element" forces a judgment, the correct verdict for each, and the shipped
+guards (`triage`, `resolve`, weak-assertion flag) — is healing's ship
+gate: [disambiguation.md](../.agents/reference/disambiguation.md).
 
 - **Phase 2 — trust hardening:** `mutation-guard` (re-break the healed
   target; a heal that can't fail is a tautology), `snapshot-diff`
@@ -182,7 +186,7 @@ Full designs in [verification-ladder.md](plugins/verification-ladder.md).
   - **Authored self-healing** (bridge `cy.goldseam` to recovery) —
     deliberately deferred; the semantic reasoning and the reason not to
     build it yet are in
-    [authored-self-healing.md](authored-self-healing.md).
+    [authored-self-healing.md](../.agents/reference/authored-self-healing.md).
   - **`goldseam mcp`** — a local MCP server exposing captures, heals,
     reports, and the benchmark to any assistant (their Cloud MCP reads
     run data server-side; ours reads artifact files — no cloud, same

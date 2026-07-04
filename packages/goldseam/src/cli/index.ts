@@ -144,6 +144,12 @@ async function heal(): Promise<number> {
     const knownBrokenTitles = [...pending.entries()]
       .filter(([f, p]) => f !== file && p.specPath === me.specPath)
       .map(([, p]) => p.title);
+    // A capture can vanish mid-batch (a concurrent Cypress session
+    // rewriting .goldseam) — skip it, never abandon the rest of the batch.
+    if (!existsSync(join(failuresDir, file))) {
+      console.log(`∅ [skipped] ${me.title} — capture disappeared during the run (concurrent Cypress session?)`);
+      continue;
+    }
     const result = await healArtifactFile(join(failuresDir, file), runner, { ...options, knownBrokenTitles });
     if (result.verdict === 'healed') pending.delete(file);
     const mark = { healed: '✔', 'gave-up': '∅', failed: '✖' }[result.verdict];
@@ -156,6 +162,7 @@ async function heal(): Promise<number> {
     if (result.verdict === 'healed') {
       healed++;
       console.log(`    edit applied to ${result.specPath}${options.dryRun ? ' (dry-run: not written)' : ''}`);
+      for (const flag of result.reviewFlags ?? []) console.log(`    ⚠ ${flag}`);
     }
   }
   console.log(`\n${healed}/${selected.length} healed; heal artifacts in ${options.healsDir}`);

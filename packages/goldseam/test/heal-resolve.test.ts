@@ -1,0 +1,421 @@
+// The disambiguation guards (.agents/reference/disambiguation.md): triage (is this a
+// selector break at all?), resolve (does the healed selector land on
+// exactly the intended element in the DOM the model saw?), and the
+// weak-assertion review flag. Pure functions + stages + engine wiring.
+
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../src/heal/engine';
+import {
+  assertionsAfter,
+  countSelectorMatches,
+  countTextMatches,
+  healedSiteForEdit,
+  impliesCollection,
+  isWeaklyAsserted,
+  reviewFlagsFor,
+  stringSiteAt,
+} from '../src/heal/resolve';
+import { resolveStage, triageStage } from '../src/heal/stages';
+import { HealContext, HealOptions, RepairRunner } from '../src/heal/types';
+import { FailureArtifact } from '../src/shared/types';
+
+const DOM = `<html><body>
+  <header id="site-header"><span id="cart-count">0</span></header>
+  <button id="add-to-cart" data-testid="add-to-cart">Add to cart</button>
+  <ul><li class="item">Mug</li><li class="item">Plate</li><li class="item">Bowl</li></ul>
+  <div id="host"><template shadowrootmode="open"><button class="shadow-buy">Buy</button></template></div>
+</body></html>`;
+
+const artifact = (overrides: Partial<FailureArtifact> = {}): FailureArtifact => ({
+  schemaVersion: 1,
+  title: 'adds',
+  specPath: 'cypress/e2e/cart.cy.ts',
+  errorMessage: 'Expected to find element: `#add-to-basket`, but never found it.',
+  url: 'http://localhost:4173/',
+  domHtml: DOM,
+  ariaSnapshot: '- button "Add to cart"',
+  redacted: true,
+  failedSelector: '#add-to-basket',
+  ...overrides,
+});
+
+describe('countSelectorMatches', () => {
+  it('counts exact CSS matches', () => {
+    expect(countSelectorMatches(DOM, '#add-to-cart', 'none')).toEqual({ count: 1, approximate: false });
+    expect(countSelectorMatches(DOM, '.item', 'none')).toEqual({ count: 3, approximate: false });
+    expect(countSelectorMatches(DOM, '#nope', 'none')).toEqual({ count: 0, approximate: false });
+  });
+
+  it('descends into declarative shadow templates', () => {
+    expect(countSelectorMatches(DOM, '.shadow-buy', 'none')).toEqual({ count: 1, approximate: false });
+  });
+
+  it('returns null for jQuery-only selectors without stripping', () => {
+    expect(countSelectorMatches(DOM, '.item:visible', 'none')).toBeNull();
+  });
+
+  it("strips state pseudo-classes in 'state' mode, marked approximate", () => {
+    expect(countSelectorMatches(DOM, '.item:visible', 'state')).toEqual({ count: 3, approximate: true });
+    // content filters are NOT strippable in state mode — the text may be the drift
+    expect(countSelectorMatches(DOM, 'li:contains("Mug")', 'state')).toBeNull();
+  });
+
+  it("strips content/position filters only in 'all' mode", () => {
+    expect(countSelectorMatches(DOM, 'li:contains("Mug")', 'all')).toEqual({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, '.item:eq(1)', 'all')).toEqual({ count: 3, approximate: true });
+    expect(countSelectorMatches(DOM, '.item:first', 'all')).toEqual({ count: 3, approximate: true });
+  });
+
+  it('does not confuse :first with :first-child', () => {
+    expect(countSelectorMatches(DOM, '.item:first-child', 'all')).toEqual({ count: 1, approximate: false });
+  });
+
+  it('returns null when stripping leaves nothing', () => {
+    expect(countSelectorMatches(DOM, ':visible', 'all')).toBeNull();
+  });
+});
+
+describe('countTextMatches', () => {
+  it('yields the deepest elements containing the text', () => {
+    expect(countTextMatches(DOM, 'Mug')).toBe(1); // the <li>, not ul/body/html
+    expect(countTextMatches(DOM, 'Add to cart')).toBe(1);
+    expect(countTextMatches(DOM, 'Checkout')).toBe(0);
+  });
+
+  it('sees text inside open shadow templates', () => {
+    expect(countTextMatches(DOM, 'Buy')).toBe(1);
+  });
+});
+
+describe('stringSiteAt / healedSiteForEdit', () => {
+  const SPEC = `describe('cart', () => {
+  // don't trip on this apostrophe
+  it('adds', () => {
+    cy.visit('/');
+    cy.get('#add-to-basket', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`;
+
+  it('locates the quoted string and its wrapping call, comment-aware', () => {
+    const idx = SPEC.indexOf('#add-to-basket');
+    const site = stringSiteAt(SPEC, idx);
+    expect(site?.value).toBe('#add-to-basket');
+    expect(site?.call).toBe('get');
+  });
+
+  it('returns null outside any string', () => {
+    expect(stringSiteAt(SPEC, SPEC.indexOf('timeout'))).toBeNull();
+  });
+
+  it('extracts the healed selector from a quoted edit', () => {
+    const healed = healedSiteForEdit(SPEC, {
+      file: 'x',
+      oldString: `cy.get('#add-to-basket', { timeout: 2000 })`,
+      newString: `cy.get('#add-to-cart', { timeout: 2000 })`,
+    });
+    expect(healed?.site.value).toBe('#add-to-cart');
+    expect(healed?.site.call).toBe('get');
+  });
+
+  it('extracts from a bare-string (cache-tier) edit', () => {
+    const healed = healedSiteForEdit(SPEC, { file: 'x', oldString: '#add-to-basket', newString: '#add-to-cart' });
+    expect(healed?.site.value).toBe('#add-to-cart');
+  });
+
+  it('keeps inner attribute-selector quotes inside the site value', () => {
+    const spec = `cy.get('[data-testid="buy"]').click();`;
+    const healed = healedSiteForEdit(spec, {
+      file: 'x',
+      oldString: `'[data-testid="buy"]'`,
+      newString: `'[data-testid="add"]'`,
+    });
+    expect(healed?.site.value).toBe('[data-testid="add"]');
+  });
+});
+
+describe('impliesCollection', () => {
+  const at = (src: string) => src.indexOf(')');
+  it('detects collection chains', () => {
+    expect(impliesCollection(`cy.get('.item').first().click();`, at(`cy.get('.item')`))).toBe(true);
+    expect(impliesCollection(`cy.get('.item').should('have.length', 3);`, 15)).toBe(true);
+    expect(impliesCollection(`cy.get('.item').each(() => {});`, 15)).toBe(true);
+  });
+  it('a bare click expects one element', () => {
+    expect(impliesCollection(`cy.get('.item').click();`, 15)).toBe(false);
+  });
+});
+
+describe('assertion strength', () => {
+  it('collects assertions to the end of the enclosing test only', () => {
+    const spec = `it('a', () => {
+    cy.get('#x').click();
+    cy.get('#y').should('be.visible');
+  });
+  it('b', () => {
+    cy.get('#z').should('have.text', 'strong');
+  });`;
+    const found = assertionsAfter(spec, spec.indexOf('.click()'));
+    expect(found).toEqual(['be.visible']);
+    expect(isWeaklyAsserted(found)).toBe(true);
+  });
+
+  it('a downstream strong assertion makes the heal behaviorally constrained', () => {
+    const spec = `cy.get('#x').click();\ncy.get('#count').should('have.text', '1');`;
+    expect(isWeaklyAsserted(assertionsAfter(spec, spec.indexOf('.click()')))).toBe(false);
+  });
+
+  it('no assertions at all is weak (action-only)', () => {
+    expect(isWeaklyAsserted([])).toBe(true);
+  });
+
+  it('reviewFlagsFor flags an all-weak heal and stays silent otherwise', () => {
+    const weak = `it('a', () => { cy.get('#old').click(); });`;
+    const strong = `it('a', () => { cy.get('#old').click(); cy.get('#c').should('have.text', '1'); });`;
+    const edit = { file: 'x', oldString: `cy.get('#old')`, newString: `cy.get('#new')` };
+    expect(reviewFlagsFor(weak, [edit])[0]).toMatch(/^weak-assertions:/);
+    expect(reviewFlagsFor(strong, [edit])).toEqual([]);
+  });
+});
+
+// ── stages ──────────────────────────────────────────────────────────────
+
+let root: string;
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'goldseam-resolve-'));
+  mkdirSync(join(root, 'cypress', 'e2e'), { recursive: true });
+});
+afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+function makeCtx(spec: string, a: FailureArtifact, proposalEdits?: Array<{ oldString: string; newString: string }>): HealContext {
+  writeFileSync(join(root, a.specPath), spec);
+  return {
+    artifact: a,
+    artifactPath: 'unused',
+    options: { ...DEFAULT_HEAL_OPTIONS, projectRoot: root, healsDir: join(root, 'heals'), cacheFile: null },
+    runner: { id: 'none', repair: async () => '' },
+    proposal: proposalEdits && {
+      edits: proposalEdits.map((e) => ({ file: a.specPath, ...e })),
+      confidence: 0.9,
+    },
+    apply() {},
+    revert() {},
+  };
+}
+
+describe('triage stage', () => {
+  it('gives up when the "missing" selector still matches the captured DOM (timing, not drift)', async () => {
+    const a = artifact({
+      errorMessage: 'Expected to find element: `#add-to-cart`, but never found it.',
+      failedSelector: '#add-to-cart',
+    });
+    const v = await triageStage.run(makeCtx('', a));
+    expect(v.verdict).toBe('gave-up');
+    expect(v.evidence).toMatch(/still matches 1 element/);
+  });
+
+  it('passes when the selector is confirmed absent', async () => {
+    const v = await triageStage.run(makeCtx('', artifact()));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/confirmed absent/);
+  });
+
+  it('gives up on a present-but-hidden :visible selector (state, not drift)', async () => {
+    const a = artifact({ failedSelector: '.item:visible' });
+    const v = await triageStage.run(makeCtx('', a));
+    expect(v.verdict).toBe('gave-up');
+    expect(v.evidence).toMatch(/state pseudo-classes/);
+  });
+
+  it('skips scoped (.find/.within) failures — a global count would lie', async () => {
+    const a = artifact({
+      errorMessage:
+        'Expected to find element: `.item`, but never found it. Queried from element: <div#empty>',
+      failedSelector: '.item', // exists globally, but the parent scope was empty
+    });
+    const v = await triageStage.run(makeCtx('', a));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/scoped/);
+  });
+
+  it('skips selectors it cannot statically check', async () => {
+    const a = artifact({ failedSelector: 'li:contains("Gone")' });
+    const v = await triageStage.run(makeCtx('', a));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/not statically checkable/);
+  });
+
+  it('passes when no selector was parsed from the error', async () => {
+    const v = await triageStage.run(makeCtx('', artifact({ failedSelector: undefined })));
+    expect(v.verdict).toBe('pass');
+  });
+});
+
+describe('resolve stage', () => {
+  const SPEC = `it('adds', () => {
+  cy.visit('/');
+  cy.get('#add-to-basket').click();
+  cy.get('#cart-count').should('have.text', '1');
+});
+`;
+
+  it('rejects a healed selector that matches nothing (hallucination)', async () => {
+    const ctx = makeCtx(SPEC, artifact(), [
+      { oldString: `cy.get('#add-to-basket')`, newString: `cy.get('#does-not-exist')` },
+    ]);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('fail');
+    expect(v.evidence).toMatch(/matches nothing/);
+  });
+
+  it('rejects an ambiguous healed selector when the chain expects one element', async () => {
+    const ctx = makeCtx(SPEC, artifact(), [
+      { oldString: `cy.get('#add-to-basket')`, newString: `cy.get('.item')` },
+    ]);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('fail');
+    expect(v.evidence).toMatch(/ambiguous.*3 elements/);
+  });
+
+  it('accepts a multi-match selector when the chain works on a collection', async () => {
+    const spec = `it('lists', () => {\n  cy.get('.itm').should('have.length', 3);\n});\n`;
+    const ctx = makeCtx(spec, artifact(), [{ oldString: `cy.get('.itm')`, newString: `cy.get('.item')` }]);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('pass');
+  });
+
+  it('accepts a unique healed selector, including into open shadow roots', async () => {
+    const ctx = makeCtx(SPEC, artifact(), [
+      { oldString: `cy.get('#add-to-basket')`, newString: `cy.get('.shadow-buy')` },
+    ]);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/1 match/);
+  });
+
+  it('judges cy.contains by page text: absent fails, present passes', async () => {
+    const spec = `it('adds', () => {\n  cy.contains('Buy now').click();\n});\n`;
+    const bad = await resolveStage.run(
+      makeCtx(spec, artifact(), [{ oldString: `cy.contains('Buy now')`, newString: `cy.contains('Purchase')` }]),
+    );
+    expect(bad.verdict).toBe('fail');
+    expect(bad.evidence).toMatch(/matches no element text/);
+
+    const good = await resolveStage.run(
+      makeCtx(spec, artifact(), [{ oldString: `cy.contains('Buy now')`, newString: `cy.contains('Add to cart')` }]),
+    );
+    expect(good.verdict).toBe('pass');
+  });
+
+  it('enforces existence only for parent-scoped calls like .find()', async () => {
+    const spec = `it('adds', () => {\n  cy.get('ul').find('.itm').should('have.text', 'Mug');\n});\n`;
+    const ctx = makeCtx(spec, artifact(), [{ oldString: `.find('.itm')`, newString: `.find('.item')` }]);
+    const v = await resolveStage.run(ctx); // 3 global matches, but scoped ⇒ no ambiguity verdict
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/scoped call/);
+  });
+
+  it('defers selectors it cannot statically check to the rerun rungs', async () => {
+    const spec = `it('adds', () => {\n  cy.get('#a').click();\n});\n`;
+    const ctx = makeCtx(spec, artifact(), [{ oldString: `cy.get('#a')`, newString: `cy.get('#b:has(svg)')` }]);
+    const v = await resolveStage.run(ctx);
+    // jsdom may or may not support :has — either an exact count or a deferral, never a throw
+    expect(['pass', 'fail']).toContain(v.verdict);
+  });
+
+  it('passes through when there are no edits (give-up upstream)', async () => {
+    const v = await resolveStage.run(makeCtx(SPEC, artifact()));
+    expect(v.verdict).toBe('pass');
+  });
+});
+
+// ── engine wiring ───────────────────────────────────────────────────────
+
+describe('engine with the offline guard rungs', () => {
+  const SPEC_REL = 'cypress/e2e/cart.cy.ts';
+  const SPEC = `it('adds', () => {
+  cy.visit('/');
+  cy.get('#add-to-basket').click();
+  cy.get('#cart-count').should('have.text', '1');
+});
+`;
+
+  function scaffold(a: FailureArtifact, spec = SPEC): string {
+    writeFileSync(join(root, SPEC_REL), spec);
+    const failuresDir = join(root, '.goldseam', 'failures');
+    mkdirSync(failuresDir, { recursive: true });
+    const p = join(failuresDir, 'cart-abc123.json');
+    writeFileSync(p, JSON.stringify(a));
+    return p;
+  }
+
+  function stubRunner(replies: string[]): RepairRunner & { calls: number } {
+    const runner = {
+      id: 'cmd:stub',
+      calls: 0,
+      async repair(): Promise<string> {
+        const reply = replies[Math.min(runner.calls, replies.length - 1)];
+        runner.calls++;
+        return reply;
+      },
+    };
+    return runner;
+  }
+
+  const options = (): HealOptions => ({
+    ...DEFAULT_HEAL_OPTIONS,
+    stages: ['triage', 'propose', 'resolve'],
+    projectRoot: root,
+    healsDir: join(root, '.goldseam', 'heals'),
+    cacheFile: null,
+  });
+
+  const reply = (newString: string) =>
+    JSON.stringify({
+      edits: [{ file: SPEC_REL, oldString: `cy.get('#add-to-basket')`, newString }],
+      confidence: 0.9,
+      reasoning: 'r',
+    });
+
+  it('triage give-up costs zero model calls', async () => {
+    const p = scaffold(artifact({ failedSelector: '#add-to-cart', errorMessage: 'Expected to find element: `#add-to-cart`, but never found it.' }));
+    const runner = stubRunner([reply(`cy.get('#whatever')`)]);
+    const heal = await healArtifactFile(p, runner, options());
+    expect(heal.verdict).toBe('gave-up');
+    expect(runner.calls).toBe(0);
+    expect(heal.attempts[0].ladder[0].stage).toBe('triage');
+  });
+
+  it('resolve rejection feeds back and the model recovers on attempt 2', async () => {
+    const p = scaffold(artifact());
+    const runner = stubRunner([reply(`cy.get('#hallucinated')`), reply(`cy.get('#add-to-cart')`)]);
+    const heal = await healArtifactFile(p, runner, options());
+    expect(heal.verdict).toBe('healed');
+    expect(heal.attempts).toHaveLength(2);
+    expect(heal.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`)).toEqual([
+      'triage:pass',
+      'propose:pass',
+      'resolve:fail',
+    ]);
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('#add-to-cart');
+  });
+
+  it('a healed test with only weak assertions carries a review flag', async () => {
+    const weakSpec = `it('adds', () => {\n  cy.visit('/');\n  cy.get('#add-to-basket').click();\n});\n`;
+    const p = scaffold(artifact(), weakSpec);
+    const heal = await healArtifactFile(p, stubRunner([reply(`cy.get('#add-to-cart')`)]), options());
+    expect(heal.verdict).toBe('healed');
+    expect(heal.reviewFlags?.[0]).toMatch(/^weak-assertions:/);
+  });
+
+  it('a downstream strong assertion suppresses the flag', async () => {
+    const p = scaffold(artifact());
+    const heal = await healArtifactFile(p, stubRunner([reply(`cy.get('#add-to-cart')`)]), options());
+    expect(heal.verdict).toBe('healed');
+    expect(heal.reviewFlags).toBeUndefined();
+  });
+});

@@ -23,6 +23,8 @@ export interface ReportRow {
   confidence?: number;
   attempts?: number;
   edit?: string;
+  /** Verified-but-review-me signals from the heal artifact. */
+  reviewFlags?: string[];
 }
 
 export interface HealReport {
@@ -51,6 +53,7 @@ export function buildReport(entries: ReportEntry[]): HealReport {
     confidence: heal?.confidence,
     attempts: heal?.attempts.length,
     edit: heal ? summarizeEdit(heal) : undefined,
+    reviewFlags: heal?.reviewFlags,
   }));
   // Failures first — the report should lead with what needs a human.
   const order = { failed: 0, unhealed: 1, 'gave-up': 2, healed: 3 } as const;
@@ -78,8 +81,8 @@ export function renderMarkdown(report: HealReport): string {
   const cell = (v: unknown) => String(v).replace(/\|/g, '\\|').replace(/\s+/g, ' ');
   if (rows.length > 0) {
     lines.push(
-      '| Verdict | Test | Spec | Broken selector | Edit | Confidence | Attempts | Model |',
-      '| --- | --- | --- | --- | --- | --- | --- | --- |',
+      '| Verdict | Test | Spec | Broken selector | Edit | Confidence | Attempts | Model | Flags |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
       ...rows.map((r) =>
         [
           '',
@@ -91,6 +94,8 @@ export function renderMarkdown(report: HealReport): string {
           r.confidence ?? '—',
           r.attempts ?? '—',
           r.model ?? '—',
+          // Short key only ('weak-assertions'); the full sentence lives in the artifact.
+          r.reviewFlags?.length ? `⚠ ${r.reviewFlags.map((f) => cell(f.split(':')[0])).join(', ')}` : '—',
           '',
         ].join(' | ').trim(),
       ),

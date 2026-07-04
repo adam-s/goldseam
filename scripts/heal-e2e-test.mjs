@@ -1,7 +1,7 @@
 // End-to-end heal test (M3+M4 done-when), model-free via the cmd: stub:
 //   1. a spec with a drifted selector fails → capture artifact
 //   2. `goldseam heal` proposes, applies, and verifies through the full
-//      ladder (propose → rerun-test → rerun-spec)
+//      ladder (triage → propose → resolve → rerun-test → rerun-spec)
 //   3. the spec file is edited, the heal artifact records the ladder
 //   4. an unhealable capture produces a clean, reported give-up
 //
@@ -64,10 +64,14 @@ try {
   check(healArtifact.verdict === 'healed', 'verdict: healed');
   const rungs = healArtifact.attempts.at(-1).ladder.map((r) => `${r.stage}:${r.verdict}`);
   check(
-    JSON.stringify(rungs) === JSON.stringify(['propose:pass', 'rerun-test:pass', 'rerun-spec:pass']),
+    JSON.stringify(rungs) ===
+      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'rerun-test:pass', 'rerun-spec:pass']),
     `full ladder recorded (${rungs.join(' → ')})`,
   );
   check(healArtifact.tier === 'model' && healArtifact.model.startsWith('cmd:'), 'tier + model recorded');
+  // The test asserts cart-count text downstream — behaviorally constrained,
+  // so the weak-assertion flag must NOT fire.
+  check(healArtifact.reviewFlags === undefined, 'no review flags on a strongly-asserted heal');
 
   console.log('\n— healed spec actually passes —');
   const green = await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
@@ -138,7 +142,7 @@ try {
   check(multiArtifact.verdict === 'healed' && multiArtifact.finalEdits.length === 2, 'both edits in the artifact');
   check(multiArtifact.tier === 'model', 'cache correctly missed on the ambiguous selector');
 
-  console.log('\n— ladder teeth: a plausible-but-wrong edit must be rejected by rerun —');
+  console.log('\n— ladder teeth: a hallucinated selector is rejected OFFLINE by resolve —');
   rmSync('.goldseam', { recursive: true, force: true });
   writeFileSync(
     TMP_SPEC,
@@ -159,17 +163,49 @@ try {
     { encoding: 'utf8' },
   );
   check(wrong.status === 0 && wrong.stdout.includes('[failed]'), 'wrong edit ends in a failed verdict, exit 0');
-  check(readFileSync(TMP_SPEC, 'utf8') === beforeWrong, 'spec reverted after the ladder rejected the edit');
+  check(readFileSync(TMP_SPEC, 'utf8') === beforeWrong, 'spec untouched after the ladder rejected the edit');
   const wrongArtifact = JSON.parse(
     readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
   );
   check(wrongArtifact.verdict === 'failed' && wrongArtifact.attempts.length === 2, 'attempt cap honored');
   const wrongRungs = wrongArtifact.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`);
   check(
-    JSON.stringify(wrongRungs) === JSON.stringify(['propose:pass', 'rerun-test:fail']),
-    `rerun rung rejected it (${wrongRungs.join(' → ')})`,
+    JSON.stringify(wrongRungs) === JSON.stringify(['triage:pass', 'propose:pass', 'resolve:fail']),
+    `resolve rung rejected it offline, no rerun spent (${wrongRungs.join(' → ')})`,
   );
   check(wrongArtifact.finalEdits === undefined, 'no finalEdits recorded on a failed heal');
+
+  console.log('\n— ladder teeth: an existing-but-wrong element (impostor) is rejected by rerun —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  writeFileSync(
+    TMP_SPEC,
+    `describe('healable', () => {
+  it('adds a mug to the cart', () => {
+    cy.visit('/');
+    cy.get('[data-testid="buy-now-5"]', { timeout: 2000 }).click();
+    cy.get('#cart-count').should('have.text', '1');
+  });
+});
+`,
+  );
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  const beforeImpostor = readFileSync(TMP_SPEC, 'utf8');
+  const impostor = spawnSync(
+    'node',
+    [CLI, 'heal', '--model', 'cmd:node scripts/stub-model.mjs impostor', '--max-attempts', '1'],
+    { encoding: 'utf8' },
+  );
+  check(impostor.status === 0 && impostor.stdout.includes('[failed]'), 'impostor edit ends in a failed verdict');
+  check(readFileSync(TMP_SPEC, 'utf8') === beforeImpostor, 'spec reverted after rerun rejected the impostor');
+  const impostorArtifact = JSON.parse(
+    readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
+  );
+  const impostorRungs = impostorArtifact.attempts[0].ladder.map((r) => `${r.stage}:${r.verdict}`);
+  check(
+    JSON.stringify(impostorRungs) ===
+      JSON.stringify(['triage:pass', 'propose:pass', 'resolve:pass', 'rerun-test:fail']),
+    `resolve passed (element exists) but rerun caught the behavior (${impostorRungs.join(' → ')})`,
+  );
 
   console.log('\n— give-up: unhealable capture reported, nothing touched —');
   rmSync('.goldseam', { recursive: true, force: true });

@@ -132,6 +132,15 @@ of what else improves:
   [...]` list; new rungs (oracle, mutation-guard, adversary) are new
   registry entries, never engine refactors. Every rung's verdict lands in
   the heal artifact.
+- **The offline rungs are sound, not complete**
+  ([heal/resolve.ts](packages/goldseam/src/heal/resolve.ts)) — `triage`
+  and `resolve` judge only the captured DOM; a selector they cannot
+  statically evaluate defers to the rerun rungs with evidence, never a
+  silent verdict. Stripped-pseudo match counts are over-approximations:
+  valid for absence (and triage's still-present check), never for
+  uniqueness. Review flags (`reviewFlags`) route human attention and
+  never block a heal. Catalog + verdict per ambiguity class:
+  [.agents/reference/disambiguation.md](.agents/reference/disambiguation.md).
 - **The engine reverts on any non-healed outcome** and `apply()` is
   idempotent (also called on healed, for propose-only ladders) —
   [heal/engine.ts](packages/goldseam/src/heal/engine.ts).
@@ -243,6 +252,14 @@ Tradeoffs, not oversights:
 - **`failedSelector` derives from the MASKED error message** — a selector
   containing a 7+ digit run gets masked before extraction, costing a
   cache key. Correctness unaffected (the model path still heals).
+- **An impostor that satisfies every surviving assertion still heals.**
+  `resolve` proves existence/uniqueness and the rerun proves passing;
+  neither proves identity. The weak-assertion flag catches the common
+  form; the oracle rung (known-good aria identity) is the designed fix
+  ([.agents/reference/disambiguation.md](.agents/reference/disambiguation.md), residual floor).
+- **Scoped calls (`.find()` etc.) get existence-only resolution** — a
+  whole-document count over-approximates within-parent uniqueness, so
+  ambiguity there is deferred to the rerun rungs.
 
 ## Noise
 

@@ -50,8 +50,9 @@ const REPLIES = {
     reasoning: 'The same drifted selector appears twice; both occurrences point at the add-to-cart button.',
   },
   // Plausible-but-wrong: passes every mechanical validation (single quoted
-  // selector-string change) but points at an element that does not exist —
-  // only the rerun rungs can reject it. Proves the ladder has teeth.
+  // selector-string change) but points at an element that does not exist.
+  // The resolve rung rejects it offline against the captured DOM — no
+  // rerun spent. Proves the ladder has teeth before the app is touched.
   wrong: {
     edits: [
       {
@@ -62,6 +63,20 @@ const REPLIES = {
     ],
     confidence: 0.9,
     reasoning: 'Plausible-looking selector that matches nothing on the page.',
+  },
+  // Impostor: the healed selector EXISTS in the captured DOM (resolve
+  // passes) but points at the wrong element, so the test's assertions
+  // fail on rerun — only the behavioral rung can reject this one.
+  impostor: {
+    edits: [
+      {
+        file: 'cypress/system/tmp-healable.cy.ts',
+        oldString: `'[data-testid="buy-now-5"]'`,
+        newString: `'#cart-count'`,
+      },
+    ],
+    confidence: 0.85,
+    reasoning: 'Existing element that is not the add-to-cart button; clicking it does not change the cart.',
   },
 };
 

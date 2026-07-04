@@ -9,6 +9,12 @@ import { join } from 'path';
 import { buildCacheEdit, loadCache, lookup } from './cache';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
+import {
+  countSelectorMatches,
+  countTextMatches,
+  healedSiteForEdit,
+  impliesCollection,
+} from './resolve';
 import { EditRejected, validateEdits } from './validate';
 import { HealContext, HealStage, StageVerdict } from './types';
 
@@ -18,6 +24,43 @@ const verdict = (
   evidence: string,
   started: number,
 ): StageVerdict => ({ stage, verdict: v, evidence, durationMs: Date.now() - started });
+
+// Pre-model triage (.agents/reference/disambiguation.md): not every "not found" is
+// selector drift. If the selector Cypress could never find STILL matches
+// the captured DOM, the element arrived after the retry window or is
+// state-gated — a timing/state failure no selector edit can fix. Give up
+// honestly before spending a model call on it.
+export const triageStage: HealStage = {
+  name: 'triage',
+  async run(ctx: HealContext): Promise<StageVerdict> {
+    const started = Date.now();
+    const { artifact } = ctx;
+    const selector = artifact.failedSelector;
+    if (!selector) {
+      return verdict('triage', 'pass', 'no selector parsed from the error — nothing to triage', started);
+    }
+    // A .find()/.within() failure is scoped to a parent element; a global
+    // count would false-positive on same-named elements elsewhere.
+    if (/Queried from/.test(artifact.errorMessage)) {
+      return verdict('triage', 'pass', 'selector was scoped to a parent element — static triage skipped', started);
+    }
+    const match = countSelectorMatches(artifact.domHtml, selector, 'state');
+    if (match === null) {
+      return verdict('triage', 'pass', `selector not statically checkable ("${selector}") — triage skipped`, started);
+    }
+    if (match.count > 0) {
+      return verdict(
+        'triage',
+        'gave-up',
+        `the "missing" selector still matches ${match.count} element(s) in the captured DOM` +
+          `${match.approximate ? ' (ignoring state pseudo-classes)' : ''} — it appeared after Cypress stopped ` +
+          'retrying or is state-gated (timing/visibility, not selector drift); a selector edit cannot fix this',
+        started,
+      );
+    }
+    return verdict('triage', 'pass', 'failed selector confirmed absent from the captured DOM', started);
+  },
+};
 
 export const proposeStage: HealStage = {
   name: 'propose',
@@ -115,6 +158,78 @@ export const proposeStage: HealStage = {
   },
 };
 
+// Static resolution of the proposal against the captured DOM — the DOM
+// the model itself saw (.agents/reference/disambiguation.md). A healed selector that
+// matches nothing is a hallucination; one that matches several elements
+// where the chain expects one is ambiguous. Both reject offline, with
+// feedback, before any rerun — and a rejection here is also the guard
+// against healing onto a nonexistent target when the surviving assertions
+// are too weak for the rerun to notice.
+export const resolveStage: HealStage = {
+  name: 'resolve',
+  async run(ctx: HealContext): Promise<StageVerdict> {
+    const started = Date.now();
+    const { artifact, options } = ctx;
+    const edits = ctx.proposal?.edits;
+    if (!edits?.length) {
+      return verdict('resolve', 'pass', 'no proposed edits — nothing to resolve', started);
+    }
+    const truncNote = artifact.domTruncated ? ' (note: the capture DOM was truncated)' : '';
+    const specSource = readFileSync(join(options.projectRoot, artifact.specPath), 'utf8');
+    const notes: string[] = [];
+    for (const edit of edits) {
+      const healed = healedSiteForEdit(specSource, edit);
+      if (!healed) {
+        notes.push('could not locate the edited selector string — deferred to rerun');
+        continue;
+      }
+      const { site, healedSource } = healed;
+      if (site.call === 'contains') {
+        const n = countTextMatches(artifact.domHtml, site.value);
+        if (n === 0) {
+          return verdict(
+            'resolve',
+            'fail',
+            `contains("${site.value}") matches no element text in the captured DOM${truncNote} — propose content that is actually on the page`,
+            started,
+          );
+        }
+        notes.push(`contains("${site.value}"): ${n} match(es)`); // several is legal: contains takes the first
+        continue;
+      }
+      const match = countSelectorMatches(artifact.domHtml, site.value, 'all');
+      if (match === null) {
+        notes.push(`"${site.value}" not statically checkable — deferred to rerun`);
+        continue;
+      }
+      if (match.count === 0) {
+        return verdict(
+          'resolve',
+          'fail',
+          `healed selector "${site.value}" matches nothing in the captured DOM${truncNote} — it points at an element that does not exist; pick a selector present in the DOM or aria snapshot`,
+          started,
+        );
+      }
+      // find/children/…: parent-scoped, so a whole-document count
+      // over-approximates — enforce existence only.
+      const scoped = site.call !== 'get';
+      if (match.count > 1 && !scoped && !match.approximate && !impliesCollection(healedSource, site.end)) {
+        return verdict(
+          'resolve',
+          'fail',
+          `healed selector "${site.value}" is ambiguous — it matches ${match.count} elements in the captured DOM and the call chain expects one; propose a selector unique to the intended element`,
+          started,
+        );
+      }
+      notes.push(
+        `"${site.value}": ${match.count} match(es)` +
+          `${match.approximate ? ' (approximate)' : ''}${scoped ? ' (scoped call — existence only)' : ''}`,
+      );
+    }
+    return verdict('resolve', 'pass', notes.join('; '), started);
+  },
+};
+
 // The rerun rungs drive Cypress through the Module API from the target
 // project. `cypress` is a peer dependency resolved from the project.
 interface CypressRunResult {
@@ -206,7 +321,9 @@ export const rerunSpecStage: HealStage = {
 };
 
 export const STAGES: Record<string, HealStage> = {
+  triage: triageStage,
   propose: proposeStage,
+  resolve: resolveStage,
   'rerun-test': rerunTestStage,
   'rerun-spec': rerunSpecStage,
 };
