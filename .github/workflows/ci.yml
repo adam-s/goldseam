@@ -26,8 +26,8 @@ jobs:
     env:
       CYPRESS_INSTALL_BINARY: '0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -42,8 +42,8 @@ jobs:
     env:
       CYPRESS_INSTALL_BINARY: '0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -65,8 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: cypress-io/github-action@v6
+      - uses: actions/checkout@v7
+      - uses: cypress-io/github-action@v7
         with:
           runTests: false
       - run: npm run build:packages
@@ -77,8 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: cypress-io/github-action@v6
+      - uses: actions/checkout@v7
+      - uses: cypress-io/github-action@v7
         with:
           runTests: false
       - run: npm run build:packages
@@ -89,8 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: cypress-io/github-action@v6
+      - uses: actions/checkout@v7
+      - uses: cypress-io/github-action@v7
         with:
           runTests: false
       - run: npm run build:packages
@@ -101,8 +101,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: cypress-io/github-action@v6
+      - uses: actions/checkout@v7
+      - uses: cypress-io/github-action@v7
         with:
           runTests: false
       - run: npm run build:packages
@@ -114,8 +114,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: cypress-io/github-action@v6
+      - uses: actions/checkout@v7
+      - uses: cypress-io/github-action@v7
         with:
           runTests: false
       - run: npm run build:packages
@@ -123,7 +123,7 @@ jobs:
         run: node scripts/ci-showcase.mjs
       - name: Upload capture + heal artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goldseam-artifacts
           path: .goldseam/
@@ -136,8 +136,8 @@ jobs:
     env:
       CYPRESS_INSTALL_BINARY: '0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
