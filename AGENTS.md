@@ -11,6 +11,13 @@ Do not use "kill" except for the Unix `kill` command. Use stop / end /
 halt / exit / close / shut down / cancel / interrupt / terminate / abort.
 Prose style: [.agents/reference/anti-slop.md](.agents/reference/anti-slop.md).
 
+Voice anchor for explanatory prose: Raymond Chen (*The Old New Thing*)
+crossed with CD-era MSDN reference docs — constraint first, then why the
+naive approach fails, then the actual mechanism, in plain declarative
+sentences. Borrow the reasoning-first structure, not anecdotes or
+folksiness. Reference-shaped content (API notes, schemas) leans MSDN:
+rigid, predictable sections, zero enthusiasm.
+
 ## What this is
 
 Self-healing for existing Cypress suites: a failure becomes a rich capture
