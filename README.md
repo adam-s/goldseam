@@ -37,12 +37,14 @@ Named for [kintsugi](https://en.wikipedia.org/wiki/Kintsugi): the repair is visi
 
 | | goldseam | `cy.prompt()` (Cypress Cloud) | Runtime healers |
 |---|---|---|---|
-| **Where the model runs** | ✅ Your machine or endpoint | ❌ Vendor cloud | ⚠️ Bundled backend |
+| **Where the model runs** | ✅ Your machine or endpoint | ❌ Vendor cloud | ⚠️ Bundled ML or BYO |
 | **Where the repair lands** | ✅ Reviewed git diff | ❌ Re-resolved at runtime | ❌ Substituted at runtime |
 | **Can it weaken assertions?** | ✅ Never — selector strings only | ⚠️ Regenerates steps | ⚠️ Swaps locators silently |
-| **Failure honesty** | ✅ Give-up is a first-class, reported outcome | ❌ Confident false greens possible | ❌ Healed ≠ verified |
+| **Failure honesty** | ✅ Give-up is a first-class, reported outcome | ⚠️ Confident false greens possible | ❌ Healed ≠ verified |
 | **Green runs** | ✅ Untouched, zero writes | — | ⚠️ Instrumented |
 | **Open source** | ✅ MIT | ❌ Proprietary | Varies |
+
+<sub>"Runtime healers" is the Healenium / CodeceptJS-`heal` class. The full landscape, with sources: [competition.md](.agents/reference/competition.md).</sub>
 
 ---
 

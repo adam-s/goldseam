@@ -1,4 +1,17 @@
-# goldseam
+<div align="center">
+  <h1>goldseam</h1>
+  <p><strong>Bring-your-own-model healing and authoring for Cypress — every repair is a reviewed diff</strong></p>
+
+  [![CI](https://github.com/adam-s/goldseam/actions/workflows/ci.yml/badge.svg)](https://github.com/adam-s/goldseam/actions/workflows/ci.yml)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/adam-s/goldseam/blob/main/LICENSE)
+  [![Node 22+](https://img.shields.io/badge/node-22+-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+  [![Cypress 15+](https://img.shields.io/badge/Cypress-15+-69D3A7.svg?logo=cypress&logoColor=white)](https://www.cypress.io)
+  [![BYO Model](https://img.shields.io/badge/model-claude%20%C2%B7%20ollama%20%C2%B7%20openai%20%C2%B7%20cmd-8B5CF6.svg)](#reference)
+
+  [Repository](https://github.com/adam-s/goldseam) · [Proving Ground](https://github.com/adam-s/goldseam/blob/main/proving/CAMPAIGN.md) · [Self-Host Recipes](https://github.com/adam-s/goldseam/tree/main/selfhost) · [Why Two Tools](https://github.com/adam-s/goldseam/blob/main/.agents/reference/authored-self-healing.md)
+</div>
+
+---
 
 **goldseam is an open, bring-your-own-model alternative to Cypress's
 `cy.prompt()`.** `cy.prompt()` is Cypress's experimental, Cypress Cloud–hosted
