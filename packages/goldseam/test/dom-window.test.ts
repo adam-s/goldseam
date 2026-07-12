@@ -268,6 +268,20 @@ describe('windowDom — robustness (never throws, always bounded)', () => {
     }
   });
 
+  it('hard-clamps output to budget even when the ancestor scaffold alone is huge', () => {
+    // A very deep, attribute-heavy ancestor chain: the scaffold (open+close
+    // tags) exceeds a small budget on its own, which the pre-clamp code let
+    // through. filler pushes the anchor past the head so windowing engages.
+    const deepOpen = Array.from({ length: 120 }, (_, i) => `<div class="scaffold-ancestor-longish-class-${i}">`).join('');
+    const deepClose = '</div>'.repeat(120);
+    const filler = '<p>pad</p>'.repeat(500);
+    const dom = `<html><body>${filler}<main>${deepOpen}<h2>Deep Clamp Anchor Heading</h2>${deepClose}</main></body></html>`;
+    const budget = 1000; // smaller than the ~5K scaffold overhead
+    const r = windowDom(dom, { specSource: specAsserting('Deep Clamp Anchor Heading'), budget });
+    expect(r.strategy).toBe('windowed');
+    expect(r.html.length).toBeLessThanOrEqual(budget); // hard-bounded despite the huge scaffold
+  });
+
   it('covers the single-over-budget-element truncation branch without throwing', () => {
     const filler = '<div class="row">f</div>'.repeat(1000);
     const huge = `<article data-testid="big"><h2>Late Unique Heading Here</h2>${'q'.repeat(120_000)}</article>`;
