@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
 import { FAILURE_SCHEMA_VERSION, FailureArtifact } from '../shared/types';
 import { deriveReplacement, saveEntry } from './cache';
+import { matchExclusion } from './exclude';
 import { HOOK_TITLE_RE, reviewFlagsFor, selectorOccursInCode } from './resolve';
 import { STAGES } from './stages';
 import {
@@ -46,6 +47,45 @@ export async function healArtifactFile(
   const specAbs = resolve(options.projectRoot, artifact.specPath);
   if (!specAbs.startsWith(resolve(options.projectRoot) + sep)) {
     throw new Error(`capture names a spec outside the project: ${artifact.specPath}`);
+  }
+  // Author-declared exclusion: a deliberately-red test the team told goldseam
+  // never to heal (a security/negative assertion, a tracked regression, a
+  // quarantined flake). Short-circuit BEFORE the spec-existence check (an
+  // excluded capture for a since-deleted spec still gives up cleanly, not
+  // errors) and before any model call — a first-class, REPORTED give-up.
+  const excluded = matchExclusion(artifact, options.exclude);
+  if (excluded) {
+    const heal: HealArtifact = {
+      schemaVersion: HEAL_SCHEMA_VERSION,
+      captureRef: basename(artifactPath),
+      specPath: artifact.specPath,
+      title: artifact.title,
+      model: runner.id,
+      tier: 'excluded',
+      verdict: 'gave-up',
+      attempts: [
+        {
+          attempt: 0,
+          ladder: [
+            {
+              stage: 'exclude',
+              verdict: 'gave-up',
+              evidence: `excluded by directive (${excluded.reason}) — goldseam was told never to heal this test`,
+              durationMs: 0,
+            },
+          ],
+        },
+      ],
+      durationMs: Date.now() - startedAt,
+    };
+    if (!options.dryRun) {
+      mkdirSync(options.healsDir, { recursive: true });
+      writeFileSync(
+        join(options.healsDir, basename(artifactPath).replace(/\.json$/, '-heal.json')),
+        JSON.stringify(heal, null, 2),
+      );
+    }
+    return heal;
   }
   const originalSpec = existsSync(specAbs) ? readFileSync(specAbs, 'utf8') : null;
   if (originalSpec === null) {

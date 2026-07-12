@@ -10,6 +10,18 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal: **`heal.exclude` directive** — a committed, reviewed guarantee that
+  goldseam never heals a deliberately-red test (a security/negative assertion,
+  a regression the team is tracking, a quarantined flake). Config
+  (`heal.exclude`, a durable list) or `--exclude <substr>` (one-off). A bare
+  string substring-matches spec-or-title; an object ANDs `spec`/`title`/
+  `selector` with an optional `reason`. Unlike `--skip` (a silent drop), an
+  exclusion produces a first-class, REPORTED give-up (`tier: excluded`) with
+  the reason in the ladder — short-circuited in the engine before any model
+  call, so an excluded test is never sent to the model and its spec is never
+  touched. Incumbent parity (Healenium `@DisableHealing`; cy.prompt has no
+  opt-out), and beats their disable leaking through `findElements`.
+
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a

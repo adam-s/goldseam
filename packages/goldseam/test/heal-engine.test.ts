@@ -386,3 +386,31 @@ describe('heal memory (cache tier)', () => {
     }
   });
 });
+
+describe('heal exclusions', () => {
+  it('an excluded capture gives up "excluded" WITHOUT calling the model; a non-match still heals', async () => {
+    const runner = stubRunner([GOOD_REPLY]);
+    const excluded = await healArtifactFile(
+      artifactPath,
+      runner,
+      makeOptions({ exclude: [{ spec: 'cart', reason: 'tracked regression' }] }),
+    );
+    expect(excluded.verdict).toBe('gave-up');
+    expect(excluded.tier).toBe('excluded');
+    expect(excluded.attempts[0].ladder[0].evidence).toMatch(/excluded by directive \(tracked regression\)/);
+    expect(runner.calls).toBe(0); // the load-bearing guarantee: never sent to the model
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC); // spec untouched
+
+    const runner2 = stubRunner([GOOD_REPLY]);
+    const healed = await healArtifactFile(artifactPath, runner2, makeOptions({ exclude: ['does-not-match'] }));
+    expect(healed.verdict).toBe('healed');
+    expect(runner2.calls).toBe(1); // the filter is specific — a non-match heals normally
+  });
+
+  it('excludes cleanly for a since-deleted spec (gives up, does not throw on the missing spec)', async () => {
+    rmSync(join(root, SPEC_REL)); // the spec is gone
+    const heal = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ exclude: ['cart'] }));
+    expect(heal.verdict).toBe('gave-up');
+    expect(heal.tier).toBe('excluded'); // short-circuits BEFORE the spec-existence check
+  });
+});

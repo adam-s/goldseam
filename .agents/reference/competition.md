@@ -96,7 +96,7 @@ evidence-backed:
 | **Opaque algorithm** — users decompile jars to learn why it healed | healenium#56 | Reasoning + evidence in every heal artifact; open source end to end |
 | **Infra collapse** — Postgres, OOM, Jenkins/Azure connection failures | healenium#65, #57, #295, #297 | No infrastructure. Files in the repo, period |
 | **Auth inflexibility** — can't use Bearer-token AI endpoints | codeceptjs#4421 | `cmd:` escape hatch, plus HTTP runners with a custom base URL (`ollama:`/`openai:`) |
-| **Per-test opt-out wanted** (@DisableHealing) | healenium#308 | Planned: capture-side exclude + `goldseam heal --only/--skip` filters |
+| **Per-test opt-out wanted** (@DisableHealing) | healenium#308, cy.prompt has none | Shipped: `heal.exclude` (config) / `--exclude` — a reviewed directive that NEVER heals a deliberately-red test (security/negative assertions, tracked regressions, quarantined flakes), as a first-class *reported* give-up, not a silent skip. Beats the incumbent: Healenium's disable leaks through `findElements` (#84); ours is a pre-model short-circuit. Plus `--only/--skip` filters |
 
 ## The DX bar (what "simplest possible" means, measured)
 

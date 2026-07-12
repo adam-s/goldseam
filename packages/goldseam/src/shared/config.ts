@@ -24,6 +24,17 @@ export const CONFIG_FILENAME = 'goldseam.config.mjs';
 
 /** Heal-only knobs; each maps to a `goldseam heal` flag / `HealOptions`
  * field and is overridden by that flag when both are present. */
+/**
+ * A test goldseam must never heal. A bare string substring-matches the spec
+ * path OR the title; an object ANDs whichever of `spec`/`title`/`selector` are
+ * present (each a substring), with an optional human `reason` shown in the
+ * give-up verdict. Kept in `shared/` so the CLI, plugin, and heal engine share
+ * one definition without a heal→shared cycle.
+ */
+export type HealExclusion =
+  | string
+  | { spec?: string; title?: string; selector?: string; reason?: string };
+
 export interface GoldseamHealConfig {
   maxAttempts?: number;
   minConfidence?: number;
@@ -35,6 +46,10 @@ export interface GoldseamHealConfig {
   cache?: boolean;
   /** Cypress config for the rerun rungs (monorepo per-app configs). */
   configFile?: string;
+  /** Tests goldseam must never heal (deliberately-red: security/negative
+   * assertions, tracked regressions, quarantined flakes) — a first-class,
+   * reported give-up, not a silent skip. */
+  exclude?: readonly HealExclusion[];
 }
 
 /** Author-only (`cy.goldseam`) knobs. */
