@@ -39,11 +39,6 @@ const STEP_STOP = new Set([
  * to a text-only anchor, so attribute matches are searched too. */
 const ANCHOR_ATTRS = ['placeholder', 'aria-label', 'title', 'alt', 'name', 'value'];
 
-/** No anchor anywhere → widen the head-first slice instead of centering. A
- * strict content superset of the old cut can only add context, never break a
- * translation the narrower slice handled (mirrors heal/dom-window.ts). */
-const NO_ANCHOR_FALLBACK_FACTOR = 2;
-
 const TRUNC_MARKER = '\n<!-- truncated -->';
 
 /** Salient anchor tokens from the English steps, most-distinctive first:
@@ -160,12 +155,14 @@ function emitWindow(anchor: Anchor, budget: number): string {
   const overhead = marker.length + open.length + close.length + TRUNC_MARKER.length;
   const allowed = Math.max(0, budget - overhead);
   let body = chosen.outerHTML;
-  let truncated = false;
-  if (body.length > allowed) {
-    body = body.slice(0, allowed);
-    truncated = true;
-  }
-  return marker + open + body + close + (truncated ? TRUNC_MARKER : '');
+  let truncated = body.length > allowed;
+  if (truncated) body = body.slice(0, allowed);
+  const out = marker + open + body + close + (truncated ? TRUNC_MARKER : '');
+  // Final hard clamp: a deep, attribute-heavy ancestor scaffold can itself
+  // exceed the budget even with the body trimmed to zero (red-team finding).
+  // The budget is a ceiling the small-context models the knob exists for
+  // cannot cross, so the emitted region is never allowed past it.
+  return out.length > budget ? out.slice(0, budget) : out;
 }
 
 /** Head-first slice, honestly marked — the pre-existing behavior and the safe
@@ -195,7 +192,12 @@ export function windowTranslationDom(stripped: string, anchors: string[], budget
     const fullParsed = parseDom(stripped);
     fullWin = fullParsed.window as { close?: () => void };
     const anchor = findAnchor(fullParsed.document, anchors);
-    if (!anchor) return headFirst(stripped, budget * NO_ANCHOR_FALLBACK_FACTOR);
+    // No anchor anywhere → head-first at the budget. The heal window widens
+    // here (a large fixed budget makes 2× safe), but authoring's budget may be
+    // deliberately small to fit a self-hosted model's context, so the budget
+    // stays a hard ceiling — never doubled past what the model can hold
+    // (red-team finding).
+    if (!anchor) return headFirst(stripped, budget);
     return emitWindow(anchor, budget);
   } catch {
     return headFirst(stripped, budget);
