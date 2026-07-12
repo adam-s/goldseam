@@ -37,6 +37,25 @@ export function maskText(text: string): string {
     .replace(DIGIT_RUN_RE, '[redacted-number]');
 }
 
+/** aria-snapshot renders a text control's typed value inline after its role
+ * and accessible name — `- textbox "Full name": <value>`. That value is user
+ * input (passwords, PII); the DOM path already strips it (stripControlValues),
+ * but the aria path went through maskText only, which PATTERN-masks and does
+ * not strip form values, so a value matching no pattern leaked to the model —
+ * breaking the documented "text-entry values are never captured" guarantee.
+ * Drop the inline value, keep the role and accessible name. Runs BEFORE
+ * maskText so the value never reaches it. Line-based: form-control values are
+ * single-line; a structural `role:` with indented children has nothing inline
+ * after the colon and is left untouched. */
+const ARIA_TEXT_CONTROL_VALUE =
+  /^(\s*-\s+(?:textbox|searchbox|spinbutton|combobox|slider)(?:\s+"(?:[^"\\]|\\.)*")?):\s+\S.*$/;
+export function stripAriaControlValues(yaml: string): string {
+  return yaml
+    .split('\n')
+    .map((line) => line.replace(ARIA_TEXT_CONTROL_VALUE, '$1'))
+    .join('\n');
+}
+
 const VALUE_KEEPING_INPUT_TYPES = new Set(['submit', 'button', 'reset']);
 
 function stripControlValues(el: Element): void {

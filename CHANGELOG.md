@@ -10,6 +10,15 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Capture (security): the **aria snapshot no longer leaks text-control
+  values**. The DOM path stripped text-entry/`textarea` values, but the aria
+  path went through `maskText` (pattern-masking) only, so a typed value
+  matching no pattern — a password, a name — shipped to the model as
+  `textbox "Pw": <value>`. `stripAriaControlValues` now removes the inline
+  value (keeping role + accessible name) before masking, restoring the
+  documented "text-entry values are never captured" guarantee on both
+  surfaces.
+
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a
