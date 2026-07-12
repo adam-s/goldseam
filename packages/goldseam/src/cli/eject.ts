@@ -7,22 +7,30 @@ import { StepCommand, isTextAssertion } from '../shared/prompt-types';
 const q = (s: string) =>
   `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 
+/** The subject expression for a selector, honoring `shadow` EXACTLY as the
+ * executor does (authoring.ts `target`): a shadow-scoped selector resolves
+ * inside the FIRST matching host's shadow root, since CSS has no
+ * cross-boundary combinator. Ejecting bare `cy.get(selector)` here would
+ * silently target a different element than replay — a fidelity break. */
+const target = (selector: string, shadow?: string): string =>
+  shadow ? `cy.get(${q(shadow)}).first().shadow().find(${q(selector)})` : `cy.get(${q(selector)})`;
+
 export function renderCommand(cmd: StepCommand): string {
   switch (cmd.action) {
     case 'visit':
       return `cy.visit(${q(cmd.url)});`;
     case 'click':
     case 'dblclick':
-      return `cy.get(${q(cmd.selector)}).${cmd.action}(${cmd.force ? '{ force: true }' : ''});`;
+      return `${target(cmd.selector, cmd.shadow)}.${cmd.action}(${cmd.force ? '{ force: true }' : ''});`;
     case 'type':
-      return `cy.get(${q(cmd.selector)}).type(${q(cmd.text)});`;
+      return `${target(cmd.selector, cmd.shadow)}.type(${q(cmd.text)});`;
     case 'check':
     case 'uncheck':
-      return `cy.get(${q(cmd.selector)}).${cmd.action}();`;
+      return `${target(cmd.selector, cmd.shadow)}.${cmd.action}();`;
     case 'select':
-      return `cy.get(${q(cmd.selector)}).select(${q(cmd.value)});`;
+      return `${target(cmd.selector, cmd.shadow)}.select(${q(cmd.value)});`;
     case 'trigger':
-      return `cy.get(${q(cmd.selector)}).trigger(${q(cmd.event)});`;
+      return `${target(cmd.selector, cmd.shadow)}.trigger(${q(cmd.event)});`;
     case 'scrollTo':
       return cmd.selector
         ? `cy.get(${q(cmd.selector)}).scrollTo(${q(cmd.position)});`
@@ -49,9 +57,26 @@ export function renderCommand(cmd: StepCommand): string {
   }
 }
 
-export function renderEntry(steps: string[], commands: StepCommand[]): string {
+export function renderEntry(
+  steps: string[],
+  commands: StepCommand[],
+  giveUp?: { reason: string },
+): string {
   const lines: string[] = [];
   for (const step of steps) lines.push(`// ${step}`);
+  // A cached refusal has no commands. Replay throws on it (give-up is
+  // first-class); ejected code must too, or a declined translation would
+  // paste as an empty, silently-passing block — a refusal misreported as
+  // success. Emit the same loud failure, not a comment the runner ignores.
+  if (giveUp) {
+    lines.push(
+      `// goldseam DECLINED these steps as ambiguous — it refused to guess.`,
+      `// Reason: ${giveUp.reason}`,
+      `// Rewrite the steps to be unambiguous (they retranslate), or drop them.`,
+      `throw new Error(${q(`goldseam declined these steps as ambiguous: ${giveUp.reason}`)});`,
+    );
+    return lines.join('\n');
+  }
   for (const cmd of commands) lines.push(renderCommand(cmd));
   return lines.join('\n');
 }

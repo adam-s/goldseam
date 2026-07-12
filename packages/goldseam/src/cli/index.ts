@@ -341,9 +341,19 @@ async function eject(): Promise<number> {
     return 0;
   }
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    const entry = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+    // A corrupt cache file must not abort the whole eject — the load path
+    // (loadPromptCache) already tolerates corruption, so eject reads raw;
+    // skip the bad file loudly and render the rest.
+    let entry;
+    try {
+      entry = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+    } catch (e) {
+      console.log(`\n// ─── ${f} ───`);
+      console.log(`// goldseam: skipped — unreadable cache file (${e instanceof Error ? e.message : e})`);
+      continue;
+    }
     console.log(`\n// ─── ${f} ───`);
-    console.log(renderEntry(entry.steps, entry.commands));
+    console.log(renderEntry(entry.steps, entry.commands, entry.giveUp));
   }
   console.log('\n// Paste into your spec to replace the cy.goldseam(...) call.');
   console.log('// Ejected code keeps healing — it goes through the normal capture → heal pipeline.');
