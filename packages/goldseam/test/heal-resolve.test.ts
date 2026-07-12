@@ -12,10 +12,12 @@ import {
   assertionsAfter,
   countSelectorMatches,
   countTextMatches,
+  directGetParentFor,
   healedSiteForEdit,
   impliesCollection,
   isWeaklyAsserted,
   reviewFlagsFor,
+  scopedChildCount,
   stringSiteAt,
 } from '../src/heal/resolve';
 import { resolveStage, triageStage } from '../src/heal/stages';
@@ -344,12 +346,15 @@ describe('resolve stage', () => {
     expect(good.verdict).toBe('pass');
   });
 
-  it('enforces existence only for parent-scoped calls like .find()', async () => {
+  it('rejects a .find() ambiguity within a uniquely-resolved parent (scoped uniqueness)', async () => {
+    // Was existence-only (deferred): `.find('.item')` matches all 3 <li> inside
+    // the single <ul>, and `.should('have.text', 'Mug')` expects one element —
+    // a look-alike-sibling ambiguity now caught offline instead of punted.
     const spec = `it('adds', () => {\n  cy.get('ul').find('.itm').should('have.text', 'Mug');\n});\n`;
     const ctx = makeCtx(spec, artifact(), [{ oldString: `.find('.itm')`, newString: `.find('.item')` }]);
-    const v = await resolveStage.run(ctx); // 3 global matches, but scoped ⇒ no ambiguity verdict
-    expect(v.verdict).toBe('pass');
-    expect(v.evidence).toMatch(/scoped call/);
+    const v = await resolveStage.run(ctx);
+    expect(v.verdict).toBe('fail');
+    expect(v.evidence).toMatch(/ambiguous within its parent scope — 3 matches inside the single "ul"/);
   });
 
   it('defers selectors it cannot statically check to the rerun rungs', async () => {
@@ -454,5 +459,84 @@ describe('engine with the offline guard rungs', () => {
     const heal = await healArtifactFile(p, stubRunner([reply(`cy.get('#add-to-cart')`)]), options());
     expect(heal.verdict).toBe('healed');
     expect(heal.reviewFlags).toBeUndefined();
+  });
+});
+
+describe('scoped .find() uniqueness (helpers)', () => {
+  it('directGetParentFor recovers ONLY the direct cy.get(P).find(<site>) parent', () => {
+    const at = (src: string, needle: string) => src.indexOf(needle);
+    const s1 = `cy.get('.cart').find('.line-item')`;
+    expect(directGetParentFor(s1, at(s1, `'.line-item'`))).toBe('.cart');
+    // chained parent (.find().find()) → not soundly resolvable → null
+    const s2 = `cy.get('.page').find('.cart').find('.line-item')`;
+    expect(directGetParentFor(s2, at(s2, `'.line-item'`))).toBeNull();
+    // .within() block / variable subject → null
+    const s3 = `cy.get('.cart').within(() => { cy.get('.line-item'); })`;
+    expect(directGetParentFor(s3, at(s3, `'.line-item'`))).toBeNull();
+  });
+
+  it('scopedChildCount counts WITHIN a uniquely-resolved parent, else defers (null)', () => {
+    const cart = (kids: string) => `<html><body><div class="cart">${kids}</div></body></html>`;
+    expect(scopedChildCount(cart('<a class="li">1</a><a class="li">2</a><a class="li">3</a>'), '.cart', '.li')).toEqual({ count: 3 });
+    expect(scopedChildCount(cart('<a class="li">1</a>'), '.cart', '.li')).toEqual({ count: 1 });
+    // ambiguous parent (2 carts) → null (defer)
+    expect(scopedChildCount('<div class="cart"><a class="li">1</a></div><div class="cart"></div>', '.cart', '.li')).toBeNull();
+    // absent parent → null
+    expect(scopedChildCount(cart('<a class="li">1</a>'), '.nope', '.li')).toBeNull();
+    // jQuery-pseudo child → null (an over-approximation must never reject)
+    expect(scopedChildCount(cart('<a class="li">1</a><a class="li">2</a>'), '.cart', '.li:visible')).toBeNull();
+    // descends a shadow template inside the parent
+    const shadow = '<html><body><div class="cart"><div><template shadowrootmode="open"><a class="li">s1</a><a class="li">s2</a></template></div></div></body></html>';
+    expect(scopedChildCount(shadow, '.cart', '.li')).toEqual({ count: 2 });
+  });
+});
+
+describe('resolve stage — scoped .find() uniqueness', () => {
+  const scopedCtx = (domHtml: string, chain: string) =>
+    makeCtx(`it('t', () => { ${chain} });`, artifact({ domHtml }), [{ oldString: `'.old'`, newString: `'.li'` }]);
+  const findChain = "cy.get('.cart').find('.old').should('exist');";
+
+  it('REJECTS a look-alike-sibling ambiguity within a uniquely-resolved parent', async () => {
+    const dom = '<html><body><div class="cart"><a class="li">1</a><a class="li">2</a><a class="li">3</a></div></body></html>';
+    const v = await resolveStage.run(scopedCtx(dom, findChain));
+    expect(v.verdict).toBe('fail');
+    expect(v.evidence).toMatch(/ambiguous within its parent scope — 3 matches inside the single "\.cart"/);
+  });
+
+  it('PASSES when the child is unique within the parent (real uniqueness, not just existence)', async () => {
+    const dom = '<html><body><div class="cart"><a class="li">only</a></div></body></html>';
+    const v = await resolveStage.run(scopedCtx(dom, findChain));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/unique within "\.cart" \(scoped uniqueness verified\)/);
+  });
+
+  it('SOUNDNESS: 3 matches document-wide but 1 within the parent → PASS (a global count would false-reject)', async () => {
+    const dom = '<html><body><div class="cart"><a class="li">in</a></div><a class="li">out1</a><a class="li">out2</a></body></html>';
+    // whole-document count is 3 — the old existence-only behavior, and a naive
+    // global-ambiguity check, would both mishandle this.
+    expect(countSelectorMatches(dom, '.li', 'all')?.count).toBe(3); // '.li' is the healed value
+    const v = await resolveStage.run(scopedCtx(dom, findChain));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/unique within "\.cart"/);
+  });
+
+  it('SOUNDNESS: ambiguous PARENT (two .cart) → defer to rerun (existence only), never a false reject', async () => {
+    const dom = '<html><body><div class="cart"><a class="li">a</a><a class="li">b</a></div><div class="cart"><a class="li">c</a></div></body></html>';
+    const v = await resolveStage.run(scopedCtx(dom, findChain));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/scoped call — existence only/);
+  });
+
+  it('SOUNDNESS: a collection chain (.first()) makes multiple matches legitimate → PASS', async () => {
+    const dom = '<html><body><div class="cart"><a class="li">1</a><a class="li">2</a><a class="li">3</a></div></body></html>';
+    const v = await resolveStage.run(scopedCtx(dom, "cy.get('.cart').find('.old').first().click();"));
+    expect(v.verdict).toBe('pass');
+  });
+
+  it('SOUNDNESS: a chained/non-direct parent defers (existence only)', async () => {
+    const dom = '<html><body><div class="page"><div class="cart"><a class="li">1</a><a class="li">2</a></div></div></body></html>';
+    const v = await resolveStage.run(scopedCtx(dom, "cy.get('.page').find('.cart').find('.old').should('exist');"));
+    expect(v.verdict).toBe('pass');
+    expect(v.evidence).toMatch(/scoped call — existence only/);
   });
 });
