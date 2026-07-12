@@ -51,6 +51,32 @@ queues (cypress#32673 BYO keys, cypress#33927 offline, cypress#20458
   proven, zero egress); the benchmark table
   (heal-rate by selector style) is published evidence they never show.
 
+### Capture: redaction *and* an auditable representation (2026-07, source-verified)
+
+Across the three public LLM-testing designs, each does exactly one of the
+two things a self-heal capture owes you — never both:
+
+- **Cypress `cy.prompt`** documents *redaction* (password / credit-card /
+  hidden field **values** stripped before egress) but does **not** disclose
+  the page representation it sends, nor any DOM-size limit — it's cloud-only
+  and unauditable.
+- **Playwright** documents the *representation* in full (the `mode:'ai'`
+  ARIA snapshot + distiller, open source) but does **no** redaction, and its
+  maintainers explicitly decline to paginate large pages
+  ([playwright-mcp#915](https://github.com/microsoft/playwright-mcp/issues/915):
+  "we don't want to introduce pagination … assuming the agentic loops
+  perform necessary summarization").
+
+goldseam is the only one that does **both**: redaction on a clone *plus* an
+auditable redacted-DOM + aria capture, arriving as a reviewed commit — and
+it *does* solve the large-page problem the others punt, deterministically
+and prompt-only, via the anchored neighborhood window
+([heal/dom-window.ts](../../packages/goldseam/src/heal/dom-window.ts);
+invariant in [AGENTS.md](../../AGENTS.md)). The window rescues deep targets
+on real page-builder output (Framer/Webflow/Wix) and huge server-rendered
+pages (Wikipedia) that a head-first slice — and CodeceptJS's `maxLength:
+50000` head cut, which has this exact bug — give up on.
+
 ## What their issue queues teach (mined 2026-07-03)
 
 The incumbents' open bugs are a taxonomy of healing-trust failures.

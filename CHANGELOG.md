@@ -10,6 +10,23 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal prompt: an anchored **neighborhood window**
+  (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
+  Style/script bodies are emptied; then, when the DOM still overflows and a
+  head-first slice shows no anchor, a page *region* is emitted around an
+  anchor tied to the failure — asserted spec text first, then a surviving
+  distinctive sub-part of the broken selector, descending into
+  open-shadow / inlined-frame `<template>`s for parity with resolution.
+  Prompt-only: resolution reads the untouched capture, so match counts never
+  change. Regression-proof gate (unchanged behavior whenever a head-first
+  slice already shows an anchor), content-neutral within the window (every
+  attribute/text preserved, scaffold values escaped), hard-bounded output,
+  and a widened fallback when no anchor exists at all. Proven live: real
+  Sonnet healed drifted selectors on Framer (whereby.com) and Webflow pages
+  whose targets sit far past the budget — cases a head-first slice gives up
+  on.
+- Heal: `--dry-run` no longer persists the heal artifact — it previews the
+  full ladder to stdout but must not overwrite a prior real heal artifact.
 - Capture: fail-event pipeline with redaction (emails, digit runs, JWTs,
   hex/base64 tokens, sensitive query params, capture URL), open-shadow-DOM
   serialization, retry-awareness, transparency toward user fail handlers,

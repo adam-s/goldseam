@@ -10,11 +10,20 @@
 import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import cypress from 'cypress';
 import { check, finish, healableSpec, runCli, startServer } from './lib/harness.mjs';
 
+// The prompt slimmer, straight from dist — asserts the windowing behavior on a
+// REAL local capture (no third-party site, no model) as part of the ladder.
+const { windowDom, deboilerplateDom } = createRequire(import.meta.url)(
+  '../packages/goldseam/dist/heal/dom-window.js',
+);
+
 const TMP_SPEC = 'cypress/system/tmp-healable.cy.ts';
 const BROKEN = healableSpec('[data-testid="buy-now-5"]');
+const WINDOW_SPEC = 'cypress/system/tmp-window.cy.ts';
+const HEAVY = 'demo/heavy.generated.html';
 
 const server = await startServer('demo', 4173);
 
@@ -260,9 +269,66 @@ export default defineConfig({
     readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'),
   );
   check(giveupArtifact.verdict === 'gave-up', 'give-up recorded as first-class verdict');
+
+  console.log('\n— windowing: a large local capture is windowed so a deep target heals —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  // A heavy page (no third-party site): front-loaded inline CSS (which the
+  // slimmer empties) PLUS >40K of real markup, then the "Recent Articles"
+  // section — so even after de-boilerplating, the target card sits far past
+  // the prompt budget and only the anchored neighborhood window rescues it.
+  // Generated (not committed) so the sizes are exact; served from demo/.
+  const bigStyle = `<style>${'.row{padding:2px;margin:1px;color:#334}'.repeat(900)}</style>`;
+  const filler = Array.from({ length: 800 }, (_, i) =>
+    `<section class="row"><span>filler content line ${i} — lorem ipsum dolor sit amet consectetur</span></section>`,
+  ).join('');
+  const cards = [5, 6, 7, 8]
+    .map(
+      (n) =>
+        `<article data-testid="item-${n}" class="card"><h2>${['Fifth', 'Sixth', 'Seventh', 'Eighth'][n - 5]} Article Headline on Wellness</h2><a href="/a/${n}">Read</a></article>`,
+    )
+    .join('');
+  writeFileSync(
+    HEAVY,
+    `<!doctype html><html><head><title>Blog</title>${bigStyle}</head><body><nav>menu</nav>${filler}<main><h1>Recent Articles</h1>${cards}</main></body></html>`,
+  );
+  // The redesign renamed data-testid post-7 → item-7; the spec still uses post-7.
+  writeFileSync(
+    WINDOW_SPEC,
+    `describe('blog', () => {\n  it('shows the seventh article', () => {\n    cy.visit('/heavy.generated.html');\n    cy.contains('Seventh Article Headline on Wellness');\n    cy.get('[data-testid="post-7"]').should('exist');\n  });\n});\n`,
+  );
+  const redWin = await cypress.run({ quiet: true, config: { specPattern: WINDOW_SPEC } });
+  check(redWin.totalFailed === 1, 'windowing: drifted deep selector fails and captures');
+  const winCap = JSON.parse(
+    readFileSync(`.goldseam/failures/${readdirSync('.goldseam/failures')[0]}`, 'utf8'),
+  );
+  check(winCap.domHtml.length > 40_000, `windowing: captured DOM is large (${winCap.domHtml.length} chars)`);
+
+  // The windowing behavior, on THIS real local capture: a head-first slice
+  // would miss the deep target, and the slimmer must window instead.
+  const winSpecSrc = readFileSync(WINDOW_SPEC, 'utf8');
+  const win = windowDom(winCap.domHtml, {
+    failedSelector: winCap.failedSelector,
+    specSource: winSpecSrc,
+    budget: 40_000,
+  });
+  check(
+    deboilerplateDom(winCap.domHtml).slice(0, 40_000).indexOf('item-7') === -1,
+    'windowing: a head-first slice WOULD miss the deep target',
+  );
+  check(win.strategy === 'windowed', `windowing: engaged (strategy=${win.strategy}, anchor=${win.anchor})`);
+  check(win.html.includes('item-7'), 'windowing: the deep target is delivered into the prompt');
+
+  // And the full pipeline heals the large-DOM capture (stub emits post-7 → item-7).
+  const winHeal = runCli(['heal', '--model', 'cmd:node scripts/stub-model.mjs window-fix']);
+  process.stdout.write(winHeal.stdout);
+  check(winHeal.status === 0 && winHeal.stdout.includes('[healed]'), 'windowing: large-DOM capture heals full-ladder');
+  const winHealed = readFileSync(WINDOW_SPEC, 'utf8');
+  check(winHealed.includes('item-7') && !winHealed.includes('post-7'), 'windowing: the deep selector was edited');
 } finally {
   server.stop();
   rmSync(TMP_SPEC, { force: true });
+  rmSync(WINDOW_SPEC, { force: true });
+  rmSync(HEAVY, { force: true });
   rmSync('.goldseam', { recursive: true, force: true });
 }
 

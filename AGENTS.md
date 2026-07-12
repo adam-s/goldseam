@@ -126,6 +126,33 @@ of what else improves:
   [shared/types.ts](packages/goldseam/src/shared/types.ts)) and every
   artifact carries `schemaVersion` — the artifact schema is a public API;
   additive changes bump minor, breaking bump major.
+- **Prompt DOM slimming is prompt-only**
+  ([heal/dom-window.ts](packages/goldseam/src/heal/dom-window.ts)) —
+  `windowDom` (called by `buildRepairPrompt`) empties `<style>`/`<script>`
+  bodies and, when the slimmed DOM still exceeds the ~40 K prompt budget
+  *and* a head-first slice contains no anchor, emits a neighborhood window
+  around an anchor tied to the failure (asserted spec text first, then a
+  surviving *distinctive* sub-part of the broken selector; descends into
+  open-shadow / inlined-frame `<template>`s for parity with `resolve.ts`).
+  It never touches `artifact.domHtml`: resolution
+  (`countSelectorMatches`/`countTextMatches`, `stages.ts`) reads the
+  untouched capture, so the deliberately lossy window can never change a
+  match count. The gate is regression-proof — if a head-first slice already
+  shows an anchor, today's exact slice is returned unchanged; windowing
+  engages only on pages that give up today. The window is a page *region*
+  (never a spotlight on the renamed element) and injects no hint; the
+  `<!-- goldseam: DOM windowed … -->` marker names the anchor, and the live
+  ladder still verifies. Output is hard-bounded by the budget. When NO anchor
+  exists anywhere (e.g. an authoring spec with no `cy.contains` and a renamed
+  single-token selector), there is no region to center on, so the floor
+  widens to `NO_ANCHOR_FALLBACK_FACTOR × budget` — a content superset of the
+  old head-first slice that rescues a target sitting just past the budget and
+  can never break a heal that worked on the narrower slice.
+- **`--dry-run` mutates nothing on disk** — the heal-artifact write in
+  [heal/engine.ts](packages/goldseam/src/heal/engine.ts) is guarded by
+  `!dryRun`; a dry-run previews the full ladder to stdout but must never
+  overwrite a prior real heal artifact (this once clobbered a video-factory
+  demo's recorded `healed` verdict with a preview's `gave-up`).
 - **`validateEdit`**
   ([heal/validate.ts](packages/goldseam/src/heal/validate.ts)) enforces the
   heal invariants mechanically: per-occurrence exact-string edits (capped
@@ -260,6 +287,23 @@ Tradeoffs, not oversights:
   is Phase-2 work.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
+- **Prompt DOM windowing anchors on light-DOM/template content only, and
+  degrades honestly when it can't.** `windowDom`
+  ([heal/dom-window.ts](packages/goldseam/src/heal/dom-window.ts)) rescues a
+  deep target only when an anchor tied to the failure sits near it in the
+  DOM. Known give-up cases (all no worse than the pre-windowing head-first
+  slice, and all caught by the live ladder): (a) an *ambiguous* spec-text
+  anchor that also appears early — the gate finds it in the head and keeps
+  head-first rather than window a wrong region; (b) an anchor genuinely far
+  from the target (different page section → their subtree is over-budget);
+  (c) a *bare-tag-only* broken selector (`nav > ul > li`) — no distinctive
+  piece survives, so no structural anchor; (d) `deepestTextBearer` picks the
+  first document-order bearer when asserted text repeats. `searchScopes`
+  descends one template level (nested open-shadow-in-shadow is not walked).
+  Landmark/`<main>`-by-size anchoring was deliberately dropped — probing
+  showed "largest container" is an unreliable anchor. Fuller future levers
+  if a page still overflows: emptying inline `style=""` attributes, and
+  ranking multiple candidate anchors instead of first-match.
 - **Duplicate test titles can confuse rerun verdicts** — `rerunVerdictFor`
   matches by full title; two identically-named tests in one spec could
   let the wrong test's state decide. Rare in practice; index-based

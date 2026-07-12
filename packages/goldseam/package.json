@@ -1,6 +1,6 @@
 {
   "name": "goldseam",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Self-healing for the Cypress suites you already have: failures become rich captures, your model (local or API) proposes a minimal selector fix, the suite verifies it, and it arrives as a pull request.",
   "license": "MIT",
   "exports": {
@@ -45,6 +45,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@types/jsdom": "^28.0.3",
     "cypress": "^15.18.0",
     "typescript": "^6.0.3",
     "vitest": "^3.0.0"

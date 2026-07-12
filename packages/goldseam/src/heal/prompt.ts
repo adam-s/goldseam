@@ -5,6 +5,13 @@
 // and the spec source. Never application source.
 
 import { FailureArtifact } from '../shared/types';
+import { deboilerplateDom, windowDom } from './dom-window';
+
+// The prompt's DOM-slimming (style/script strip + anchored neighborhood
+// window) lives in dom-window.ts; re-exported here because it is part of the
+// prompt contract. See that file for the content-neutral / prompt-only
+// invariants and the evidence behind the windowing gate.
+export { deboilerplateDom };
 
 const MAX_PROMPT_DOM_CHARS = 40_000;
 
@@ -16,10 +23,11 @@ export interface PromptInput {
 }
 
 export function buildRepairPrompt({ artifact, specSource, selectorPriority, feedback }: PromptInput): string {
-  const dom =
-    artifact.domHtml.length > MAX_PROMPT_DOM_CHARS
-      ? `${artifact.domHtml.slice(0, MAX_PROMPT_DOM_CHARS)}\n<!-- truncated for prompt -->`
-      : artifact.domHtml;
+  const { html: dom } = windowDom(artifact.domHtml, {
+    failedSelector: artifact.failedSelector,
+    specSource,
+    budget: MAX_PROMPT_DOM_CHARS,
+  });
 
   return `You repair broken selectors in Cypress tests. A test failed because a selector no longer matches the page. Propose the minimal edit to the spec file that points the selector at the intended element.
 
