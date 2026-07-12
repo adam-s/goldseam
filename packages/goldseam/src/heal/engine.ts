@@ -242,10 +242,16 @@ export async function healArtifactFile(
     durationMs: Date.now() - startedAt,
   };
 
-  mkdirSync(options.healsDir, { recursive: true });
-  writeFileSync(
-    join(options.healsDir, basename(artifactPath).replace(/\.json$/, '-heal.json')),
-    JSON.stringify(heal, null, 2),
-  );
+  // Dry-run previews to stdout and must mutate nothing on disk — persisting
+  // here would OVERWRITE a prior real heal artifact with the preview's verdict
+  // (a footgun that clobbered a video-factory demo's recorded heal). The CLI
+  // prints the returned ladder either way.
+  if (!options.dryRun) {
+    mkdirSync(options.healsDir, { recursive: true });
+    writeFileSync(
+      join(options.healsDir, basename(artifactPath).replace(/\.json$/, '-heal.json')),
+      JSON.stringify(heal, null, 2),
+    );
+  }
   return heal;
 }

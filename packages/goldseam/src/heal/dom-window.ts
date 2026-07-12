@@ -1,0 +1,304 @@
+// Prompt-only DOM slimming: shrink the captured HTML so the element a heal
+// must find survives the fixed prompt budget, WITHOUT touching the artifact
+// the resolution rungs read. Two layers, cheapest first:
+//
+//   1. deboilerplateDom — empty <style>/<script> bodies (see below).
+//   2. windowDom — when the slimmed DOM still overflows the budget AND a
+//      head-first slice would miss the relevant region, emit a neighborhood
+//      window centered on an anchor tied to the failure, instead of the head.
+//
+// Why this file and not the capture: resolution (heal/resolve.ts,
+// heal/stages.ts) counts selector/text matches over the UNTOUCHED
+// artifact.domHtml. Everything here feeds ONLY the model prompt, so it can
+// never change a match count. That is the load-bearing invariant — every
+// export is a pure function of its input string and mutates nothing.
+//
+// Why an anchored window and not just a bigger slice: the slice is head-first,
+// and on a large page the element a renamed selector should now point at can
+// sit hundreds of KB down (a page-builder's blog card, a late list item). The
+// head then holds only chrome and the model gives up on a healable page. But a
+// heal is not a blind search — we know the selector that broke and the text
+// the spec asserts, and the moved element is overwhelmingly still beside its
+// old neighbors. So we anchor on a signal that survived the break and emit the
+// DOM neighborhood around it. The window is a page *region*, wide enough that
+// the model still does real disambiguation — we never hand it the answer.
+
+import { parseDom } from './dom-env';
+
+/**
+ * Empty the *bodies* of <style>/<script> elements, keeping the opening tag
+ * (with every attribute) and closing tag intact.
+ *
+ * When a page inlines its stylesheets and scripts, that markup carries no
+ * selectable content but can dwarf the DOM — a build tool that inlines
+ * critical CSS can put hundreds of KB ahead of the first real element. The
+ * head-first prompt slice then fills with CSS/JS text and the model sees
+ * nothing to select. That text is pure noise for selector reasoning; dropping
+ * it moves real content back toward the front.
+ *
+ * Content-neutral by construction: structure, element count, and every
+ * attribute survive (a heal target that is itself a <script>/<style> — never
+ * observed, but permitted — stays intact and selectable). This is the lighter
+ * cousin of translate.ts `translationDom`, which is free to *remove*
+ * <head>/<script>/<style>/<svg> outright because it grounds NEW selectors in
+ * body markup; a heal must point at a real, untouched element in this same
+ * capture, so we empty rather than remove.
+ */
+export function deboilerplateDom(html: string): string {
+  return html
+    .replace(/(<style\b[^>]*>)[\s\S]*?<\/style\s*>/gi, '$1</style>')
+    .replace(/(<script\b[^>]*>)[\s\S]*?<\/script\s*>/gi, '$1</script>');
+}
+
+/**
+ * Text a spec asserts on — `contains()` arguments and the text argument of a
+ * `should/and('contain'|'have.text'|'include.text', …)`. These are the
+ * strongest anchors we have: a token rename cannot move the words on the page,
+ * and the demo pattern asserts text co-located with the broken selector's
+ * element, so the assertion sits right beside the target. Selector-shaped and
+ * trivially short strings are dropped — they are not page text.
+ */
+export function extractAnchorTexts(specSource: string): string[] {
+  const texts = new Set<string>();
+  const add = (s: string): void => {
+    const t = s.trim();
+    // reject selector-shaped args (.foo, #id, [attr]) and noise
+    if (t.length >= 3 && !/^[.#[]/.test(t) && /[a-z0-9]/i.test(t)) texts.add(t);
+  };
+  const strings = /(['"`])((?:\\.|(?!\1).)*)\1/g;
+  for (const m of specSource.matchAll(/\bcontains\s*\(([^)]*)\)/g)) {
+    // cy.contains([selector,] text) — text is the LAST string arg; a leading
+    // arg is a scope selector, not page text.
+    const args = [...m[1].matchAll(strings)].map((s) => s[2]);
+    if (args.length) add(args[args.length - 1]);
+  }
+  for (const m of specSource.matchAll(
+    /\.(?:should|and)\s*\(\s*(['"`])(?:contain|have\.text|include\.text)[^)]*?\1\s*,\s*(['"`])((?:\\.|(?!\2).)*)\2/g,
+  )) {
+    add(m[3]);
+  }
+  return [...texts];
+}
+
+export interface WindowInput {
+  /** artifact.failedSelector — parsed for surviving structural anchors. */
+  failedSelector?: string;
+  /** spec source — mined for asserted-text anchors. */
+  specSource?: string;
+  /** char budget for the DOM the prompt embeds. */
+  budget: number;
+}
+
+export interface WindowResult {
+  /** the DOM string to embed in the prompt (already budget-bounded). */
+  html: string;
+  /** which path produced it — for the honesty marker and diagnostics. */
+  strategy: 'whole' | 'head-first' | 'windowed';
+  /** true when the emitted DOM was cut at the budget. */
+  truncated: boolean;
+  /** for windowed results: how the anchor was found (e.g. 'spec-text "…"'). */
+  anchor?: string;
+}
+
+const TRUNC_MARKER = '\n<!-- truncated for prompt -->';
+
+/** When no anchor can be found at all, we cannot center a window — but a hard
+ * head-first cut at the budget silently drops a target that sits just past it
+ * (a heal target ~2K past the budget in a moderately-heavy page, with an
+ * authoring spec that offers no text anchor and a renamed single-token
+ * selector that offers no surviving sub-part — the video-factory case). With
+ * no region to aim at, showing the model MORE of the page is strictly better:
+ * it is a content superset, so it can only add context, never break a heal
+ * that worked on the narrower slice. Bounded so a genuinely huge page still
+ * truncates. Tunable. */
+const NO_ANCHOR_FALLBACK_FACTOR = 2;
+
+/** Slice the head, honestly marked — today's behavior and the safe floor. */
+function headFirst(slim: string, budget: number): WindowResult {
+  return slim.length > budget
+    ? { html: slim.slice(0, budget) + TRUNC_MARKER, strategy: 'head-first', truncated: true }
+    : { html: slim, strategy: 'whole', truncated: false };
+}
+
+/** An anchor element plus a human-readable reason it was chosen. */
+interface Anchor {
+  el: Element;
+  why: string;
+}
+
+/** Deepest element under `scope` whose own text contains `t` (the bearer, not
+ * an ancestor). <template> elements are skipped — their content is a detached
+ * fragment searched separately (see searchScopes). */
+function deepestTextBearer(scope: ParentNode, t: string): Element | null {
+  for (const el of Array.from(scope.querySelectorAll('*'))) {
+    if (el.tagName === 'TEMPLATE') continue;
+    if (!el.textContent?.includes(t)) continue;
+    if (!Array.from(el.children).some((c) => c.textContent?.includes(t))) return el;
+  }
+  return null;
+}
+
+/** Split a selector into candidate structural sub-parts, longest prefix first,
+ * then individual compound pieces — a token rename usually hits the
+ * distinctive piece, so a *surviving* piece marks the neighborhood the renamed
+ * element likely still lives in. Combinators are treated as whitespace.
+ *
+ * Only DISTINCTIVE pieces (carrying an id/class/attribute) are kept: a bare
+ * tag name like `div` or `main` matches near the top of nearly every page, so
+ * using it as an anchor would both defeat the head-first gate and window an
+ * arbitrary region. */
+function subSelectorParts(selector: string): string[] {
+  const pieces = selector.trim().split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+  const parts: string[] = [];
+  for (let n = pieces.length - 1; n >= 1; n--) parts.push(pieces.slice(0, n).join(' '));
+  for (const p of pieces) parts.push(p);
+  return [...new Set(parts)].filter((p) => /[.#[]/.test(p));
+}
+
+/** The document body plus every open-shadow / inlined-frame template content
+ * fragment (`<template shadowrootmode>` / `<template data-frame-content>`),
+ * each paired with its light-DOM host. This mirrors resolve.ts `countIn`:
+ * anchoring must be able to see the same content resolution counts, or a heal
+ * whose target lives in an open shadow root could never be windowed. A match
+ * inside a fragment anchors on its host, whose serialization includes the
+ * fragment. */
+function searchScopes(doc: Document): Array<{ scope: ParentNode; host: Element | null }> {
+  const scopes: Array<{ scope: ParentNode; host: Element | null }> = [
+    { scope: doc.body ?? doc, host: null },
+  ];
+  for (const t of Array.from(
+    doc.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+  )) {
+    scopes.push({ scope: (t as HTMLTemplateElement).content, host: t });
+  }
+  return scopes;
+}
+
+/** Find an anchor: an asserted-text bearer first (most reliable — tied to the
+ * test's intent and co-located with the target by the demo pattern), then a
+ * surviving distinctive sub-part of the broken selector. Searches the light
+ * DOM and open-shadow/frame content alike. Null when neither signal is
+ * present. */
+function findAnchor(doc: Document, input: WindowInput): Anchor | null {
+  const scopes = searchScopes(doc);
+  for (const t of extractAnchorTexts(input.specSource ?? '')) {
+    for (const { scope, host } of scopes) {
+      const el = deepestTextBearer(scope, t);
+      if (el) return { el: host ?? el, why: `spec-text ${JSON.stringify(t)}${host ? ' (shadow/frame)' : ''}` };
+    }
+  }
+  if (input.failedSelector) {
+    for (const sel of subSelectorParts(input.failedSelector)) {
+      for (const { scope, host } of scopes) {
+        try {
+          const el = scope.querySelector(sel);
+          if (el) {
+            return { el: host ?? el, why: `surviving sub-selector ${JSON.stringify(sel)}${host ? ' (shadow/frame)' : ''}` };
+          }
+        } catch {
+          // an isolated piece may not be valid CSS on its own — skip it
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Escape an attribute value for hand-serialization (jsdom's outerHTML escapes
+ * the body for us, but the scaffold tags are built by hand). Without this a
+ * `data-*` value containing a quote or ampersand — routine on page-builder
+ * sites — produces malformed markup. */
+const escapeAttr = (v: string): string =>
+  v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/** Opening/closing tags for the anchor's ancestor chain (up to and including
+ * <body>), so the emitted fragment reads as a real DOM path and a descendant
+ * selector written against it still resolves. Every attribute is preserved,
+ * escaped. */
+function ancestorScaffold(chosen: Element): { open: string; close: string } {
+  const chain: Element[] = [];
+  for (let p = chosen.parentElement; p; p = p.parentElement) {
+    chain.unshift(p);
+    if (p.tagName === 'BODY') break;
+  }
+  const open = chain
+    .map((n) => {
+      const attrs = Array.from(n.attributes)
+        .map((a) => (a.value === '' ? a.name : `${a.name}="${escapeAttr(a.value)}"`))
+        .join(' ');
+      return `<${n.tagName.toLowerCase()}${attrs ? ' ' + attrs : ''}>`;
+    })
+    .join('');
+  const close = chain
+    .map((n) => `</${n.tagName.toLowerCase()}>`)
+    .reverse()
+    .join('');
+  return { open, close };
+}
+
+/** Emit the neighborhood around `anchor`: climb to the largest ancestor whose
+ * serialized subtree fits the budget, then wrap it in its ancestor scaffold.
+ * Output is hard-bounded by `budget`: the body is trimmed to what remains
+ * after the marker and scaffold, so a deep scaffold or a single over-budget
+ * element can never blow the budget. */
+function emitWindow(anchor: Anchor, budget: number): WindowResult {
+  let chosen: Element = anchor.el;
+  for (let p = anchor.el.parentElement; p && p.tagName !== 'HTML' && p.tagName !== 'BODY'; p = p.parentElement) {
+    if (p.outerHTML.length <= budget) chosen = p;
+    else break;
+  }
+  const { open, close } = ancestorScaffold(chosen);
+  const marker = `<!-- goldseam: DOM windowed to the region around ${anchor.why}; page exceeds the prompt budget -->\n`;
+  const overhead = marker.length + open.length + close.length + TRUNC_MARKER.length;
+  const allowed = Math.max(0, budget - overhead);
+  let body = chosen.outerHTML;
+  let truncated = false;
+  if (body.length > allowed) {
+    body = body.slice(0, allowed);
+    truncated = true;
+  }
+  return {
+    html: marker + open + body + close + (truncated ? TRUNC_MARKER : ''),
+    strategy: 'windowed',
+    truncated,
+    anchor: anchor.why,
+  };
+}
+
+/**
+ * Produce the DOM string for the repair prompt. Never throws; on any internal
+ * error it degrades to the head-first slice (the pre-existing behavior).
+ *
+ * The gate that keeps this regression-proof: if a head-first slice already
+ * contains a usable anchor, we return exactly that slice — no windowing, no
+ * behavior change for any page that heals today. Windowing engages ONLY when
+ * the head-first slice has no anchor at all, i.e. exactly the pages that give
+ * up today. It is strictly additive.
+ *
+ * When NO anchor exists anywhere, there is no region to center on, so we fall
+ * back to a wider head-first slice (NO_ANCHOR_FALLBACK_FACTOR × budget) — a
+ * content superset of the old floor that rescues a target sitting just past
+ * the budget, and can never break a heal that worked on the narrower slice.
+ */
+export function windowDom(domHtml: string, input: WindowInput): WindowResult {
+  try {
+    const slim = deboilerplateDom(domHtml);
+    if (slim.length <= input.budget) return { html: slim, strategy: 'whole', truncated: false };
+
+    // Cheap gate: does a usable anchor already appear in the head-first slice?
+    // Parse only the head (not the whole page) — if it does, keep today's
+    // behavior verbatim.
+    const head = slim.slice(0, input.budget);
+    if (findAnchor(parseDom(head).document, input)) return headFirst(slim, input.budget);
+
+    // Head-first would give up. Try to window around an anchor in the full DOM.
+    const anchor = findAnchor(parseDom(slim).document, input);
+    if (!anchor) return headFirst(slim, input.budget * NO_ANCHOR_FALLBACK_FACTOR);
+    return emitWindow(anchor, input.budget);
+  } catch {
+    // Robustness over cleverness: a malformed DOM or jsdom hiccup must never
+    // fail a heal — fall back to the plain slice.
+    const slim = deboilerplateDom(domHtml);
+    return headFirst(slim, input.budget);
+  }
+}
