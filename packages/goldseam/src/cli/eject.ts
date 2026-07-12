@@ -7,6 +7,13 @@ import { StepCommand, isTextAssertion } from '../shared/prompt-types';
 const q = (s: string) =>
   `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 
+/** A single-line `// comment`. A step or a model refusal reason is free text
+ * that may contain newlines; emitted raw, a newline would split the comment
+ * into a second, UNCOMMENTED line — a syntax error in the pasted spec
+ * (red-team finding). Collapse all newlines to spaces so the comment stays one
+ * line. */
+const comment = (s: string): string => `// ${String(s).replace(/\s*[\r\n]+\s*/g, ' ')}`;
+
 /** The subject expression for a selector, honoring `shadow` EXACTLY as the
  * executor does (authoring.ts `target`): a shadow-scoped selector resolves
  * inside the FIRST matching host's shadow root, since CSS has no
@@ -63,20 +70,23 @@ export function renderEntry(
   giveUp?: { reason: string },
 ): string {
   const lines: string[] = [];
-  for (const step of steps) lines.push(`// ${step}`);
+  // Tolerate a shape-corrupt cache entry (valid JSON, missing steps/commands):
+  // eject must skip it, never throw a TypeError that aborts the whole run
+  // (red-team finding — the JSON.parse guard alone didn't cover shape).
+  for (const step of steps ?? []) lines.push(comment(step));
   // A cached refusal has no commands. Replay throws on it (give-up is
   // first-class); ejected code must too, or a declined translation would
   // paste as an empty, silently-passing block — a refusal misreported as
   // success. Emit the same loud failure, not a comment the runner ignores.
   if (giveUp) {
     lines.push(
-      `// goldseam DECLINED these steps as ambiguous — it refused to guess.`,
-      `// Reason: ${giveUp.reason}`,
-      `// Rewrite the steps to be unambiguous (they retranslate), or drop them.`,
+      comment('goldseam DECLINED these steps as ambiguous — it refused to guess.'),
+      comment(`Reason: ${giveUp.reason}`),
+      comment('Rewrite the steps to be unambiguous (they retranslate), or drop them.'),
       `throw new Error(${q(`goldseam declined these steps as ambiguous: ${giveUp.reason}`)});`,
     );
     return lines.join('\n');
   }
-  for (const cmd of commands) lines.push(renderCommand(cmd));
+  for (const cmd of commands ?? []) lines.push(renderCommand(cmd));
   return lines.join('\n');
 }

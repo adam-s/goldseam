@@ -94,6 +94,23 @@ describe('renderEntry (eject)', () => {
     expect(code).toContain('throw new Error(');
   });
 
+  it('a multi-line refusal reason / step never breaks the comment (no bare newline)', () => {
+    // A model reason with a newline emitted raw would split into a second,
+    // uncommented line — a syntax error in the pasted spec.
+    const code = renderEntry(['do\nthis vague thing'], [], { reason: 'no target;\ntry again' });
+    for (const line of code.split('\n')) {
+      // Every line is either a // comment or executable JS — never a stray
+      // fragment of comment text on its own uncommented line.
+      const ok = line.startsWith('//') || line.startsWith('throw ') || line.trim() === '';
+      expect(ok, `stray line: ${JSON.stringify(line)}`).toBe(true);
+    }
+    expect(code).toContain('no target; try again'); // newline collapsed to a space
+  });
+
+  it('tolerates a shape-corrupt cache entry (missing steps/commands) without throwing', () => {
+    expect(() => renderEntry(undefined as unknown as string[], undefined as unknown as [])).not.toThrow();
+  });
+
   it('a text expectation paired with a non-text chainer becomes a REAL assertion (false-green fix)', () => {
     // should('be.visible', 'ordered!') silently ignores the second arg in
     // Chai — the fresh-consumer walkthrough proved an app showing the
