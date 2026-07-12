@@ -18,6 +18,20 @@ const REPLIES = {
     confidence: 0.95,
     reasoning: 'The add-to-cart button for product 5 carries data-testid="add-to-cart-5"; "buy-now-5" does not exist in the captured DOM.',
   },
+  // Large-DOM windowing scenario: the seventh article card, deep past the
+  // prompt budget, drifted post-7 → item-7. The stub can only emit the right
+  // edit if the prompt slimmer windowed the capture and delivered that card.
+  'window-fix': {
+    edits: [
+      {
+        file: 'cypress/system/tmp-window.cy.ts',
+        oldString: `'[data-testid="post-7"]'`,
+        newString: `'[data-testid="item-7"]'`,
+      },
+    ],
+    confidence: 0.95,
+    reasoning: 'The seventh article card carries data-testid="item-7"; "post-7" does not exist in the captured DOM.',
+  },
   giveup: {
     giveUp: { reason: 'no element in the capture plausibly matches the broken selector' },
     reasoning: 'Nothing in the DOM or aria tree resembles the target.',
