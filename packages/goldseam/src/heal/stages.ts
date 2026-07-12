@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getAllByAria, queryAllDeep } from 'aria-snapshot';
 import { buildCacheEdit, loadCache, lookup } from './cache';
-import { parseDom, withDomGlobals } from './dom-env';
+import { closeWindow, parseDom, withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
 import {
@@ -296,7 +296,10 @@ export const oracleStage: HealStage = {
     const { window } = parseDom(artifact.domHtml);
     const specSource = ctx.specSource;
 
-    return withDomGlobals(window, () => {
+    // The aria walk reads live nodes for the whole closure; close the window
+    // only after withDomGlobals returns (the verdict it yields holds strings).
+    try {
+      return withDomGlobals(window, () => {
       const docEl = window.document.documentElement;
       // Judge on the UNEXPANDED capture: the aria walk descends serialized
       // templates natively and queryAllDeep respects boundaries, so both
@@ -387,7 +390,10 @@ export const oracleStage: HealStage = {
         `healed selector targets the known-good ${identity}${notes.length ? ` (${notes.join('; ')})` : ''}`,
         started,
       );
-    });
+      });
+    } finally {
+      closeWindow(window);
+    }
   },
 };
 

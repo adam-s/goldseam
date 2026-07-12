@@ -336,6 +336,34 @@ Tradeoffs, not oversights:
   frame-scoping honestly instead of calling it timing. Positional oracle
   judgment models `.first()/.last()/.eq(n)` only; other collection chains
   require every match to carry the identity (red-team, accepted).
+- **No unbounded leak; jsdom windows are closed as hygiene.** A measured
+  leak audit (async-realistic, event-loop-turning runs on 1 MB captures)
+  found heap *plateaus*, not growth: the engine `await`s a macrotask
+  (`runner.repair`, `cypress.run`) between heals, so per-heal jsdom windows
+  are reclaimed. The module-level caches, the `fail` listener, the `cmd:`
+  child, and aria-snapshot's refcounted `beginAriaCaches`/`endAriaCaches`
+  (`finally`-released `Map<Element>`) were all cleared. Still, `parseDom`
+  consumers now release their window through `closeWindow`/`withParsedDom`
+  ([heal/dom-env.ts](packages/goldseam/src/heal/dom-env.ts)) in a `finally`
+  after the last read — correct jsdom lifecycle, and a guard so a *future*
+  tight synchronous parse loop (no `await`) can't OOM. Behavior-neutral: the
+  release runs after counts/verdicts (plain values) are computed.
+- **`countTextMatches` and `deepestTextBearer` are O(N × subtree) on very
+  large DOMs** ([heal/resolve.ts](packages/goldseam/src/heal/resolve.ts),
+  [heal/dom-window.ts](packages/goldseam/src/heal/dom-window.ts)) — each
+  reads full `textContent` per element and per child, ~2.7 s on a synthetic
+  36 K-element capture. Correct and bounded (offline, fires only on a
+  `cy.contains()` edit), just slow on pathological pages; a single
+  post-order accumulation would linearize it. Deferred: a speed fix on a
+  trust-adjacent counter needs an exact-semantics parity test, and the
+  maintainer deprioritized speed for this pass (measured, accepted).
+- **The oracle rung's aria-tree build does not scale to giant DOMs** —
+  `getAllByAria` over a 36 K-element capture did not finish in minutes
+  (`generateAriaTree` visits every node computing roles/names). The rung is
+  opt-in (`recordOracles` or a hand-written `oracle.json`); on such a page
+  it would dominate the heal. No fix — the aria-walk cost is inherent, not a
+  bug — but recorded so a future scaling pass has the number (measured,
+  accepted).
 
 ## Noise
 

@@ -23,7 +23,7 @@
 // DOM neighborhood around it. The window is a page *region*, wide enough that
 // the model still does real disambiguation — we never hand it the answer.
 
-import { parseDom } from './dom-env';
+import { closeWindow, parseDom } from './dom-env';
 
 /**
  * Empty the *bodies* of <style>/<script> elements, keeping the opening tag
@@ -281,6 +281,12 @@ function emitWindow(anchor: Anchor, budget: number): WindowResult {
  * the budget, and can never break a heal that worked on the narrower slice.
  */
 export function windowDom(domHtml: string, input: WindowInput): WindowResult {
+  // Own the two parse windows and close them once the result string is built.
+  // The slim window must stay open through emitWindow (it serializes live
+  // anchor nodes); the finally runs after the return expression evaluates, so
+  // the html is already a string by the time either window closes.
+  let headWindow: ReturnType<typeof parseDom>['window'] | undefined;
+  let slimWindow: ReturnType<typeof parseDom>['window'] | undefined;
   try {
     const slim = deboilerplateDom(domHtml);
     if (slim.length <= input.budget) return { html: slim, strategy: 'whole', truncated: false };
@@ -289,10 +295,14 @@ export function windowDom(domHtml: string, input: WindowInput): WindowResult {
     // Parse only the head (not the whole page) — if it does, keep today's
     // behavior verbatim.
     const head = slim.slice(0, input.budget);
-    if (findAnchor(parseDom(head).document, input)) return headFirst(slim, input.budget);
+    const headParsed = parseDom(head);
+    headWindow = headParsed.window;
+    if (findAnchor(headParsed.document, input)) return headFirst(slim, input.budget);
 
     // Head-first would give up. Try to window around an anchor in the full DOM.
-    const anchor = findAnchor(parseDom(slim).document, input);
+    const slimParsed = parseDom(slim);
+    slimWindow = slimParsed.window;
+    const anchor = findAnchor(slimParsed.document, input);
     if (!anchor) return headFirst(slim, input.budget * NO_ANCHOR_FALLBACK_FACTOR);
     return emitWindow(anchor, input.budget);
   } catch {
@@ -300,5 +310,8 @@ export function windowDom(domHtml: string, input: WindowInput): WindowResult {
     // fail a heal — fall back to the plain slice.
     const slim = deboilerplateDom(domHtml);
     return headFirst(slim, input.budget);
+  } finally {
+    closeWindow(headWindow);
+    closeWindow(slimWindow);
   }
 }

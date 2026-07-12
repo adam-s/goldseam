@@ -10,6 +10,14 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal internals: `parseDom` consumers (triage, resolve, oracle, the prompt
+  window) now release their jsdom window through `closeWindow`/`withParsedDom`
+  after the last read — correct lifecycle and a guard against a future
+  tight-loop caller OOMing. Behavior-neutral (counts and verdicts are computed
+  before release). A measured leak audit found no unbounded growth in the
+  engine; the offline text-match helpers' O(N × subtree) cost on giant DOMs
+  and the oracle rung's aria-walk scaling are recorded as accepted, deferred
+  findings.
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a

@@ -18,9 +18,7 @@
 // deferred to the rerun rungs, never a silent verdict either way.
 
 import { RepairEdit } from './types';
-import { parseDom as parseDomFull } from './dom-env';
-
-const parseDom = (html: string): Document => parseDomFull(html).document;
+import { closeWindow, parseDom } from './dom-env';
 
 export interface MatchCount {
   count: number;
@@ -87,17 +85,24 @@ export function countSelectorMatches(
     const stripped = selector.replace(strip === 'state' ? STATE_PSEUDOS : JQUERY_PSEUDOS, '').trim();
     if (stripped && stripped !== selector) attempts.push({ sel: stripped, approximate: true });
   }
-  let document: Document | undefined;
-  for (const attempt of attempts) {
-    try {
-      document ??= parseDom(domHtml);
-      const { total, frame } = countIn(document, attempt.sel);
-      return { count: total, approximate: attempt.approximate, frameCount: frame };
-    } catch {
-      // invalid selector — try the stripped form, else not checkable
+  // Parse once, reuse across the (at most two) selector attempts, and close
+  // the window after the LAST read — closing between attempts would tear down
+  // the document the stripped-selector retry still needs to query.
+  let parsed: { document: Document; window: ReturnType<typeof parseDom>['window'] } | undefined;
+  try {
+    for (const attempt of attempts) {
+      try {
+        parsed ??= parseDom(domHtml);
+        const { total, frame } = countIn(parsed.document, attempt.sel);
+        return { count: total, approximate: attempt.approximate, frameCount: frame };
+      } catch {
+        // invalid selector — try the stripped form, else not checkable
+      }
     }
+    return null;
+  } finally {
+    closeWindow(parsed?.window);
   }
-  return null;
 }
 
 /**
@@ -107,21 +112,26 @@ export function countSelectorMatches(
  * absence.
  */
 export function countTextMatches(domHtml: string, text: string): number {
-  const roots: ParentNode[] = [parseDom(domHtml)];
-  let n = 0;
-  while (roots.length > 0) {
-    const root = roots.pop()!;
-    for (const el of Array.from(root.querySelectorAll('*'))) {
-      if (!el.textContent?.includes(text)) continue;
-      if (!Array.from(el.children).some((c) => c.textContent?.includes(text))) n++;
+  const { document, window } = parseDom(domHtml);
+  try {
+    const roots: ParentNode[] = [document];
+    let n = 0;
+    while (roots.length > 0) {
+      const root = roots.pop()!;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        if (!el.textContent?.includes(text)) continue;
+        if (!Array.from(el.children).some((c) => c.textContent?.includes(text))) n++;
+      }
+      for (const t of Array.from(
+        root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+      )) {
+        roots.push((t as HTMLTemplateElement).content);
+      }
     }
-    for (const t of Array.from(
-      root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
-    )) {
-      roots.push((t as HTMLTemplateElement).content);
-    }
+    return n;
+  } finally {
+    closeWindow(window);
   }
-  return n;
 }
 
 export interface StringSite {
