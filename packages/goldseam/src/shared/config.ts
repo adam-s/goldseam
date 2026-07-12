@@ -40,6 +40,12 @@ export interface GoldseamHealConfig {
 /** Author-only (`cy.goldseam`) knobs. */
 export interface GoldseamAuthorConfig {
   promptsDir?: string;
+  /** Char budget for the DOM embedded in the translate prompt. At or under
+   * it, the whole stripped body is sent; over it, a step-anchored window is
+   * emitted (falling back to a head-first slice when no anchor is found).
+   * Default 40000 — set lower (e.g. 16000) for small-context self-hosted
+   * models whose token window can't hold the larger slice. */
+  domBudget?: number;
 }
 
 /** The shape a `goldseam.config.mjs` may `export default`. Every field is
