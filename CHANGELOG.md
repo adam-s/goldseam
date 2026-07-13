@@ -14,13 +14,16 @@ Everything below is unreleased work toward it.
   (`author.representation: 'aria'`, `plugin/aria-outline.ts`). Instead of raw
   page HTML, the model can be given a compact accessibility outline — one line
   per interactive/landmark element carrying a `deriveSelector` locator verified
-  unique. In a session experiment it grounded 8/9 vs 6/9 raw at fewer tokens
-  and structurally dissolves the large-page cut (the whole interactive surface
-  fits the budget). **Default is unchanged** (`'dom'`, the raw-DOM window —
-  byte-identical); `'aria'` falls back to the raw-DOM window whenever the
-  outline can't be produced (parse error, closed-shadow-only, no groundable
-  node), so it is never worse. Composes with the selector-verify pass
-  (aria-derived selectors resolve by construction). Bench baseline held.
+  unique. Measured live (28 sites, Opus): ~29% denser overall and up to 57% on
+  pages where the raw-DOM window hits its budget cap, structurally dissolving
+  the large-page cut — but NOT a universal win (worse on shadow-host and
+  hidden-`input` pages, where the a11y tree omits the target), which is exactly
+  why it is opt-in, not the default. **Default is unchanged** (`'dom'`, the
+  raw-DOM window — byte-identical); `'aria'` falls back to the raw-DOM window
+  whenever the outline can't be produced (parse error, closed-shadow-only, no
+  groundable node), so it is never worse than default. Composes with the
+  selector-verify pass (aria-derived selectors resolve by construction). Bench
+  baseline held.
 - Authoring prompt: **emit a verifying assert when a step names an outcome**
   (`translate-rules.ts`). When a step explicitly names a result — something
   appears/opens, disappears/closes, or a message/toast shows — the translator
