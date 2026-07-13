@@ -9,7 +9,8 @@ import { DEFAULT_HEAL_OPTIONS, healArtifactFile } from '../heal/engine';
 import { preflightRunner, resolveRunner } from '../heal/runners';
 import { HealOptions } from '../heal/types';
 import { SUPPORT_SNIPPET, wireConfigSource, wireSupportSource } from './init';
-import { renderEntry } from './eject';
+import { renderCommand, renderEntry } from './eject';
+import { InvalidScene, parseScene, renderImportedSpec, sceneToCommands } from './import';
 import { ReportEntry, buildReport, renderMarkdown } from './report';
 import { FailureArtifact } from '../shared/types';
 import { HealArtifact } from '../heal/types';
@@ -22,6 +23,7 @@ Usage:
   goldseam heal [options]   read failure artifacts, propose + verify selector fixes
   goldseam report [options] per-test summary of captures + heals
   goldseam eject            render cached cy.goldseam translations as plain Cypress code
+  goldseam import <file>    compile a recorded journey (scene.json) to a Cypress spec, no model
   goldseam pr               open PR(s) from verified heals            (not yet)
 
 Config: an optional goldseam.config.mjs at the project root supplies
@@ -51,6 +53,11 @@ report options:
   --out <file>            write to a file instead of stdout
   --failures-dir/--heals-dir as above
 
+import options:
+  --base <url>            resolve relative goto/chrome urls against this base
+                          (falls back to the scene's own "base" field)
+  --out <file>            write the spec to a file instead of stdout
+
 The app under test must be reachable (same requirement as \`cypress run\`)
 for the rerun stages.
 `;
@@ -73,6 +80,7 @@ const COMMAND_FLAGS: Record<string, Set<string>> = {
   ]),
   report: new Set(['--format', '--out', '--failures-dir', '--heals-dir']),
   eject: new Set(['--prompts-dir']),
+  import: new Set(['--base', '--out']),
 };
 
 /** Print usage on --help/-h; reject unknown flags. Returns an exit code to
@@ -365,6 +373,54 @@ async function eject(): Promise<number> {
   return 0;
 }
 
+async function importScene(): Promise<number> {
+  // The journey file is the first positional token after `import`; --base and
+  // --out each consume the following token.
+  const rest = process.argv.slice(3);
+  let file: string | undefined;
+  for (let i = 0; i < rest.length; i++) {
+    const t = rest[i];
+    if (t === '--base' || t === '--out') { i++; continue; }
+    if (t.startsWith('-')) continue; // unknown flags already rejected by checkFlags
+    if (file === undefined) file = t;
+  }
+  if (!file) {
+    console.error('goldseam import: needs a journey file — usage: goldseam import <journey.json>');
+    return 1;
+  }
+  if (!existsSync(file)) {
+    console.error(`goldseam import: no such file "${file}"`);
+    return 1;
+  }
+
+  let scene;
+  try {
+    scene = parseScene(readFileSync(file, 'utf8'));
+  } catch (e) {
+    // A bad file errors clearly, never a raw stack.
+    console.error(`goldseam import: ${file}: ${e instanceof InvalidScene ? e.message : e instanceof Error ? e.message : e}`);
+    return 1;
+  }
+
+  const { commands, unmapped } = sceneToCommands(scene, { base: arg('--base') });
+  if (commands.length === 0) {
+    // An all-dropped scene is honest, not a crash: report what was dropped.
+    console.error(`goldseam import: ${file}: no reproducible browser interactions — all ${unmapped.length} beat(s) dropped:`);
+    for (const u of unmapped) console.error(`  [beat ${u.index}] ${u.do} — ${u.why}`);
+    return 1;
+  }
+
+  const spec = renderImportedSpec({ commands, unmapped }, file, renderCommand);
+  const out = arg('--out');
+  if (out) {
+    writeFileSync(out, spec);
+    console.log(`goldseam import: wrote ${out} (${commands.length} command(s), ${unmapped.length} beat(s) dropped)`);
+  } else {
+    process.stdout.write(spec);
+  }
+  return 0;
+}
+
 /** Run an async command, exit with its code, and frame any rejection as
  * `goldseam <name>: <message>` — one error contract for every command. */
 const runAsync = (name: string, fn: () => Promise<number>): void => {
@@ -394,6 +450,9 @@ switch (command) {
     break;
   case 'eject':
     runAsync('eject', eject);
+    break;
+  case 'import':
+    runAsync('import', importScene);
     break;
   case 'pr':
     console.error(`goldseam ${command}: not implemented yet`);
