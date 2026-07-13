@@ -93,6 +93,13 @@ export function sceneToCommands(
   };
 
   list.forEach((beat, index) => {
+    // A scene is external data — a non-object beat (null, string, number) is
+    // malformed, not a crash. Record it as dropped rather than dereferencing
+    // `.do` on it (red-team finding: `[null]` threw an internal TypeError).
+    if (typeof beat !== 'object' || beat === null || Array.isArray(beat)) {
+      unmapped.push({ index, do: '(none)', why: 'beat is not an object' });
+      return;
+    }
     let dropped: string | null = null;
     switch (beat.do) {
       case 'goto':
@@ -207,6 +214,12 @@ export function parseScene(json: string): Scene | SceneBeat[] {
 /** Render a compiled scene as a runnable Cypress spec, with a header that
  * names the source and honestly lists every dropped beat. `renderLine`
  * renders one StepCommand (the authoring `eject` renderCommand). */
+/** Collapse newlines so a scene-derived value emitted into a `//` line cannot
+ * break out of the comment. A beat's `do` (and the source path) is external
+ * data; without this, `{"do":"x\nMALICIOUS\n//"}` would inject a line of code
+ * at the top of the generated spec (red-team finding). */
+const commentSafe = (s: string): string => String(s).replace(/\s*[\r\n]+\s*/g, ' ');
+
 export function renderImportedSpec(
   compiled: CompiledScene,
   source: string,
@@ -214,12 +227,12 @@ export function renderImportedSpec(
 ): string {
   const { commands, unmapped } = compiled;
   const header: string[] = [
-    `// goldseam import — compiled from ${source} with ZERO model calls.`,
+    `// goldseam import — compiled from ${commentSafe(source)} with ZERO model calls.`,
     `// A recorded journey holds real, reviewed selectors; nothing was translated.`,
     `// ${commands.length} command(s) emitted; ${unmapped.length} beat(s) dropped as non-interactive:`,
   ];
   for (const u of unmapped) {
-    header.push(`//   [beat ${u.index}] ${u.do} — ${u.why}`);
+    header.push(`//   [beat ${u.index}] ${commentSafe(u.do)} — ${commentSafe(u.why)}`);
   }
   if (unmapped.length === 0) header.push('//   (none)');
 

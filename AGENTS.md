@@ -340,14 +340,32 @@ Tradeoffs, not oversights:
   those selectors are deferred (accepted), not rejected. Verify therefore has
   teeth mainly when the author is already on the target page (the heal-a-page
   and single-page-app authoring cases). The guarded re-derive fires only when
-  EXACTLY ONE command's selector failed AND exactly one strong anchor resolves
-  uniquely: multiple simultaneous hallucinations, or a target with no
-  quoted/proper-noun name, go straight to retranslate rather than risk
-  mis-mapping a step's text to the wrong failing command. Shadow-scoped
-  selectors are existence-checked (host present + inner selector matches inside
-  it) but never re-derived. All conservative: the honesty rule is "never ship a
-  non-resolving selector, never guess an ambiguous one" — a deferred selector
-  is one the model still answered for, not one we invented.
+  the translation is a SINGLE step AND exactly one command's selector failed AND
+  exactly one strong anchor resolves uniquely. The single-step gate is
+  load-bearing: no command→step provenance is tracked, so with several steps the
+  winning anchor could belong to a DIFFERENT step than the failing command, and
+  patching that command with it is a cross-step impostor (red-team finding —
+  `["Click the \"Ember Mug\"", "Submit the form"]` where Submit hallucinates).
+  Multiple simultaneous hallucinations, a multi-step list, or a target with no
+  quoted/proper-noun name go straight to retranslate rather than risk a
+  mis-map. Shadow-scoped selectors are existence-checked (host present + inner
+  selector matches inside it) but never re-derived. All conservative: the
+  honesty rule is "never ship a non-resolving selector, never guess an ambiguous
+  one" — a deferred selector is one the model still answered for, not invented.
+- **A `not.exist` disappearance assert can pass vacuously (accepted).** The
+  outcome-assert prompt rule emits `{selector, should:'not.exist'}` for a named
+  disappearance; `verifyCommands` deliberately does NOT verify `assert` targets
+  (an assert may legitimately point at future-state content), so a model that
+  picks a never-present selector yields an assertion that passes testing
+  nothing. Low-likelihood (the rule fires only when the step names a
+  disappearance and the model usually names the real element); a future guard
+  could confirm a `not.exist` target WAS present in the pre-action capture, but
+  that risks false-rejecting a legitimate "already absent" assertion, so it is
+  deferred. The `firstBalancedObject` reply-scan errs safe (a wrong slice from
+  leading JSON-ish prose fails to parse → retranslate/give-up, never accepts a
+  weakened edit), and `selector-score`'s short-prefix-counter heuristic can
+  flag a human id like `#page404` as volatile — review-only, never blocks, the
+  reason is shown (both red-team, accepted).
 - **The authoring settle is best-effort and capture-path-only.**
   `waitForDomStable` ([support/settle.ts](packages/goldseam/src/support/settle.ts))
   runs INSIDE `cy.goldseam` before the FIRST-run translation capture only —
