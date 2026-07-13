@@ -137,6 +137,23 @@ describe('rederiveUnresolved — impostor-guarded identity', () => {
     expect((out.commands[0] as { selector: string }).selector).toBe('[data-testid="signin-link"]');
   });
 
+  it('does NOT re-derive across steps — a winning anchor may belong to a DIFFERENT step', () => {
+    // Two steps; the second command hallucinates. "Ember Mug" (step 1) resolves
+    // uniquely, but it is NOT the failing "Submit" step's target — patching
+    // Submit with the Mug's selector would be a cross-step impostor (red-team).
+    const two: StepCommand[] = [
+      { action: 'click', selector: '[data-testid="ember-mug"]' }, // resolves
+      { action: 'click', selector: '[data-testid="ghost-submit"]' }, // hallucinated
+    ];
+    const dom = '<body><button data-testid="ember-mug">Ember Mug</button></body>';
+    const unresolved = verifyCommands(two, dom);
+    expect(unresolved).toHaveLength(1); // only the submit failed
+    const out = rederiveUnresolved(two, unresolved, ['Click the "Ember Mug"', 'Submit the form'], dom);
+    // steps.length > 1 → no guess; Submit is left for retranslate / give-up.
+    expect(out.remaining).toEqual(unresolved);
+    expect(out.commands).toBe(two);
+  });
+
   it('does NOT guess when the target text is ambiguous (>1 element)', () => {
     const dom = '<body><button>Sign In</button><a href="/login">Sign In</a></body>';
     const unresolved = verifyCommands(commands, dom);

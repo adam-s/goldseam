@@ -176,3 +176,33 @@ describe('renderImportedSpec — renders valid Cypress', () => {
     for (const cmd of compiled.commands) expect(spec).toContain(renderCommand(cmd));
   });
 });
+
+describe('goldseam import — hostile scene data (red-team)', () => {
+  it('a newline in a beat.do cannot break out of the header comment', () => {
+    const compiled = sceneToCommands([
+      { do: 'x\n    throw new Error("injected")\n    //' } as unknown as SceneBeat, // unknown do → dropped + recorded
+      { do: 'goto', url: '/' },
+    ]);
+    const spec = renderImportedSpec(compiled, 'scene.json', renderCommand);
+    for (const line of spec.split('\n')) {
+      if (line.startsWith('describe(')) break;
+      const ok = line === '' || line.startsWith('//');
+      expect(ok, `stray non-comment header line: ${JSON.stringify(line)}`).toBe(true);
+    }
+    expect(spec).not.toMatch(/^\s*throw new Error\("injected"\)/m);
+  });
+
+  it('a source path with a newline is sanitized in the header', () => {
+    const compiled = sceneToCommands([{ do: 'goto', url: '/' }]);
+    const spec = renderImportedSpec(compiled, 'a.json\nEVIL()', renderCommand);
+    expect(spec).not.toMatch(/^EVIL\(\)/m);
+  });
+
+  it('a non-object beat (null) is dropped, not a crash', () => {
+    const beats = [null as unknown as SceneBeat, { do: 'goto', url: '/' }];
+    expect(() => sceneToCommands(beats)).not.toThrow();
+    const compiled = sceneToCommands(beats);
+    expect(compiled.unmapped.some((u) => u.why.includes('not an object'))).toBe(true);
+    expect(compiled.commands).toHaveLength(1); // the goto survived
+  });
+});

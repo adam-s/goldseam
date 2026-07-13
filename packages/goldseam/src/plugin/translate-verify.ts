@@ -229,6 +229,15 @@ export function rederiveUnresolved(
 ): { commands: StepCommand[]; remaining: UnresolvedSelector[] } {
   const noop = { commands, remaining: unresolved };
   if (unresolved.length !== 1) return noop; // ambiguous mapping → don't guess
+  // Re-derive ONLY for a single-step translation. We track no command→step
+  // provenance, so with several steps the winning anchor could belong to a
+  // DIFFERENT step than the failing command — patching the failing command
+  // with that anchor's element is a cross-step impostor (red-team finding:
+  // `["Click the \"Ember Mug\"", "Submit the form"]` where Submit hallucinates
+  // and only "Ember Mug" resolves would silently give Submit the Mug's
+  // selector). One step ⇒ the anchor provably owns the failing command; more
+  // than one ⇒ don't guess, fall through to retranslate / give-up.
+  if (steps.length !== 1) return noop;
   const target = unresolved[0];
   if (target.shadow) return noop; // shadow re-derive is out of scope
   const anchors = strongAnchors(steps);
