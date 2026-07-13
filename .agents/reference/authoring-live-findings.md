@@ -107,19 +107,17 @@ Ranked by measured value:
    selectors + `done{}` postconditions would ground translation better than a
    DOM snapshot alone.
 
-## Known follow-ups (fixes, not features)
+## Known follow-ups — both now RESOLVED
 
-- **`heal/dom-window.ts` `emitWindow` scaffold-overflow.** Same bug the
-  authoring window just fixed: a deep, attribute-heavy ancestor chain can push
-  the emitted region past the budget even with the body trimmed to zero, so the
-  "hard-bounded" invariant is aspirational there. Port the final
-  `slice(0, budget)` clamp.
-- **`heal/parse.ts` `parseJsonBlock` rejects a valid object + trailing prose.**
-  It strips a code fence, then `JSON.parse`s the WHOLE reply (parse.ts:15), so a
-  reply like `{"commands":[…]}\n\nWait — let me double-check…` fails outright.
-  Opus intermittently appends self-doubt prose after a complete JSON object;
-  this fails real-model heal AND authoring translation with a parse error, not
-  a capability miss. Fix: on a failed direct parse, fall back to extracting the
-  first balanced `{…}` object (brace-depth scan that respects strings/escapes)
-  and parse that; keep the strict path for genuinely malformed replies. Cheap,
-  cross-cutting, purely additive robustness.
+- **`heal/dom-window.ts` `emitWindow` scaffold-overflow — already fixed.** The
+  final `slice(0, budget)` clamp was added by the "window bound" trust-hardening
+  pass; a deep attribute-heavy scaffold can no longer push the emitted region
+  past the budget. (The exp1 note that flagged this predated that merge.)
+- **`heal/parse.ts` `parseJsonBlock` trailing-prose — fixed.** It stripped a
+  code fence then `JSON.parse`d the WHOLE reply, so `{"commands":[…]}\n\nWait —
+  let me double-check…` (Opus intermittently appends self-doubt after a complete
+  object) failed outright — a parse error on real-model heal AND authoring, not
+  a capability miss. Now: on a failed direct parse it falls back to the first
+  balanced `{…}` object (brace-depth scan respecting strings/escapes), handling
+  prose on either side; the strict path still rejects a reply with no parseable
+  object. Pinned in heal-validate.test.ts.
