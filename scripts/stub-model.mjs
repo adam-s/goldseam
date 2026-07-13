@@ -72,6 +72,19 @@ const REPLIES = {
   'translate-giveup': {
     giveUp: { reason: 'two checkboxes match "the checkbox" — say which one' },
   },
+  // Selector-verify: hallucinate a selector that does NOT exist in the DOM on
+  // the first attempt; once the verify feedback ("match NOTHING") appears in
+  // the prompt, emit the selector the page actually carries. Proves the
+  // verify → retranslate → success path.
+  'translate-hallucinate-then-fix': (prompt) =>
+    /match NOTHING/.test(prompt)
+      ? { commands: [{ action: 'click', selector: '[data-testid="real-target"]' }] }
+      : { commands: [{ action: 'click', selector: '[data-testid="ghost-target"]' }] },
+  // Persistent hallucination: the model never corrects. Verify must exhaust
+  // its retries and cache a giveUp naming the offending selector.
+  'translate-hallucinate-always': {
+    commands: [{ action: 'click', selector: '[data-testid="ghost-target"]' }],
+  },
   // Repeated selector: one edit per occurrence, each made unique by its
   // surrounding call chain.
   multi: {
@@ -121,10 +134,15 @@ const REPLIES = {
   },
 };
 
+// Collect the prompt so prompt-aware modes (e.g. the verify retranslate loop)
+// can branch on its content; static modes ignore it.
+let prompt = '';
+process.stdin.on('data', (d) => (prompt += d));
 process.stdin.on('end', () => {
   if (!(mode in REPLIES)) {
     console.error(`stub-model: unknown mode "${mode}" (have: ${Object.keys(REPLIES).join(', ')})`);
     process.exit(1);
   }
-  console.log(JSON.stringify(REPLIES[mode]));
+  const reply = REPLIES[mode];
+  console.log(JSON.stringify(typeof reply === 'function' ? reply(prompt) : reply));
 });

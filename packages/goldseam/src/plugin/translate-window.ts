@@ -26,7 +26,7 @@ import { parseDom } from '../heal/dom-env';
  * an unfiltered capitalized-word pass would treat "Click" as a distinctive
  * label (windowing an arbitrary region) and "The" would match in the head
  * slice and defeat the zero-regression gate. */
-const STEP_STOP = new Set([
+export const STEP_STOP = new Set([
   'the', 'a', 'an', 'into', 'in', 'on', 'to', 'of', 'and', 'or', 'for', 'with', 'from',
   'that', 'this', 'click', 'type', 'select', 'check', 'uncheck', 'enter', 'press', 'set',
   'choose', 'link', 'button', 'tab', 'field', 'box', 'input', 'navigation', 'menu', 'nav',

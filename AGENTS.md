@@ -183,6 +183,22 @@ of what else improves:
   uniqueness. Review flags (`reviewFlags`) route human attention and
   never block a heal. Catalog + verdict per ambiguity class:
   [.agents/reference/disambiguation.md](.agents/reference/disambiguation.md).
+- **Authoring verifies every translated selector against the captured DOM**
+  ([plugin/translate-verify.ts](packages/goldseam/src/plugin/translate-verify.ts))
+  — authoring has NO rerun rung, so a hallucinated selector (one that matches
+  nothing in the DOM the model saw) is caught here or never. `translateSteps`
+  runs `verifyCommands` after `validateCommands`; a sound zero-match triggers a
+  retranslate with feedback naming the selector (capped at `MAX_VERIFY_RETRIES`),
+  then a cached give-up — a non-resolving selector is NEVER shipped. The
+  soundness rules mirror heal `resolve`: only commands BEFORE the first `visit`
+  are grounded (post-navigation selectors target a page the capture doesn't
+  hold — checking them would be a false rejection); `assert`/`visit` are never
+  verified; a selector the CSS parser can't evaluate (jQuery pseudo) is
+  ACCEPTED, never rejected. The guarded re-derive (`rederiveUnresolved`)
+  substitutes a selector only on a UNIQUE, verified identity — exactly one
+  strong anchor text (quoted/proper-noun) resolving to exactly one element
+  whose derived selector resolves back — and only when a single command failed;
+  any ambiguity defers to retranslate. It never guesses.
 - **The engine reverts on any non-healed outcome** and `apply()` is
   idempotent (also called on healed, for propose-only ladders) —
   [heal/engine.ts](packages/goldseam/src/heal/engine.ts).
@@ -302,6 +318,21 @@ Tradeoffs, not oversights:
   same step text key differently, a spurious miss the load-time step recheck
   makes harmless — efficiency only, `.normalize('NFC')` deferred until churn
   is observed since it would also rekey existing entries.)
+- **Authoring selector-verify is scoped and single-target by design.**
+  `verifyCommands` ([plugin/translate-verify.ts](packages/goldseam/src/plugin/translate-verify.ts))
+  grounds only the commands before the first `visit` — a translated flow that
+  navigates away targets a page the authoring-time capture doesn't hold, so
+  those selectors are deferred (accepted), not rejected. Verify therefore has
+  teeth mainly when the author is already on the target page (the heal-a-page
+  and single-page-app authoring cases). The guarded re-derive fires only when
+  EXACTLY ONE command's selector failed AND exactly one strong anchor resolves
+  uniquely: multiple simultaneous hallucinations, or a target with no
+  quoted/proper-noun name, go straight to retranslate rather than risk
+  mis-mapping a step's text to the wrong failing command. Shadow-scoped
+  selectors are existence-checked (host present + inner selector matches inside
+  it) but never re-derived. All conservative: the honesty rule is "never ship a
+  non-resolving selector, never guess an ambiguous one" — a deferred selector
+  is one the model still answered for, not one we invented.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
 - **Prompt DOM windowing anchors on light-DOM/template content only, and
