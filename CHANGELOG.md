@@ -10,6 +10,13 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring cache hardening: `loadPromptCache` now validates `schemaVersion`
+  on load (a mismatched/hand-edited/foreign entry retranslates instead of
+  replaying with wrong command semantics), and the FNV key delimiter is now the
+  explicit `\u0000` escape (byte-identical to the prior invisible NUL, so zero
+  cache invalidation) so a contributor cannot silently change it to a colliding
+  space.
+
 - Authoring prompt: a **step-anchored DOM window** + configurable budget
   (`author.domBudget`, `translate-window.ts`) — the authoring twin of the heal
   window. When the stripped translation DOM overflows the budget, instead of a

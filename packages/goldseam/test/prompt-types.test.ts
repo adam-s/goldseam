@@ -13,6 +13,15 @@ describe('promptKey', () => {
     expect(promptKey(['a', 'b'])).not.toBe(promptKey(['a', 'c']));
   });
 
+  it('the delimiter defeats join-ambiguity — different step splits never collide', () => {
+    // The key joins on a NUL, not a space, so two DIFFERENT step lists that
+    // would share a space-joined string get distinct keys. A future "cleanup"
+    // to a literal space would reintroduce this collision (and rekey every
+    // committed cache file) — this pins against it.
+    expect(promptKey(['a b', 'c'])).not.toBe(promptKey(['a', 'b c']));
+    expect(promptKey(['click', 'submit'])).not.toBe(promptKey(['click submit']));
+  });
+
   it('keys on the token text, not a substituted value (values never collapse into the token)', () => {
     // The key is derived from the step text WITH `{{pwd}}` intact; a step
     // carrying a literal value is a different step and must key differently.
