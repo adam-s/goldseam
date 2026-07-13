@@ -133,9 +133,17 @@ function persist(promptsDir: string, key: string, entry: PromptCacheEntry): void
 export function loadPromptCache(promptsDir: string, key: string): PromptCacheEntry | null {
   const file = join(promptsDir, `${key}.json`);
   if (!existsSync(file)) return null;
+  let entry: PromptCacheEntry;
   try {
-    return JSON.parse(readFileSync(file, 'utf8')) as PromptCacheEntry;
+    entry = JSON.parse(readFileSync(file, 'utf8')) as PromptCacheEntry;
   } catch {
     return null; // corrupt cache regenerates
   }
+  // The prompt-cache schema is a public API like the capture/heal artifacts;
+  // `persist` stamps `schemaVersion` but nothing validated it on load, so an
+  // entry from a future breaking bump (or a hand-edited/foreign committed file)
+  // would replay with mismatched command semantics — silently wrong. Mirror the
+  // heal engine: a version mismatch means "don't trust this entry" → retranslate.
+  if (Math.floor(entry?.schemaVersion as number) !== PROMPT_SCHEMA_VERSION) return null;
+  return entry;
 }

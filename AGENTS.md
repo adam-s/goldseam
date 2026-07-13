@@ -291,6 +291,17 @@ Tradeoffs, not oversights:
   selector appears; near-miss selectors (same element, different
   locator style) still go to the model. Semantic keying (aria identity)
   is Phase-2 work.
+- **The prompt cache (`.goldseam-prompts/`) does not invalidate on a model
+  change.** `promptKey` is FNV-1a over the steps joined on a NUL delimiter (never a literal space — a space would collide `["a b","c"]` with
+  `["a","b c"]` and rekey every committed file), and the entry records
+  `model`/`schemaVersion` but only `schemaVersion` gates the load. Switching
+  the configured model reuses a committed translation by design — a reviewed,
+  git-shared translation shouldn't silently invalidate because someone
+  reconfigured a model; delete the entry (or edit a step) to retranslate.
+  (Cross-machine NUL vs NFC filename note: two Unicode normalizations of the
+  same step text key differently, a spurious miss the load-time step recheck
+  makes harmless — efficiency only, `.normalize('NFC')` deferred until churn
+  is observed since it would also rekey existing entries.)
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
 - **Prompt DOM windowing anchors on light-DOM/template content only, and
