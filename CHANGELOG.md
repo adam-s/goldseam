@@ -10,6 +10,15 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring: a bounded **DOM-stability settle** before the first-run
+  translation capture (`support/settle.ts`). SPA/AJAX pages paint the target
+  after load, so a snapshot taken the instant `cy.goldseam` runs sees stale
+  markup; a `MutationObserver` now waits for ~200ms of quiescence (hard-capped,
+  default 1500ms) so late content is captured. Opt-out/tunable via
+  `cy.goldseam(steps, { settle })` or the plugin-wide `Cypress.env('goldseam')`
+  `settle`. Transparency-safe: capture-path-only (never the cache-hit replay or
+  the general suite), the observer is always disconnected, and it never throws
+  (any failure degrades to capturing immediately).
 - Authoring **verifies every translated selector against the captured DOM**
   (`plugin/translate-verify.ts`). Authoring has no rerun rung, so a hallucinated
   action selector (matches nothing in the page the model saw) is caught here or

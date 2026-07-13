@@ -4,8 +4,13 @@
 // in front of someone's suite. A capture failure must never mask (or
 // green-light) the real test failure, and green runs must stay silent.
 
-import { beforeEach as vitestBeforeEach, describe, expect, it } from 'vitest';
+import { beforeEach as vitestBeforeEach, describe, expect, it, vi } from 'vitest';
 import { CAPTURE_TASK, FailureCapture } from '../src/shared/types';
+import {
+  SETTLE_MAX_MS,
+  resolveSettleMs,
+  waitForDomStable,
+} from '../src/support/settle';
 
 type Handler = (...args: any[]) => unknown;
 
@@ -188,5 +193,98 @@ describe('allowCypressEnv: false compatibility', () => {
     } finally {
       cypressGlobal.env = realEnv;
     }
+  });
+});
+
+// The authoring translation settle: a bounded DOM-stability wait BEFORE the
+// first-run capture so late SPA/AJAX content is present. Driven at the helper
+// level (`waitForDomStable`) — the full cy.goldseam command needs a real
+// Cypress runtime, but the settle mechanism and its bounds are pure and jsdom
+// has MutationObserver. Small bounds keep these fast.
+describe('authoring translation settle', () => {
+  vitestBeforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('waits for the DOM to go quiet before capturing (late content is present)', async () => {
+    const root = document.documentElement;
+    const started = Date.now();
+    // A node painted after the command runs — the exact SPA/AJAX case.
+    setTimeout(() => {
+      const late = document.createElement('div');
+      late.id = 'late-ajax-content';
+      late.textContent = 'arrived after load';
+      document.body.appendChild(late);
+    }, 25);
+
+    await waitForDomStable(root, { quietMs: 40, maxMs: 500 });
+    const elapsed = Date.now() - started;
+
+    // Resolved only after a full quiet window past the last mutation…
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+    // …and well before the cap, since the page did quiesce.
+    expect(elapsed).toBeLessThan(500);
+    // A capture taken now sees the late content the eager path would miss.
+    expect(root.outerHTML).toContain('late-ajax-content');
+  });
+
+  it('captures immediately when disabled (settle:false / 0 resolves to no wait)', () => {
+    // The command only calls waitForDomStable when the resolved cap is > 0;
+    // false / 0 / negative short-circuit to an immediate capture.
+    expect(resolveSettleMs(false)).toBe(0);
+    expect(resolveSettleMs(0)).toBe(0);
+    expect(resolveSettleMs(-5)).toBe(0);
+    // …while the default and an explicit override are honored.
+    expect(resolveSettleMs(undefined)).toBe(SETTLE_MAX_MS);
+    expect(resolveSettleMs(true)).toBe(SETTLE_MAX_MS);
+    expect(resolveSettleMs(600)).toBe(600);
+  });
+
+  it('fires the maxMs ceiling when the DOM never quiesces (capped, still resolves)', async () => {
+    const root = document.documentElement;
+    // Mutate faster than the quiet window forever — quiescence never arrives.
+    const churn = setInterval(() => {
+      document.body.appendChild(document.createElement('span'));
+    }, 10);
+    const started = Date.now();
+    try {
+      await waitForDomStable(root, { quietMs: 60, maxMs: 90 });
+    } finally {
+      clearInterval(churn);
+    }
+    const elapsed = Date.now() - started;
+    // It did not hang on the never-quiet page; the cap released it.
+    expect(elapsed).toBeGreaterThanOrEqual(80);
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  it('fully disconnects its observer afterward (no leak)', async () => {
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    try {
+      await waitForDomStable(document.documentElement, { quietMs: 20, maxMs: 100 });
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      disconnect.mockRestore();
+    }
+  });
+
+  it('never throws — degrades to resolving immediately when observation fails', async () => {
+    // A root whose observe() throws must not fail the author's test.
+    const hostile = {
+      ownerDocument: document,
+    } as unknown as Node;
+    const OriginalMO = MutationObserver;
+    // Force observe() to throw for this one call.
+    const spy = vi
+      .spyOn(MutationObserver.prototype, 'observe')
+      .mockImplementation(() => {
+        throw new Error('observe boom');
+      });
+    try {
+      await expect(waitForDomStable(hostile, { quietMs: 20, maxMs: 100 })).resolves.toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(MutationObserver).toBe(OriginalMO);
   });
 });

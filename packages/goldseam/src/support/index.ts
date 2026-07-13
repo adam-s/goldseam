@@ -28,6 +28,11 @@ export interface GoldseamSupportOptions {
    * verifies heals against. Opt-in: the ONE exception to "green runs
    * write nothing", and it writes only the manifest. Default false. */
   recordOracles?: boolean;
+  /** Plugin-wide default for the `cy.goldseam` translation settle — a bounded
+   * DOM-stability wait before the first-run capture so late SPA/AJAX content
+   * is present. `false`/`0` disables; a number overrides the ~1500 ms ceiling.
+   * A per-call `cy.goldseam(steps, { settle })` overrides this. Default on. */
+  settle?: boolean | number;
 }
 
 let installed = false;
