@@ -10,6 +10,17 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- CLI: **`goldseam import <journey.json>`** — compile a recorded/authored
+  browser journey (webtour/performer beats: goto/click/type/select/check/
+  hover/scroll + `done` postconditions) into a runnable Cypress spec with
+  **zero model calls**, since a recorded journey already holds real, reviewed
+  selectors. Beats map 1:1 to `StepCommand`s (`done:{sel,state}` →
+  `be.visible`/`not.exist`/`exist` asserts); staging/camera/narration/wait
+  beats and fields-missing beats are dropped and **reported** (never silently),
+  and the result passes the same `validateCommands` gate as a model
+  translation. A misshaped file errors clearly; an all-dropped scene is a
+  reported outcome, not a crash. `--base` resolves relative urls, `--out`
+  writes to a file.
 - Authoring: an **opt-in aria-outline translation representation**
   (`author.representation: 'aria'`, `plugin/aria-outline.ts`). Instead of raw
   page HTML, the model can be given a compact accessibility outline — one line
