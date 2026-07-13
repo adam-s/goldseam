@@ -9,6 +9,7 @@ import { resolveRunner } from '../heal/runners';
 import { parseJsonBlock } from '../heal/parse';
 import { writeJsonAtomic } from '../shared/fs';
 import { TRANSLATE_RULES } from './translate-rules';
+import { ariaOutline } from './aria-outline';
 import { stepAnchors, windowTranslationDom } from './translate-window';
 import {
   rederiveUnresolved,
@@ -33,6 +34,12 @@ export interface TranslatePayload {
   /** Char budget for the DOM embedded in the prompt; default 40000. Lower it
    * (e.g. 16000) for small-context self-hosted models. */
   domBudget?: number;
+  /** Which page representation to embed in the prompt. `'dom'` (default) sends
+   * the step-anchored raw-DOM window (unchanged historical behavior); `'aria'`
+   * sends a compact accessibility outline whose selectors are verified unique
+   * (`ariaOutline`), falling back to `'dom'` whenever the outline is empty or
+   * un-walkable. Opt-in via `author.representation` in goldseam.config.mjs. */
+  representation?: 'dom' | 'aria';
 }
 
 /** Default DOM budget. A small-context self-hosted model (e.g. an 8K-token
@@ -61,8 +68,39 @@ export function translationDom(
   return windowTranslationDom(stripped, stepAnchors(opts.steps ?? []), budget);
 }
 
-export function buildTranslatePrompt(payload: TranslatePayload, feedback?: string): string {
+/** The `## Current page` block embedded in the translate prompt. Default
+ * (`'dom'`) is the raw-DOM window — byte-for-byte the historical block, so the
+ * default authoring path is provably unchanged. `'aria'` swaps in a compact,
+ * selector-carrying accessibility outline (opt-in), but ONLY when `ariaOutline`
+ * returns a usable outline; a null return (empty/closed-only tree, parse error)
+ * falls straight back to the raw-DOM window. Either way the block is a page
+ * region the model grounds selectors in, and every translated selector still
+ * runs the deterministic verify pass afterward (translate-verify.ts). */
+function renderPageBlock(payload: TranslatePayload): string {
+  if (payload.representation === 'aria') {
+    const outline = ariaOutline(payload.domHtml, {
+      budget: payload.domBudget ?? DEFAULT_TRANSLATE_DOM_BUDGET,
+    });
+    if (outline !== null) {
+      return `## Current page — accessibility outline (may predate a visit step)
+URL: ${payload.url}
+Each line is an interactive or landmark element. A selector in « » is VERIFIED to match exactly one element on this page — prefer it VERBATIM as that element's selector instead of inventing one from markup. \`(shadow)\`/\`(frame)\` marks a selector that needs a shadow scope.
+\`\`\`
+${outline}
+\`\`\``;
+    }
+    // ariaOutline gave up (empty/closed-only tree, parse error) — fall through
+    // to the raw-DOM window, the default representation.
+  }
   const dom = translationDom(payload.domHtml, { budget: payload.domBudget, steps: payload.steps });
+  return `## Current page (may predate a visit step)
+URL: ${payload.url}
+\`\`\`html
+${dom || '(blank — rely on the steps and common patterns)'}
+\`\`\``;
+}
+
+export function buildTranslatePrompt(payload: TranslatePayload, feedback?: string): string {
   const correction = feedback ? `\n## Correction (your last answer was rejected)\n${feedback}\n` : '';
   return `You translate natural-language test steps into a constrained JSON command list for Cypress. You never write code — only commands from this vocabulary:
 
@@ -83,11 +121,7 @@ ${TRANSLATE_RULES}
 ## Steps
 ${payload.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
-## Current page (may predate a visit step)
-URL: ${payload.url}
-\`\`\`html
-${dom || '(blank — rely on the steps and common patterns)'}
-\`\`\`
+${renderPageBlock(payload)}
 ${correction}`;
 }
 

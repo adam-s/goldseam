@@ -46,5 +46,13 @@ export default {
   // ── Author (cy.goldseam) defaults ───────────────────────────────────
   // author: {
   //   promptsDir: '.goldseam-prompts', // committable translation cache
+  //   domBudget: 40000,        // char budget for the page sent to the model;
+  //                            // lower it (e.g. 16000) for small-context models
+  //   representation: 'dom',   // 'dom' (default) sends the raw-DOM window;
+  //                            // 'aria' sends a compact accessibility outline
+  //                            // whose selectors are verified unique — denser,
+  //                            // better-grounded, and it dissolves the
+  //                            // large-page budget cut. Falls back to 'dom'
+  //                            // automatically on an un-walkable page.
   // },
 };

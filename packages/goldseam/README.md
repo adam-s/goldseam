@@ -300,9 +300,32 @@ export default {
   // healModel: 'claude:opus',         // per-tool override (optional)
   // promptModel: 'ollama:qwen2.5:14b',
   // heal: { maxAttempts: 3, minConfidence: 0.5, cache: true },
-  // author: { promptsDir: '.goldseam-prompts' },
+  // author: { promptsDir: '.goldseam-prompts', domBudget: 40000, representation: 'dom' },
 };
 ```
+
+**Authoring page representation (`author.representation`).** By default
+(`'dom'`) `cy.goldseam()` shows the model a step-anchored slice of the
+captured page's raw HTML and asks it to copy a selector out of the markup.
+Set `representation: 'aria'` to instead send a compact **accessibility
+outline** — one line per interactive or landmark element, each carrying a
+selector that has already been verified to match exactly one element:
+
+```text
+- navigation "Main"
+  - link "Cart"  « [data-testid="cart-link"] »
+- button "Add to cart"  « [data-cy="add-1"] »
+- searchbox "Search products"  « [name="q"] »
+```
+
+The model copies a known-good selector rather than inventing one from
+markup, at a fraction of the tokens — which also dissolves the raw path's
+budget cut on large pages (the outline lists what matters instead of
+truncating markup). It is **opt-in and additive**: a page the aria walk
+can't ground (empty tree, closed-shadow-only, a parse error) transparently
+falls back to the raw-DOM window, and either way every translated selector
+still runs the same deterministic verify pass. `'aria'` is never worse than
+`'dom'`.
 
 Everything is a default. **Precedence, most specific wins:** CLI flag /
 plugin option **>** env var (`GOLDSEAM_MODEL`, `GOLDSEAM_PROMPT_MODEL`)

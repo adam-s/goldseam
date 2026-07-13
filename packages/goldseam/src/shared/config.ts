@@ -61,6 +61,14 @@ export interface GoldseamAuthorConfig {
    * Default 40000 — set lower (e.g. 16000) for small-context self-hosted
    * models whose token window can't hold the larger slice. */
   domBudget?: number;
+  /** Which page representation the translate prompt embeds. `'dom'` (default)
+   * sends the step-anchored raw-DOM window; `'aria'` sends a compact
+   * accessibility outline whose selectors are verified unique — denser and
+   * better-grounded, and it dissolves the large-page budget cut, at the cost of
+   * hiding raw markup the model might otherwise use. Opt-in and additive: an
+   * un-walkable page (empty/closed-only aria tree, parse error) transparently
+   * falls back to the raw-DOM window, so `'aria'` is never worse than `'dom'`. */
+  representation?: 'dom' | 'aria';
 }
 
 /** The shape a `goldseam.config.mjs` may `export default`. Every field is
