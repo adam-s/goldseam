@@ -13,7 +13,7 @@
 import { ariaIdentityOf, ariaSnapshot } from 'aria-snapshot';
 import { CAPTURE_TASK, FailureCapture, ORACLE_TASK } from '../shared/types';
 import { registerAuthoringCommand } from './authoring';
-import { maskText, redactedOuterHtml } from './redact';
+import { maskText, redactedOuterHtml, stripAriaControlValues } from './redact';
 import { cloneWithShadow } from './shadow';
 
 export interface GoldseamSupportOptions {
@@ -136,7 +136,11 @@ export function installGoldseam(userOptions: GoldseamSupportOptions = {}): void 
           // (cross-origin frames stay opaque leaves), matching the DOM
           // capture's <template data-frame-content> inlining.
           const aria = ariaSnapshot(doc.body, { frames: true });
-          stash.ariaSnapshot = redact ? maskText(aria) : aria;
+          // Strip text-control VALUES before pattern-masking: the aria tree
+          // renders a typed value inline (`textbox "Pw": <value>`), which
+          // maskText alone would not remove — the DOM clone strips these, the
+          // aria path must too, or passwords/PII leak to the model.
+          stash.ariaSnapshot = redact ? maskText(stripAriaControlValues(aria)) : aria;
         }
       }
     } catch (error) {

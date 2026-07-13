@@ -22,6 +22,23 @@ Everything below is unreleased work toward it.
   touched. Incumbent parity (Healenium `@DisableHealing`; cy.prompt has no
   opt-out), and beats their disable leaking through `findElements`.
 
+- Capture (security): the **aria snapshot no longer leaks text-control
+  values**. The DOM path stripped text-entry/`textarea` values, but the aria
+  path went through `maskText` (pattern-masking) only, so a typed value
+  matching no pattern — a password, a name — shipped to the model as
+  `textbox "Pw": <value>`. `stripAriaControlValues` now removes the inline
+  value (keeping role + accessible name) before masking, restoring the
+  documented "text-entry values are never captured" guarantee on both
+  surfaces.
+- Heal `resolve` rung: **scoped `.find()` uniqueness**. A whole-document
+  count is existence-only for scoped calls, so a heal to a look-alike sibling
+  inside a parent scope could pass offline. Now, for the direct
+  `cy.get('P').find('C')` shape where `P` resolves to exactly one element, the
+  rung counts `C` *within* that element and rejects a within-parent ambiguity
+  — the incumbents' cardinal "heals to the next element of the same type"
+  failure, caught offline. Sound, not complete: any other shape (chained
+  parent, `.within()`, variable subject, jQuery-pseudo child) defers to the
+  rerun, so an over-approximation never rejects.
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a

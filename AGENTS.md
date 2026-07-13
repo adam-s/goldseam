@@ -119,9 +119,15 @@ of what else improves:
   attempt poisons the healer with a stale artifact from a flaky-then-green
   test.
 - **Redaction runs on a clone, never the live DOM**
-  ([support/redact.ts](packages/goldseam/src/support/redact.ts)), and
-  `maskText` also runs on the aria YAML. The capture is the model's input;
-  redaction is a capture concern, not polish.
+  ([support/redact.ts](packages/goldseam/src/support/redact.ts)). The DOM path
+  strips text-entry control values (`stripControlValues`) and masks patterns;
+  the aria path must do BOTH too — `stripAriaControlValues` removes a text
+  control's inline typed value (`textbox "Pw": <value>`) *before* `maskText`
+  pattern-masks the rest, or a value matching no pattern (a password, a name)
+  leaks through the aria YAML. "Text-entry values are never captured" is a
+  structural guarantee on both surfaces, distinct from the pattern-based
+  redaction of everything else. The capture is the model's input; redaction is
+  a capture concern, not polish.
 - **`CAPTURE_TASK` is namespaced** (`goldseam:capture`,
   [shared/types.ts](packages/goldseam/src/shared/types.ts)) and every
   artifact carries `schemaVersion` — the artifact schema is a public API;
@@ -319,9 +325,16 @@ Tradeoffs, not oversights:
   assertion still heals — the weak-assertion flag is the fallback. The
   harvest is the ONE sanctioned exception to "green runs write nothing":
   it writes only `.goldseam/oracle.json`, never captures (E2E-pinned).
-- **Scoped calls (`.find()` etc.) get existence-only resolution** — a
-  whole-document count over-approximates within-parent uniqueness, so
-  ambiguity there is deferred to the rerun rungs.
+- **Scoped calls get existence-only resolution — except the direct
+  `.find()` shape.** A whole-document count over-approximates within-parent
+  uniqueness, so scoped ambiguity defaults to the rerun rungs. The one shape
+  now judged offline: `cy.get('P').find('C')` where `P` resolves to exactly
+  one element — the `resolve` rung counts `C` *within* that element and
+  rejects a look-alike-sibling ambiguity (`scopedChildCount` /
+  `directGetParentFor` in [heal/resolve.ts](packages/goldseam/src/heal/resolve.ts)).
+  Sound, not complete: a chained/scoped parent, `.within()`, a variable
+  subject, `.children()`/`.filter()`/etc., or a jQuery-pseudo child all return
+  null and defer — an over-approximation never rejects.
 - **Retry dedup is scoped to deterministic rungs.** An identical
   proposal failing twice at resolve/oracle aborts (provably futile);
   rerun-rung failures keep the full attempt budget because app flake is

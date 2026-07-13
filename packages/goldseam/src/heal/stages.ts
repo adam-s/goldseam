@@ -14,9 +14,11 @@ import { parseRepairReply, ReplyParseError } from './parse';
 import {
   countSelectorMatches,
   countTextMatches,
+  directGetParentFor,
   healedSiteForEdit,
   HOOK_TITLE_RE,
   impliesCollection,
+  scopedChildCount,
 } from './resolve';
 import { EditRejected, validateEdits } from './validate';
 import { HealContext, HealStage, OracleEntry, StageVerdict } from './types';
@@ -227,6 +229,30 @@ export const resolveStage: HealStage = {
       // find/children/…: parent-scoped, so a whole-document count
       // over-approximates — enforce existence only.
       const scoped = site.call !== 'get';
+      // …unless the `.find()`'s parent resolves UNIQUELY: then we can count
+      // within it and reject a look-alike-sibling ambiguity offline — the
+      // incumbents' cardinal sin, in the one shape the existence-only default
+      // punts. Sound: only the direct cy.get('P').find('C') shape with a
+      // plain-CSS child is judged; every other shape returns null and defers.
+      if (site.call === 'find') {
+        const parentSel = directGetParentFor(healedSource, site.start);
+        if (parentSel) {
+          const within = scopedChildCount(artifact.domHtml, parentSel, site.value);
+          if (within && within.count > 1 && !impliesCollection(healedSource, site.end)) {
+            return verdict(
+              'resolve',
+              'fail',
+              `healed selector "${site.value}" is ambiguous within its parent scope — ${within.count} matches inside the single "${parentSel}"${truncNote}, and the chain expects one; propose a selector unique within that scope`,
+              started,
+            );
+          }
+          if (within && within.count === 1) {
+            notes.push(`"${site.value}": unique within "${parentSel}" (scoped uniqueness verified)`);
+            continue;
+          }
+          // within null (parent absent/ambiguous) or count 0 → defer to rerun
+        }
+      }
       if (match.count > 1 && !scoped && !match.approximate && !impliesCollection(healedSource, site.end)) {
         return verdict(
           'resolve',

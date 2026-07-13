@@ -29,7 +29,11 @@ const MUTATIONS = [
   {
     name: 'assertion guard dropped (heals-never-weaken invariant)',
     file: 'packages/goldseam/src/heal/validate.ts',
-    find: '  if (call && ASSERTION_CALLS.has(call)) {',
+    find:
+      '  if (\n' +
+      '    call &&\n' +
+      '    (ASSERTION_CALLS.has(call) || (CHAI_MATCHERS.has(call) && inAssertionStatement(specSource, changePos)))\n' +
+      '  ) {',
     replace: '  if (false) {',
   },
   {
