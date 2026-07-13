@@ -77,9 +77,15 @@ export function goldseam(
       if (configError) throw configError;
       const promptModel = resolvePromptModel(options.promptModel, process.env, cfg);
       // The DOM budget comes from config (author.domBudget); a small-context
-      // self-hosted model sets it low so the prompt fits its token window.
-      const withBudget = { ...payload, domBudget: payload.domBudget ?? cfg.author?.domBudget };
-      return translateSteps(withBudget, promptModel, promptsDirFor(cfg));
+      // self-hosted model sets it low so the prompt fits its token window. The
+      // representation (raw-DOM window vs aria outline) is likewise config-only
+      // and additive — default 'dom' keeps the historical prompt unchanged.
+      const withConfig = {
+        ...payload,
+        domBudget: payload.domBudget ?? cfg.author?.domBudget,
+        representation: payload.representation ?? cfg.author?.representation,
+      };
+      return translateSteps(withConfig, promptModel, promptsDirFor(cfg));
     },
     [ORACLE_TASK]: (payload: OracleRecordPayload) =>
       recordOracleEntries(join(root, '.goldseam', 'oracle.json'), payload),

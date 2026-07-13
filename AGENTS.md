@@ -199,6 +199,21 @@ of what else improves:
   strong anchor text (quoted/proper-noun) resolving to exactly one element
   whose derived selector resolves back — and only when a single command failed;
   any ambiguity defers to retranslate. It never guesses.
+- **The translate prompt's page representation is opt-in and the raw-DOM
+  window is the default** (`renderPageBlock` in
+  [plugin/translate.ts](packages/goldseam/src/plugin/translate.ts)). `'dom'`
+  (default, or `representation` unset) emits the historical step-anchored
+  raw-DOM window byte-for-byte — the default authoring path must stay
+  unchanged. `'aria'` (config-only, `author.representation`) swaps in
+  `ariaOutline` ([plugin/aria-outline.ts](packages/goldseam/src/plugin/aria-outline.ts)):
+  a compact, selector-carrying accessibility outline whose selectors come
+  from `deriveSelector` (verified unique) so the model copies a known-good
+  locator instead of inventing one. `ariaOutline` NEVER throws and returns
+  `null` on an un-walkable page (parse error, empty/closed-shadow-only tree,
+  no interactive node with a selector); `renderPageBlock` then falls back to
+  the raw-DOM window — so `'aria'` is never worse than `'dom'`. It composes
+  with verify unchanged: an aria-derived selector still runs `verifyCommands`
+  (and passes, being unique-by-construction).
 - **The engine reverts on any non-healed outcome** and `apply()` is
   idempotent (also called on healed, for propose-only ladders) —
   [heal/engine.ts](packages/goldseam/src/heal/engine.ts).
