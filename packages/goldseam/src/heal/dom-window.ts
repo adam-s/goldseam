@@ -239,8 +239,9 @@ function ancestorScaffold(chosen: Element): { open: string; close: string } {
 /** Emit the neighborhood around `anchor`: climb to the largest ancestor whose
  * serialized subtree fits the budget, then wrap it in its ancestor scaffold.
  * Output is hard-bounded by `budget`: the body is trimmed to what remains
- * after the marker and scaffold, so a deep scaffold or a single over-budget
- * element can never blow the budget. */
+ * after the marker and scaffold, and a final clamp covers the pathological
+ * case where the scaffold ALONE (a very deep, attribute-heavy ancestor chain)
+ * exceeds the budget — so the emitted string can never blow the budget. */
 function emitWindow(anchor: Anchor, budget: number): WindowResult {
   let chosen: Element = anchor.el;
   for (let p = anchor.el.parentElement; p && p.tagName !== 'HTML' && p.tagName !== 'BODY'; p = p.parentElement) {
@@ -257,12 +258,15 @@ function emitWindow(anchor: Anchor, budget: number): WindowResult {
     body = body.slice(0, allowed);
     truncated = true;
   }
-  return {
-    html: marker + open + body + close + (truncated ? TRUNC_MARKER : ''),
-    strategy: 'windowed',
-    truncated,
-    anchor: anchor.why,
-  };
+  let html = marker + open + body + close + (truncated ? TRUNC_MARKER : '');
+  if (html.length > budget) {
+    // Scaffold overhead alone exceeded the budget — hard-clamp the whole
+    // string. Only reachable for a tiny budget or an absurdly deep chain
+    // (never at the 40K production budget); correctness over prettiness.
+    html = html.slice(0, budget);
+    truncated = true;
+  }
+  return { html, strategy: 'windowed', truncated, anchor: anchor.why };
 }
 
 /**

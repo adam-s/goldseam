@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { maskText, redactedOuterHtml } from '../src/support/redact';
+import { maskText, redactedOuterHtml, stripAriaControlValues } from '../src/support/redact';
 
 describe('maskText', () => {
   it('masks emails', () => {
@@ -46,6 +46,39 @@ describe('maskText', () => {
   });
 });
 
+describe('stripAriaControlValues', () => {
+  it('strips inline text-control values but keeps role, name, labels, structure', () => {
+    const aria = [
+      '- text: Full name',
+      '- textbox "Full name": John Q Secretson',
+      '- textbox "Pw": hunter2pw',
+      '- textbox: dear diary my secret plan',
+      '- searchbox "Query": my private search',
+      '- button "Buy now"',
+      '- combobox:',
+      '  - option "Bravo" [selected]',
+    ].join('\n');
+    const out = stripAriaControlValues(aria);
+    // typed values gone
+    expect(out).not.toContain('John Q Secretson');
+    expect(out).not.toContain('hunter2pw');
+    expect(out).not.toContain('secret plan');
+    expect(out).not.toContain('my private search');
+    // role + accessible name + surrounding structure kept
+    expect(out).toContain('- textbox "Full name"');
+    expect(out).toContain('- textbox "Pw"');
+    expect(out).toContain('- searchbox "Query"');
+    expect(out).toContain('- text: Full name'); // a label text node, not a form value — kept
+    expect(out).toContain('- button "Buy now"'); // button label — kept
+    expect(out).toContain('  - option "Bravo" [selected]'); // structural combobox children — kept
+  });
+
+  it('is a no-op on a snapshot with no inline control values', () => {
+    const aria = '- heading "Welcome" [level=1]\n- list:\n  - listitem: shop item';
+    expect(stripAriaControlValues(aria)).toBe(aria);
+  });
+});
+
 describe('redactedOuterHtml', () => {
   it('strips values from text-entry controls but keeps button labels', () => {
     document.body.innerHTML = `
@@ -69,6 +102,23 @@ describe('redactedOuterHtml', () => {
     expect(html).not.toContain('9876543210');
     expect(html).toContain('[redacted-email]');
     expect(html).toContain('[redacted-number]');
+  });
+
+  it('masks pattern-matching secrets inside HTML comment nodes (light DOM and shadow content)', () => {
+    // Comments serialize into domHtml via outerHTML and are sent to the model;
+    // their node type was being skipped by the redaction walker.
+    document.body.innerHTML =
+      '<div id="host">visible</div><!-- ops note: card 4111111111111111 / admin@corp.com -->';
+    document.getElementById('host')!.attachShadow({ mode: 'open' }).innerHTML =
+      '<!-- shadow secret token 9876543210 -->';
+    const html = redactedOuterHtml(document.body);
+    expect(html).not.toContain('4111111111111111');
+    expect(html).not.toContain('admin@corp.com');
+    expect(html).not.toContain('9876543210'); // masked inside the shadow template too
+    expect(html).toContain('[redacted-number]');
+    expect(html).toContain('[redacted-email]');
+    expect(html).toContain('<!--'); // the comment node is preserved (structure), only its data masked
+    expect(html).toContain('visible');
   });
 
   it('never mutates the live DOM', () => {

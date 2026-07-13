@@ -3,6 +3,7 @@
 // rungs (mutation-guard, adversary, review) are inserted stage
 // implementations — never pipeline refactors.
 
+import { HealExclusion } from '../shared/config';
 import { FailureArtifact } from '../shared/types';
 
 export const HEAL_SCHEMA_VERSION = 1;
@@ -73,6 +74,9 @@ export interface HealOptions {
   /** Titles of OTHER captures still awaiting heals in the same spec —
    * rerun-spec tolerates exactly these failures and nothing else. */
   knownBrokenTitles?: string[];
+  /** Author-declared exclusions — captures matching any of these are never
+   * healed; they give up "excluded" before any model call. */
+  exclude?: readonly HealExclusion[];
 }
 
 export interface HealAttempt {
@@ -93,7 +97,7 @@ export interface HealArtifact {
   /** 'cache' = healed from heal memory (zero model calls); 'sibling' = an
    * earlier heal in the same run already fixed this break (verified by
    * rerun, zero model calls). */
-  tier: 'cache' | 'model' | 'sibling';
+  tier: 'cache' | 'model' | 'sibling' | 'excluded';
   verdict: 'healed' | 'gave-up' | 'failed';
   attempts: HealAttempt[];
   finalEdits?: RepairEdit[];

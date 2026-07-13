@@ -2,7 +2,7 @@
 // feedback loop, give-up short-circuits, and apply/revert semantics —
 // no model, no Cypress (stages: propose only).
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -74,6 +74,35 @@ describe('healArtifactFile', () => {
     const heal = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ dryRun: true }));
     expect(heal.verdict).toBe('healed');
     expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC);
+  });
+
+  it('dry-run writes NO heal cache — an unverified mapping must not enter heal memory', async () => {
+    // With a failedSelector, the cache path is reachable; and in dry-run the
+    // rerun rungs short-circuit to pass, so `healed` is UNVERIFIED.
+    writeFileSync(
+      artifactPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        title: 'adds',
+        specPath: SPEC_REL,
+        errorMessage: 'Expected to find element: `#add-to-basket`',
+        url: 'http://localhost:4173/',
+        domHtml: '<html><body><button id="add-to-cart">Add to cart</button></body></html>',
+        ariaSnapshot: '- button "Add to cart"',
+        redacted: true,
+        failedSelector: '#add-to-basket',
+      }),
+    );
+    const cacheFile = join(root, '.goldseam', 'heal-cache.json');
+    const dry = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ dryRun: true, cacheFile }));
+    expect(dry.verdict).toBe('healed');
+    expect(existsSync(cacheFile)).toBe(false); // the fix: dry-run mutates nothing on disk
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC); // spec untouched too
+
+    // Control: a real (non-dry) run DOES cache — proves this test would catch a regression.
+    const real = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ cacheFile }));
+    expect(real.verdict).toBe('healed');
+    expect(existsSync(cacheFile)).toBe(true);
   });
 
   it('short-circuits to gave-up on about:blank without calling the model', async () => {
@@ -384,5 +413,33 @@ describe('heal memory (cache tier)', () => {
     } finally {
       delete STAGES['reject-stale'];
     }
+  });
+});
+
+describe('heal exclusions', () => {
+  it('an excluded capture gives up "excluded" WITHOUT calling the model; a non-match still heals', async () => {
+    const runner = stubRunner([GOOD_REPLY]);
+    const excluded = await healArtifactFile(
+      artifactPath,
+      runner,
+      makeOptions({ exclude: [{ spec: 'cart', reason: 'tracked regression' }] }),
+    );
+    expect(excluded.verdict).toBe('gave-up');
+    expect(excluded.tier).toBe('excluded');
+    expect(excluded.attempts[0].ladder[0].evidence).toMatch(/excluded by directive \(tracked regression\)/);
+    expect(runner.calls).toBe(0); // the load-bearing guarantee: never sent to the model
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toBe(SPEC); // spec untouched
+
+    const runner2 = stubRunner([GOOD_REPLY]);
+    const healed = await healArtifactFile(artifactPath, runner2, makeOptions({ exclude: ['does-not-match'] }));
+    expect(healed.verdict).toBe('healed');
+    expect(runner2.calls).toBe(1); // the filter is specific — a non-match heals normally
+  });
+
+  it('excludes cleanly for a since-deleted spec (gives up, does not throw on the missing spec)', async () => {
+    rmSync(join(root, SPEC_REL)); // the spec is gone
+    const heal = await healArtifactFile(artifactPath, stubRunner([GOOD_REPLY]), makeOptions({ exclude: ['cart'] }));
+    expect(heal.verdict).toBe('gave-up');
+    expect(heal.tier).toBe('excluded'); // short-circuits BEFORE the spec-existence check
   });
 });

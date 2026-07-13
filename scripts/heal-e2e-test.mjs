@@ -270,6 +270,27 @@ export default defineConfig({
   );
   check(giveupArtifact.verdict === 'gave-up', 'give-up recorded as first-class verdict');
 
+  console.log('\n— exclude: a directive-excluded capture is never healed (reported give-up, spec untouched) —');
+  rmSync('.goldseam', { recursive: true, force: true });
+  writeFileSync(TMP_SPEC, BROKEN);
+  await cypress.run({ quiet: true, config: { specPattern: TMP_SPEC } });
+  const beforeExcl = readFileSync(TMP_SPEC, 'utf8');
+  // --exclude matches the test title; the model is never consulted (the giveup
+  // stub would refuse anyway, so a healed/edited outcome could only come from
+  // the model actually running — it must not).
+  const excl = runCli(['heal', '--exclude', 'adds a mug', '--model', 'cmd:node scripts/stub-model.mjs giveup']);
+  check(excl.status === 0 && excl.stdout.includes('[gave-up]'), 'excluded capture reports a give-up, exit 0');
+  check(readFileSync(TMP_SPEC, 'utf8') === beforeExcl, 'excluded spec is byte-for-byte untouched');
+  const exclArtifact = JSON.parse(readFileSync(`.goldseam/heals/${readdirSync('.goldseam/heals')[0]}`, 'utf8'));
+  check(
+    exclArtifact.verdict === 'gave-up' && exclArtifact.tier === 'excluded',
+    `excluded verdict=gave-up tier=excluded (got ${exclArtifact.verdict}/${exclArtifact.tier})`,
+  );
+  check(
+    exclArtifact.attempts[0].ladder[0].evidence.includes('excluded by directive'),
+    'the exclusion reason is recorded in the ladder',
+  );
+
   console.log('\n— windowing: a large local capture is windowed so a deep target heals —');
   rmSync('.goldseam', { recursive: true, force: true });
   // A heavy page (no third-party site): front-loaded inline CSS (which the
