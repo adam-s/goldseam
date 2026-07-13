@@ -17,6 +17,43 @@ Everything below is unreleased work toward it.
   vacuously-passing block (give-up stays first-class through eject); and a
   corrupt cache file is skipped with a note instead of aborting the whole
   eject. Pinned in `test/prompt-types.test.ts`.
+- Heal internals: `parseDom` consumers (triage, resolve, oracle, the prompt
+  window) now release their jsdom window through `closeWindow`/`withParsedDom`
+  after the last read — correct lifecycle and a guard against a future
+  tight-loop caller OOMing. Behavior-neutral (counts and verdicts are computed
+  before release). A measured leak audit found no unbounded growth in the
+  engine; the offline text-match helpers' O(N × subtree) cost on giant DOMs
+  and the oracle rung's aria-walk scaling are recorded as accepted, deferred
+  findings.
+- Heal: **`heal.exclude` directive** — a committed, reviewed guarantee that
+  goldseam never heals a deliberately-red test (a security/negative assertion,
+  a regression the team is tracking, a quarantined flake). Config
+  (`heal.exclude`, a durable list) or `--exclude <substr>` (one-off). A bare
+  string substring-matches spec-or-title; an object ANDs `spec`/`title`/
+  `selector` with an optional `reason`. Unlike `--skip` (a silent drop), an
+  exclusion produces a first-class, REPORTED give-up (`tier: excluded`) with
+  the reason in the ladder — short-circuited in the engine before any model
+  call, so an excluded test is never sent to the model and its spec is never
+  touched. Incumbent parity (Healenium `@DisableHealing`; cy.prompt has no
+  opt-out), and beats their disable leaking through `findElements`.
+
+- Capture (security): the **aria snapshot no longer leaks text-control
+  values**. The DOM path stripped text-entry/`textarea` values, but the aria
+  path went through `maskText` (pattern-masking) only, so a typed value
+  matching no pattern — a password, a name — shipped to the model as
+  `textbox "Pw": <value>`. `stripAriaControlValues` now removes the inline
+  value (keeping role + accessible name) before masking, restoring the
+  documented "text-entry values are never captured" guarantee on both
+  surfaces.
+- Heal `resolve` rung: **scoped `.find()` uniqueness**. A whole-document
+  count is existence-only for scoped calls, so a heal to a look-alike sibling
+  inside a parent scope could pass offline. Now, for the direct
+  `cy.get('P').find('C')` shape where `P` resolves to exactly one element, the
+  rung counts `C` *within* that element and rejects a within-parent ambiguity
+  — the incumbents' cardinal "heals to the next element of the same type"
+  failure, caught offline. Sound, not complete: any other shape (chained
+  parent, `.within()`, variable subject, jQuery-pseudo child) defers to the
+  rerun, so an over-approximation never rejects.
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a

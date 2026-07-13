@@ -33,6 +33,9 @@ heal options:
   --dry-run               propose + validate only; touch nothing, skip reruns
   --only <substr>         heal only captures whose spec path or title matches
   --skip <substr>         skip captures whose spec path or title matches
+  --exclude <substr>      NEVER heal captures matching this (spec/title) — a
+                          reported "excluded" give-up, not a silent skip; the
+                          durable form is heal.exclude in goldseam.config.mjs
   --no-cache              skip heal memory (.goldseam/heal-cache.json); always ask the model
   --oracle-file <path>    known-good aria identities for the oracle rung
                           (default: .goldseam/oracle.json; rung skips if absent)
@@ -64,7 +67,7 @@ function arg(flag: string): string | undefined {
 const COMMAND_FLAGS: Record<string, Set<string>> = {
   init: new Set<string>(),
   heal: new Set([
-    '--model', '--dry-run', '--only', '--skip', '--no-cache', '--oracle-file',
+    '--model', '--dry-run', '--only', '--skip', '--exclude', '--no-cache', '--oracle-file',
     '--config-file', '--max-attempts', '--min-confidence', '--stages',
     '--failures-dir', '--heals-dir',
   ]),
@@ -180,6 +183,8 @@ async function heal(): Promise<number> {
     cacheFile: cacheDisabled ? null : join('.goldseam', 'heal-cache.json'),
     oracleFile: arg('--oracle-file') ?? cfg.heal?.oracleFile ?? join('.goldseam', 'oracle.json'),
     configFile: arg('--config-file') ?? cfg.heal?.configFile,
+    // config is the durable form; --exclude is a one-off convenience appended to it.
+    exclude: [...(cfg.heal?.exclude ?? []), ...(arg('--exclude') ? [arg('--exclude')!] : [])],
   };
   const modelSpec = resolveHealModel(arg('--model'), process.env, cfg);
   const runner = resolveRunner(modelSpec);

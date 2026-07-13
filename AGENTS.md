@@ -119,9 +119,15 @@ of what else improves:
   attempt poisons the healer with a stale artifact from a flaky-then-green
   test.
 - **Redaction runs on a clone, never the live DOM**
-  ([support/redact.ts](packages/goldseam/src/support/redact.ts)), and
-  `maskText` also runs on the aria YAML. The capture is the model's input;
-  redaction is a capture concern, not polish.
+  ([support/redact.ts](packages/goldseam/src/support/redact.ts)). The DOM path
+  strips text-entry control values (`stripControlValues`) and masks patterns;
+  the aria path must do BOTH too — `stripAriaControlValues` removes a text
+  control's inline typed value (`textbox "Pw": <value>`) *before* `maskText`
+  pattern-masks the rest, or a value matching no pattern (a password, a name)
+  leaks through the aria YAML. "Text-entry values are never captured" is a
+  structural guarantee on both surfaces, distinct from the pattern-based
+  redaction of everything else. The capture is the model's input; redaction is
+  a capture concern, not polish.
 - **`CAPTURE_TASK` is namespaced** (`goldseam:capture`,
   [shared/types.ts](packages/goldseam/src/shared/types.ts)) and every
   artifact carries `schemaVersion` — the artifact schema is a public API;
@@ -319,9 +325,16 @@ Tradeoffs, not oversights:
   assertion still heals — the weak-assertion flag is the fallback. The
   harvest is the ONE sanctioned exception to "green runs write nothing":
   it writes only `.goldseam/oracle.json`, never captures (E2E-pinned).
-- **Scoped calls (`.find()` etc.) get existence-only resolution** — a
-  whole-document count over-approximates within-parent uniqueness, so
-  ambiguity there is deferred to the rerun rungs.
+- **Scoped calls get existence-only resolution — except the direct
+  `.find()` shape.** A whole-document count over-approximates within-parent
+  uniqueness, so scoped ambiguity defaults to the rerun rungs. The one shape
+  now judged offline: `cy.get('P').find('C')` where `P` resolves to exactly
+  one element — the `resolve` rung counts `C` *within* that element and
+  rejects a look-alike-sibling ambiguity (`scopedChildCount` /
+  `directGetParentFor` in [heal/resolve.ts](packages/goldseam/src/heal/resolve.ts)).
+  Sound, not complete: a chained/scoped parent, `.within()`, a variable
+  subject, `.children()`/`.filter()`/etc., or a jQuery-pseudo child all return
+  null and defer — an over-approximation never rejects.
 - **Retry dedup is scoped to deterministic rungs.** An identical
   proposal failing twice at resolve/oracle aborts (provably futile);
   rerun-rung failures keep the full attempt budget because app flake is
@@ -336,6 +349,34 @@ Tradeoffs, not oversights:
   frame-scoping honestly instead of calling it timing. Positional oracle
   judgment models `.first()/.last()/.eq(n)` only; other collection chains
   require every match to carry the identity (red-team, accepted).
+- **No unbounded leak; jsdom windows are closed as hygiene.** A measured
+  leak audit (async-realistic, event-loop-turning runs on 1 MB captures)
+  found heap *plateaus*, not growth: the engine `await`s a macrotask
+  (`runner.repair`, `cypress.run`) between heals, so per-heal jsdom windows
+  are reclaimed. The module-level caches, the `fail` listener, the `cmd:`
+  child, and aria-snapshot's refcounted `beginAriaCaches`/`endAriaCaches`
+  (`finally`-released `Map<Element>`) were all cleared. Still, `parseDom`
+  consumers now release their window through `closeWindow`/`withParsedDom`
+  ([heal/dom-env.ts](packages/goldseam/src/heal/dom-env.ts)) in a `finally`
+  after the last read — correct jsdom lifecycle, and a guard so a *future*
+  tight synchronous parse loop (no `await`) can't OOM. Behavior-neutral: the
+  release runs after counts/verdicts (plain values) are computed.
+- **`countTextMatches` and `deepestTextBearer` are O(N × subtree) on very
+  large DOMs** ([heal/resolve.ts](packages/goldseam/src/heal/resolve.ts),
+  [heal/dom-window.ts](packages/goldseam/src/heal/dom-window.ts)) — each
+  reads full `textContent` per element and per child, ~2.7 s on a synthetic
+  36 K-element capture. Correct and bounded (offline, fires only on a
+  `cy.contains()` edit), just slow on pathological pages; a single
+  post-order accumulation would linearize it. Deferred: a speed fix on a
+  trust-adjacent counter needs an exact-semantics parity test, and the
+  maintainer deprioritized speed for this pass (measured, accepted).
+- **The oracle rung's aria-tree build does not scale to giant DOMs** —
+  `getAllByAria` over a 36 K-element capture did not finish in minutes
+  (`generateAriaTree` visits every node computing roles/names). The rung is
+  opt-in (`recordOracles` or a hand-written `oracle.json`); on such a page
+  it would dominate the heal. No fix — the aria-walk cost is inherent, not a
+  bug — but recorded so a future scaling pass has the number (measured,
+  accepted).
 
 ## Noise
 

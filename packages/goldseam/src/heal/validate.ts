@@ -69,6 +69,39 @@ function enclosingCallName(code: string, index: number): string | undefined {
 
 const ASSERTION_CALLS = new Set(['should', 'and', 'expect', 'assert']);
 
+/** Chai / assert value-taking matchers whose argument is the EXPECTED VALUE,
+ * never a selector. `expect(x).to.equal('shipped')` has innermost call
+ * `equal` — not `expect` — so the ASSERTION_CALLS check alone misses it and an
+ * edit could rewrite the expected value, weakening the assertion. Gated on
+ * `inAssertionStatement` below so it never rejects a same-named subject call
+ * such as `cy.contains('text')`. A denylist, like the other pattern guards;
+ * `resolve` and the weak-assertion review flag remain backstops. */
+const CHAI_MATCHERS = new Set([
+  'equal', 'equals', 'eql', 'eqls', 'include', 'includes', 'contain', 'contains',
+  'match', 'matches', 'above', 'gt', 'greaterThan', 'below', 'lt', 'lessThan',
+  'least', 'gte', 'most', 'lte', 'within', 'closeTo', 'approximately', 'oneOf',
+  'members', 'keys', 'property', 'ownProperty', 'string', 'length', 'lengthOf', 'satisfy',
+]);
+
+/** Is `index` inside an assertion statement rooted at `expect(` or `assert.`?
+ * The statement is bounded by the nearest preceding `;` `{` or `}` outside a
+ * string — chai chains carry no `;` until their end, so the root is visible. */
+function inAssertionStatement(code: string, index: number): boolean {
+  let start = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < index; i++) {
+    const ch = code[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    else if (ch === ';' || ch === '{' || ch === '}') start = i + 1;
+  }
+  return /\bexpect\s*\(|\bassert\s*\./.test(code.slice(start, index));
+}
+
 /** Real specs reference a selector several times; each occurrence needs its
  * own exact-string edit. The cap is a minimality guard, not a feature. */
 const MAX_EDITS = 8;
@@ -120,7 +153,10 @@ function validateSingleEdit(edit: RepairEdit, specPath: string, specSource: stri
   // calls. A change inside cy.get() stays a selector edit even when its
   // fragment reads like a word such as "value".
   const call = enclosingCallName(specSource, changePos);
-  if (call && ASSERTION_CALLS.has(call)) {
+  if (
+    call &&
+    (ASSERTION_CALLS.has(call) || (CHAI_MATCHERS.has(call) && inAssertionStatement(specSource, changePos)))
+  ) {
     throw new EditRejected(`the change is inside ${call}(…); heals never weaken assertions`);
   }
   if (!call && (ASSERTION_CORE.test(oldCore) || ASSERTION_CORE.test(newCore))) {

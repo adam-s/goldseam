@@ -18,9 +18,7 @@
 // deferred to the rerun rungs, never a silent verdict either way.
 
 import { RepairEdit } from './types';
-import { parseDom as parseDomFull } from './dom-env';
-
-const parseDom = (html: string): Document => parseDomFull(html).document;
+import { closeWindow, parseDom } from './dom-env';
 
 export interface MatchCount {
   count: number;
@@ -87,17 +85,81 @@ export function countSelectorMatches(
     const stripped = selector.replace(strip === 'state' ? STATE_PSEUDOS : JQUERY_PSEUDOS, '').trim();
     if (stripped && stripped !== selector) attempts.push({ sel: stripped, approximate: true });
   }
-  let document: Document | undefined;
-  for (const attempt of attempts) {
-    try {
-      document ??= parseDom(domHtml);
-      const { total, frame } = countIn(document, attempt.sel);
-      return { count: total, approximate: attempt.approximate, frameCount: frame };
-    } catch {
-      // invalid selector — try the stripped form, else not checkable
+  // Parse once, reuse across the (at most two) selector attempts, and close
+  // the window after the LAST read — closing between attempts would tear down
+  // the document the stripped-selector retry still needs to query.
+  let parsed: { document: Document; window: ReturnType<typeof parseDom>['window'] } | undefined;
+  try {
+    for (const attempt of attempts) {
+      try {
+        parsed ??= parseDom(domHtml);
+        const { total, frame } = countIn(parsed.document, attempt.sel);
+        return { count: total, approximate: attempt.approximate, frameCount: frame };
+      } catch {
+        // invalid selector — try the stripped form, else not checkable
+      }
     }
+    return null;
+  } finally {
+    closeWindow(parsed?.window);
   }
-  return null;
+}
+
+/** All elements matching `selector` under `root`, descending serialized shadow
+ * / same-origin-frame templates (the element-returning sibling of `countIn`).
+ * Boundary-safe: a combinator never crosses into template content. */
+function queryDeepIn(root: ParentNode, selector: string): Element[] {
+  const out: Element[] = Array.from(root.querySelectorAll(selector));
+  for (const t of Array.from(
+    root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+  )) {
+    out.push(...queryDeepIn((t as HTMLTemplateElement).content, selector));
+  }
+  return out;
+}
+
+/**
+ * For a `.find()`-scoped heal `cy.get(parent).find(child)`: when `parent`
+ * resolves to EXACTLY ONE element in the captured DOM, how many of its
+ * descendants match `child`?
+ *
+ * This is what makes scoped uniqueness SOUND. A whole-document count
+ * over-approximates within-parent uniqueness (the reason scoped calls default
+ * to existence-only), but counting inside the single resolved parent does not.
+ * Returns null — i.e. defer to the rerun rungs — when the parent is absent,
+ * ambiguous, or not statically checkable, or when the child is not plain CSS
+ * (a jQuery-pseudo count would over-approximate, and an over-approximation must
+ * never drive a rejection). The returned count is therefore always exact.
+ */
+export function scopedChildCount(
+  domHtml: string,
+  parentSelector: string,
+  childSelector: string,
+): { count: number } | null {
+  // parseDom returns { document, window }; own the window and release it after
+  // the reads (the window-lifecycle discipline this file adopted).
+  let parsed: ReturnType<typeof parseDom>;
+  try {
+    parsed = parseDom(domHtml);
+  } catch {
+    return null;
+  }
+  try {
+    let parents: Element[];
+    try {
+      parents = queryDeepIn(parsed.document, parentSelector);
+    } catch {
+      return null; // parent selector not valid CSS → defer
+    }
+    if (parents.length !== 1) return null; // absent or ambiguous parent → defer
+    try {
+      return { count: queryDeepIn(parents[0], childSelector).length };
+    } catch {
+      return null; // child not valid CSS on its own (jQuery pseudo, …) → defer
+    }
+  } finally {
+    closeWindow(parsed.window);
+  }
 }
 
 /**
@@ -107,21 +169,26 @@ export function countSelectorMatches(
  * absence.
  */
 export function countTextMatches(domHtml: string, text: string): number {
-  const roots: ParentNode[] = [parseDom(domHtml)];
-  let n = 0;
-  while (roots.length > 0) {
-    const root = roots.pop()!;
-    for (const el of Array.from(root.querySelectorAll('*'))) {
-      if (!el.textContent?.includes(text)) continue;
-      if (!Array.from(el.children).some((c) => c.textContent?.includes(text))) n++;
+  const { document, window } = parseDom(domHtml);
+  try {
+    const roots: ParentNode[] = [document];
+    let n = 0;
+    while (roots.length > 0) {
+      const root = roots.pop()!;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        if (!el.textContent?.includes(text)) continue;
+        if (!Array.from(el.children).some((c) => c.textContent?.includes(text))) n++;
+      }
+      for (const t of Array.from(
+        root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
+      )) {
+        roots.push((t as HTMLTemplateElement).content);
+      }
     }
-    for (const t of Array.from(
-      root.querySelectorAll('template[shadowrootmode], template[data-frame-content]'),
-    )) {
-      roots.push((t as HTMLTemplateElement).content);
-    }
+    return n;
+  } finally {
+    closeWindow(window);
   }
-  return n;
 }
 
 export interface StringSite {
@@ -197,6 +264,21 @@ export function healedSiteForEdit(
   ) p++;
   const site = stringSiteAt(healedSource, pos + p);
   return site && { site, healedSource };
+}
+
+/**
+ * The selector of a directly-resolved `cy.get('parent')` immediately scoping a
+ * healed `.find('child')` site — i.e. the exact `cy.get('P').find(<site>)`
+ * shape, where `<site>` opens at `siteStart`. Null for anything else: a
+ * chained/scoped parent (`cy.get('a').find('b').find(<site>)`), a `.within()`
+ * block, or a variable subject cannot be soundly resolved offline, so the
+ * caller defers to the rerun. Sound by construction — a non-match never rejects.
+ */
+export function directGetParentFor(source: string, siteStart: number): string | null {
+  const before = source.slice(0, siteStart);
+  // …cy.get('P') . find (   [optional whitespace, then the site opens]
+  const m = before.match(/\bcy\s*\.\s*get\s*\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*\)\s*\.\s*find\s*\(\s*$/);
+  return m ? m[2] : null;
 }
 
 /** Does the chain after the selector expect a collection? (.first()/.eq()/
