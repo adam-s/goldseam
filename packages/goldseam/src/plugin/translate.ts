@@ -9,6 +9,7 @@ import { resolveRunner } from '../heal/runners';
 import { parseJsonBlock } from '../heal/parse';
 import { writeJsonAtomic } from '../shared/fs';
 import { TRANSLATE_RULES } from './translate-rules';
+import { stepAnchors, windowTranslationDom } from './translate-window';
 import {
   InvalidTranslation,
   MAX_PROMPT_STEPS,
@@ -22,27 +23,39 @@ export interface TranslatePayload {
   steps: string[];
   url: string;
   domHtml: string;
+  /** Char budget for the DOM embedded in the prompt; default 40000. Lower it
+   * (e.g. 16000) for small-context self-hosted models. */
+  domBudget?: number;
 }
 
-const MAX_TRANSLATE_DOM_CHARS = 40_000;
+/** Default DOM budget. A small-context self-hosted model (e.g. an 8K-token
+ * vLLM serve) must request a smaller one; frontier models keep this. */
+export const DEFAULT_TRANSLATE_DOM_BUDGET = 40_000;
 
 /** The translator grounds selectors in markup — <head> content, scripts,
  * and inline styles are dead weight that can eat the whole budget (a
  * live Wikipedia page's head alone exceeded it, forcing a refusal on a
- * perfectly translatable step). Spend the budget on body markup. */
-export function translationDom(domHtml: string): string {
+ * perfectly translatable step). Spend the budget on body markup — and when
+ * the body still overflows, a step-anchored window keeps the element a step
+ * names in view instead of a blind head-first cut that drops it (the
+ * authoring twin of the heal path; see translate-window.ts). */
+export function translationDom(
+  domHtml: string,
+  opts: { budget?: number; steps?: string[] } = {},
+): string {
+  const budget = opts.budget ?? DEFAULT_TRANSLATE_DOM_BUDGET;
   const stripped = domHtml
     .replace(/<head[\s\S]*?<\/head>/i, '<head><!-- stripped --></head>')
     .replace(/<script\b[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[\s\S]*?<\/style>/gi, '')
     .replace(/<svg\b[\s\S]*?<\/svg>/gi, '<svg><!-- stripped --></svg>');
-  return stripped.length > MAX_TRANSLATE_DOM_CHARS
-    ? `${stripped.slice(0, MAX_TRANSLATE_DOM_CHARS)}\n<!-- truncated -->`
-    : stripped;
+  if (stripped.length <= budget) return stripped;
+  // Over budget: window around a step anchor, else head-first (never throws).
+  return windowTranslationDom(stripped, stepAnchors(opts.steps ?? []), budget);
 }
 
 export function buildTranslatePrompt(payload: TranslatePayload): string {
-  const dom = translationDom(payload.domHtml);
+  const dom = translationDom(payload.domHtml, { budget: payload.domBudget, steps: payload.steps });
   return `You translate natural-language test steps into a constrained JSON command list for Cypress. You never write code — only commands from this vocabulary:
 
 {"action":"visit","url":string}

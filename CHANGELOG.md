@@ -10,6 +10,20 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring prompt: a **step-anchored DOM window** + configurable budget
+  (`author.domBudget`, `translate-window.ts`) — the authoring twin of the heal
+  window. When the stripped translation DOM overflows the budget, instead of a
+  blind head-first cut that drops the element a step names on a large page, a
+  region is emitted around an anchor mined from the English steps (quoted text,
+  then Capitalized labels, then content words — imperatives/articles filtered;
+  form controls anchored by `placeholder`/`aria-label` too). Regression-proof
+  gate (a head-first slice that already holds an anchor is returned unchanged),
+  never throws, hard-bounded output. Proven live: real Opus/Sonnet *refused*
+  drifted-past-budget targets on Wikipedia/Webflow/GitHub that the window
+  grounds; the configurable budget lets a small-context self-hosted model
+  (8K-token vLLM) translate at all. Bigger context was measured *worse* — full
+  DOM overflows a 32K model and grounds no more; the window wins at 3–8× less
+  cost.
 - Authoring `eject` fidelity + trust fixes: ejected code now honors `shadow`
   scoping (`cy.get(host).first().shadow().find(selector)`) exactly as replay
   does — a bare `cy.get` silently targeted a different element; a cached
