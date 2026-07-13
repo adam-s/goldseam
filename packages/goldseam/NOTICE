@@ -1,0 +1,12 @@
+goldseam
+
+src/heal/selector-score.ts contains code derived from Playwright
+(https://github.com/microsoft/playwright), Copyright (c) Microsoft
+Corporation, licensed under the Apache License, Version 2.0. Specifically,
+the selector-cost constants (kTestIdScore … kNthScore … kCSSFallbackScore)
+and the isGuidLike function are taken verbatim from
+packages/playwright-core/src/server/injected/selectorGenerator.ts; the
+attribution is repeated in that file's header comment. The surrounding
+grader (scoreSelector / isOptimal, the tokenizer, the volatile-attribute and
+framework-auto-id filters, and the goldseam wiring) is original to this
+project.
