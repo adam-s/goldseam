@@ -94,9 +94,13 @@ Honest limits, kept in view rather than papered over:
   and `recordOracles` (shipped 2026-07-04) harvests those identities
   automatically on green runs — but it is opt-in. Suites that never
   enable it fall back to the weak-assertion flag and rerun assertions.
-- **Scoped selectors get existence-only checks** (#6): `.find()` counts
-  against the whole document, so uniqueness within the parent scope is
-  deferred to the rerun.
+- **Scoped selectors get existence-only checks** (#6) — *except the direct
+  `cy.get('P').find('C')` shape*, now judged offline: when `P` resolves to a
+  single element the `resolve` rung counts `C` within it and rejects a
+  look-alike-sibling ambiguity, instead of deferring. A chained/scoped
+  parent, `.within()`, a variable subject, or a non-`.find()` scoper still
+  counts against the whole document and defers to the rerun (sound, not
+  complete — an over-approximation never rejects).
 - **Flakes are verified once** (#15): a heal that goes green on a flaky
   test may be a coin flip. N-run verification is a config away
   (`stages` is a list) but not built.
