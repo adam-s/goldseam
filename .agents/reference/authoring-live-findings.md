@@ -33,11 +33,20 @@ is the durable conclusion.
    (PR: `plugin/translate-window.ts`) — a 14B model with a 16K window grounded
    a page both frontier models refused.
 2. **Dynamic / AJAX content timing.** SPA/AJAX pages load the target *after*
-   `domcontentloaded`; the captured DOM misses it, so translation refuses
-   honestly (DemoBlaze product grid; SauceDemo cart nav). The fix is a
-   capture-**settle** (`networkidle` + DOM-stability poll) before translating
-   — a plugin/harness concern, not selector quality. *Deferred: settle
-   strategy for `cy.goldseam` capture.*
+   `domcontentloaded`; the captured DOM misses it. The fix is a
+   capture-**settle**, and the placement is load-bearing (proven by driving
+   5 hard multi-page workflows to 3/5 fully-live + 4/4 assembled Cypress specs
+   green, incl. a full 12-step SauceDemo checkout):
+   - a **post-action** settle (a click returns *before* its navigation begins,
+     so a pre-capture settle alone still grounds the next step on the OLD page
+     — this was the SauceDemo cart→checkout stall);
+   - `networkidle` **plus** a DOM-stability poll (client `setTimeout` content
+     fires no request, so `networkidle` never triggers — the-internet
+     "Hello World!");
+   - retry-able assertions (mirroring Cypress's own assertion retry) for
+     late-appearing asserted text.
+   A plugin/harness concern, not selector quality. *Deferred: settle strategy
+   for `cy.goldseam` capture.*
 3. **Small models under-refuse.** Self-hosted Qwen2.5-14B hallucinated
    selectors for 4/6 ambiguous steps where Opus refused. The refusal contract
    **cannot** be delegated to a weak translator — goldseam's offline
@@ -98,10 +107,19 @@ Ranked by measured value:
    selectors + `done{}` postconditions would ground translation better than a
    DOM snapshot alone.
 
-## Known follow-up (not a Phase-2 feature, a fix)
+## Known follow-ups (fixes, not features)
 
-`heal/dom-window.ts` `emitWindow` has the same scaffold-overflow the authoring
-window just fixed: a deep, attribute-heavy ancestor chain can push the emitted
-region past the budget even with the body trimmed to zero, so the
-"hard-bounded" invariant is aspirational there. Port the final `slice(0,
-budget)` clamp.
+- **`heal/dom-window.ts` `emitWindow` scaffold-overflow.** Same bug the
+  authoring window just fixed: a deep, attribute-heavy ancestor chain can push
+  the emitted region past the budget even with the body trimmed to zero, so the
+  "hard-bounded" invariant is aspirational there. Port the final
+  `slice(0, budget)` clamp.
+- **`heal/parse.ts` `parseJsonBlock` rejects a valid object + trailing prose.**
+  It strips a code fence, then `JSON.parse`s the WHOLE reply (parse.ts:15), so a
+  reply like `{"commands":[…]}\n\nWait — let me double-check…` fails outright.
+  Opus intermittently appends self-doubt prose after a complete JSON object;
+  this fails real-model heal AND authoring translation with a parse error, not
+  a capability miss. Fix: on a failed direct parse, fall back to extracting the
+  first balanced `{…}` object (brace-depth scan that respects strings/escapes)
+  and parse that; keep the strict path for genuinely malformed replies. Cheap,
+  cross-cutting, purely additive robustness.
