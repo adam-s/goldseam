@@ -64,6 +64,53 @@ describe('renderEntry (eject)', () => {
     expect(code).toContain(`cy.get('#cart-count').should('have.text', '1');`);
   });
 
+  it('honors shadow scoping — ejected code targets the SAME element replay does', () => {
+    // The executor resolves a shadow-scoped selector inside the first host's
+    // shadow root; eject must render the identical form, not a bare cy.get
+    // that would target a different element (or nothing).
+    const code = renderEntry(
+      ['Open the first details panel'],
+      [{ action: 'click', selector: "[part='header']", shadow: 'sl-details:first-of-type', force: true }],
+    );
+    expect(code).toContain(
+      `cy.get('sl-details:first-of-type').first().shadow().find('[part=\\'header\\']').click({ force: true });`,
+    );
+    // Without a shadow field it stays the plain form (no regression).
+    const plain = renderEntry(['t'], [{ action: 'type', selector: '#name', text: 'hi' }]);
+    expect(plain).toContain(`cy.get('#name').type('hi');`);
+    expect(plain).not.toContain('.shadow()');
+  });
+
+  it('renders a DECLINED translation as a loud throw, never an empty passing block', () => {
+    // A cached refusal replays as a thrown error (give-up is first-class).
+    // Ejected, it must fail the same way — an empty command list would paste
+    // as a silently-passing block: a refusal misreported as success.
+    const code = renderEntry(['do something vague'], [], { reason: 'no element matches "the thing"' });
+    expect(code).toContain('// do something vague');
+    expect(code).toContain('goldseam DECLINED these steps as ambiguous');
+    expect(code).toContain('no element matches');
+    expect(code).toMatch(/throw new Error\('goldseam declined these steps as ambiguous:/);
+    // The refusal is not silently swallowed as an inert comment-only body.
+    expect(code).toContain('throw new Error(');
+  });
+
+  it('a multi-line refusal reason / step never breaks the comment (no bare newline)', () => {
+    // A model reason with a newline emitted raw would split into a second,
+    // uncommented line — a syntax error in the pasted spec.
+    const code = renderEntry(['do\nthis vague thing'], [], { reason: 'no target;\ntry again' });
+    for (const line of code.split('\n')) {
+      // Every line is either a // comment or executable JS — never a stray
+      // fragment of comment text on its own uncommented line.
+      const ok = line.startsWith('//') || line.startsWith('throw ') || line.trim() === '';
+      expect(ok, `stray line: ${JSON.stringify(line)}`).toBe(true);
+    }
+    expect(code).toContain('no target; try again'); // newline collapsed to a space
+  });
+
+  it('tolerates a shape-corrupt cache entry (missing steps/commands) without throwing', () => {
+    expect(() => renderEntry(undefined as unknown as string[], undefined as unknown as [])).not.toThrow();
+  });
+
   it('a text expectation paired with a non-text chainer becomes a REAL assertion (false-green fix)', () => {
     // should('be.visible', 'ordered!') silently ignores the second arg in
     // Chai — the fresh-consumer walkthrough proved an app showing the

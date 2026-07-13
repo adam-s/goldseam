@@ -76,7 +76,10 @@ export function goldseam(
       const cfg = await configReady;
       if (configError) throw configError;
       const promptModel = resolvePromptModel(options.promptModel, process.env, cfg);
-      return translateSteps(payload, promptModel, promptsDirFor(cfg));
+      // The DOM budget comes from config (author.domBudget); a small-context
+      // self-hosted model sets it low so the prompt fits its token window.
+      const withBudget = { ...payload, domBudget: payload.domBudget ?? cfg.author?.domBudget };
+      return translateSteps(withBudget, promptModel, promptsDirFor(cfg));
     },
     [ORACLE_TASK]: (payload: OracleRecordPayload) =>
       recordOracleEntries(join(root, '.goldseam', 'oracle.json'), payload),

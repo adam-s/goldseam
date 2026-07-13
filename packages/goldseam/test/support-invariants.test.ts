@@ -124,6 +124,24 @@ describe('the never-mask invariant', () => {
     expect(payload.captureError).toBeUndefined();
   });
 
+  it('never captures text-control values — DOM path AND aria snapshot (structural guarantee)', () => {
+    document.body.innerHTML =
+      '<label>Password<input type="password" value="hunter2pw"></label>' +
+      '<label>Full name<input type="text" value="Jane Q Secretson"></label>' +
+      '<textarea>dear diary my secret plan</textarea>';
+    startTest();
+    expect(() => failHandler(new Error('Expected to find element: `#go`'), runnable)).toThrow();
+    endTest('failed');
+    const { payload } = taskCalls[0];
+    // typed values must reach the model through NEITHER path
+    for (const secret of ['hunter2pw', 'Jane Q Secretson', 'secret plan']) {
+      expect(payload.domHtml).not.toContain(secret);
+      expect(payload.ariaSnapshot).not.toContain(secret);
+    }
+    // but the aria structure survives so the model can still reason about the form
+    expect(payload.ariaSnapshot).toContain('textbox');
+  });
+
   it('re-throws the original error even when capture itself explodes', () => {
     domAccessible = false;
     startTest();

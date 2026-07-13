@@ -37,6 +37,25 @@ export function maskText(text: string): string {
     .replace(DIGIT_RUN_RE, '[redacted-number]');
 }
 
+/** aria-snapshot renders a text control's typed value inline after its role
+ * and accessible name — `- textbox "Full name": <value>`. That value is user
+ * input (passwords, PII); the DOM path already strips it (stripControlValues),
+ * but the aria path went through maskText only, which PATTERN-masks and does
+ * not strip form values, so a value matching no pattern leaked to the model —
+ * breaking the documented "text-entry values are never captured" guarantee.
+ * Drop the inline value, keep the role and accessible name. Runs BEFORE
+ * maskText so the value never reaches it. Line-based: form-control values are
+ * single-line; a structural `role:` with indented children has nothing inline
+ * after the colon and is left untouched. */
+const ARIA_TEXT_CONTROL_VALUE =
+  /^(\s*-\s+(?:textbox|searchbox|spinbutton|combobox|slider)(?:\s+"(?:[^"\\]|\\.)*")?):\s+\S.*$/;
+export function stripAriaControlValues(yaml: string): string {
+  return yaml
+    .split('\n')
+    .map((line) => line.replace(ARIA_TEXT_CONTROL_VALUE, '$1'))
+    .join('\n');
+}
+
 const VALUE_KEEPING_INPUT_TYPES = new Set(['submit', 'button', 'reset']);
 
 function stripControlValues(el: Element): void {
@@ -58,12 +77,19 @@ function stripControlValues(el: Element): void {
  */
 export function redactInPlace(root: Node): void {
   const doc = root.ownerDocument as Document;
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  // SHOW_COMMENT matters: a secret in an HTML comment (`<!-- card 4111... -->`)
+  // is serialized into domHtml by outerHTML and would otherwise ship to the
+  // model unmasked — its format matches the redaction patterns, only its node
+  // type was being skipped.
+  const walker = doc.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT | NodeFilter.SHOW_COMMENT,
+  );
   const elements: Element[] = root.nodeType === 1 ? [root as Element] : [];
-  const textNodes: Text[] = [];
+  const charData: CharacterData[] = []; // Text (3) and Comment (8) both expose .data
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeType === 1) elements.push(node as Element);
-    else textNodes.push(node as Text);
+    else charData.push(node as CharacterData);
   }
   for (const el of elements) {
     stripControlValues(el);
@@ -73,9 +99,9 @@ export function redactInPlace(root: Node): void {
     }
     if (el.tagName === 'TEMPLATE') redactInPlace((el as HTMLTemplateElement).content);
   }
-  for (const text of textNodes) {
-    const masked = maskText(text.data);
-    if (masked !== text.data) text.data = masked;
+  for (const node of charData) {
+    const masked = maskText(node.data);
+    if (masked !== node.data) node.data = masked;
   }
 }
 

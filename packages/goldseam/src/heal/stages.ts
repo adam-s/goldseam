@@ -8,15 +8,17 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getAllByAria, queryAllDeep } from 'aria-snapshot';
 import { buildCacheEdit, loadCache, lookup } from './cache';
-import { parseDom, withDomGlobals } from './dom-env';
+import { closeWindow, parseDom, withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
 import { parseRepairReply, ReplyParseError } from './parse';
 import {
   countSelectorMatches,
   countTextMatches,
+  directGetParentFor,
   healedSiteForEdit,
   HOOK_TITLE_RE,
   impliesCollection,
+  scopedChildCount,
 } from './resolve';
 import { EditRejected, validateEdits } from './validate';
 import { HealContext, HealStage, OracleEntry, StageVerdict } from './types';
@@ -227,6 +229,30 @@ export const resolveStage: HealStage = {
       // find/children/…: parent-scoped, so a whole-document count
       // over-approximates — enforce existence only.
       const scoped = site.call !== 'get';
+      // …unless the `.find()`'s parent resolves UNIQUELY: then we can count
+      // within it and reject a look-alike-sibling ambiguity offline — the
+      // incumbents' cardinal sin, in the one shape the existence-only default
+      // punts. Sound: only the direct cy.get('P').find('C') shape with a
+      // plain-CSS child is judged; every other shape returns null and defers.
+      if (site.call === 'find') {
+        const parentSel = directGetParentFor(healedSource, site.start);
+        if (parentSel) {
+          const within = scopedChildCount(artifact.domHtml, parentSel, site.value);
+          if (within && within.count > 1 && !impliesCollection(healedSource, site.end)) {
+            return verdict(
+              'resolve',
+              'fail',
+              `healed selector "${site.value}" is ambiguous within its parent scope — ${within.count} matches inside the single "${parentSel}"${truncNote}, and the chain expects one; propose a selector unique within that scope`,
+              started,
+            );
+          }
+          if (within && within.count === 1) {
+            notes.push(`"${site.value}": unique within "${parentSel}" (scoped uniqueness verified)`);
+            continue;
+          }
+          // within null (parent absent/ambiguous) or count 0 → defer to rerun
+        }
+      }
       if (match.count > 1 && !scoped && !match.approximate && !impliesCollection(healedSource, site.end)) {
         return verdict(
           'resolve',
@@ -296,7 +322,10 @@ export const oracleStage: HealStage = {
     const { window } = parseDom(artifact.domHtml);
     const specSource = ctx.specSource;
 
-    return withDomGlobals(window, () => {
+    // The aria walk reads live nodes for the whole closure; close the window
+    // only after withDomGlobals returns (the verdict it yields holds strings).
+    try {
+      return withDomGlobals(window, () => {
       const docEl = window.document.documentElement;
       // Judge on the UNEXPANDED capture: the aria walk descends serialized
       // templates natively and queryAllDeep respects boundaries, so both
@@ -387,7 +416,10 @@ export const oracleStage: HealStage = {
         `healed selector targets the known-good ${identity}${notes.length ? ` (${notes.join('; ')})` : ''}`,
         started,
       );
-    });
+      });
+    } finally {
+      closeWindow(window);
+    }
   },
 };
 
