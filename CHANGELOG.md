@@ -10,6 +10,14 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal internals: `parseDom` consumers (triage, resolve, oracle, the prompt
+  window) now release their jsdom window through `closeWindow`/`withParsedDom`
+  after the last read — correct lifecycle and a guard against a future
+  tight-loop caller OOMing. Behavior-neutral (counts and verdicts are computed
+  before release). A measured leak audit found no unbounded growth in the
+  engine; the offline text-match helpers' O(N × subtree) cost on giant DOMs
+  and the oracle rung's aria-walk scaling are recorded as accepted, deferred
+  findings.
 - Heal: **`heal.exclude` directive** — a committed, reviewed guarantee that
   goldseam never heals a deliberately-red test (a security/negative assertion,
   a regression the team is tracking, a quarantined flake). Config
