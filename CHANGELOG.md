@@ -10,6 +10,16 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring **verifies every translated selector against the captured DOM**
+  (`plugin/translate-verify.ts`). Authoring has no rerun rung, so a hallucinated
+  action selector (matches nothing in the page the model saw) is caught here or
+  never: it triggers a retranslate with feedback naming the selector (capped),
+  then an honest give-up — a non-resolving selector is never shipped. Grounds
+  only commands before the first `visit` (later steps target a page the capture
+  does not hold); jQuery-pseudo selectors are accepted (not statically
+  checkable). A guarded last-resort re-derive substitutes a selector ONLY when a
+  single explicit step name resolves to exactly one element (heal resolve+oracle
+  discipline — never guesses on ambiguity).
 - Heal review: a **brittle-selector `reviewFlag`** (`heal/selector-score.ts`).
   A healed selector that RESOLVES but leans on a positional (`:nth-of-type`) or
   volatile identity (guid/framework-auto-id, volatile `data-*`, JS-handler attr)
