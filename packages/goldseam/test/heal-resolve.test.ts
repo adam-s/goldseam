@@ -205,6 +205,23 @@ describe('assertion strength', () => {
     expect(reviewFlagsFor(weak, [edit])[0]).toMatch(/^weak-assertions:/);
     expect(reviewFlagsFor(strong, [edit])).toEqual([]);
   });
+
+  it('reviewFlagsFor flags a brittle healed selector on a get(), independent of assertion strength', () => {
+    // Strong assertion downstream ⇒ no weak flag; the ONLY flag is the brittle one.
+    const strong = `it('a', () => { cy.get('#old').click(); cy.get('#c').should('have.text', '1'); });`;
+    const edit = { file: 'x', oldString: `cy.get('#old')`, newString: `cy.get('input:nth-of-type(2)')` };
+    const flags = reviewFlagsFor(strong, [edit]);
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatch(/^brittle-selector: "input:nth-of-type\(2\)" resolves but is positional\/volatile/);
+  });
+
+  it('reviewFlagsFor does NOT score a contains() text argument as a selector', () => {
+    // contains takes TEXT, not a CSS selector — a text that happens to look
+    // positional must never trip the brittle flag.
+    const spec = `it('a', () => { cy.contains(':nth-of-type').should('be.visible'); });`;
+    const edit = { file: 'x', oldString: `cy.contains(':nth-of-type')`, newString: `cy.contains(':first-child')` };
+    expect(reviewFlagsFor(spec, [edit]).some((f) => f.startsWith('brittle-selector:'))).toBe(false);
+  });
 });
 
 // ── stages ──────────────────────────────────────────────────────────────
@@ -459,6 +476,19 @@ describe('engine with the offline guard rungs', () => {
     const heal = await healArtifactFile(p, stubRunner([reply(`cy.get('#add-to-cart')`)]), options());
     expect(heal.verdict).toBe('healed');
     expect(heal.reviewFlags).toBeUndefined();
+  });
+
+  it('a brittle-but-valid healed selector still heals AND carries a brittle-selector flag (never blocks)', async () => {
+    // `li:nth-of-type(2)` resolves to exactly one <li> in the captured DOM
+    // (so the resolve rung passes and the heal succeeds) but is positional —
+    // the flag routes attention without changing the verdict.
+    const p = scaffold(artifact());
+    const heal = await healArtifactFile(p, stubRunner([reply(`cy.get('li:nth-of-type(2)')`)]), options());
+    expect(heal.verdict).toBe('healed');
+    expect(heal.reviewFlags?.some((f) => f.startsWith('brittle-selector:'))).toBe(true);
+    expect(heal.reviewFlags?.find((f) => f.startsWith('brittle-selector:'))).toMatch(/positional pseudo/);
+    // The healed selector was actually written — the flag did not revert it.
+    expect(readFileSync(join(root, SPEC_REL), 'utf8')).toContain('li:nth-of-type(2)');
   });
 });
 

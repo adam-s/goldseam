@@ -10,6 +10,14 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal review: a **brittle-selector `reviewFlag`** (`heal/selector-score.ts`).
+  A healed selector that RESOLVES but leans on a positional (`:nth-of-type`) or
+  volatile identity (guid/framework-auto-id, volatile `data-*`, JS-handler attr)
+  is flagged for human review — the selector-quality analog of the
+  weak-assertion flag. Additive metadata on the heal artifact; never blocks a
+  verdict. Cost model + `isGuidLike` are lifted from Playwright (Apache-2.0,
+  see NOTICE).
+
 - Authoring cache hardening: `loadPromptCache` now validates `schemaVersion`
   on load (a mismatched/hand-edited/foreign entry retranslates instead of
   replaying with wrong command semantics), and the FNV key delimiter is now the
