@@ -19,6 +19,7 @@
 
 import { RepairEdit } from './types';
 import { closeWindow, parseDom } from './dom-env';
+import { scoreSelector } from './selector-score';
 
 export interface MatchCount {
   count: number;
@@ -338,15 +339,29 @@ export function selectorOccursInCode(source: string, selector: string): boolean 
 export const isWeaklyAsserted = (assertions: string[]): boolean =>
   assertions.every((a) => WEAK_ASSERTIONS.has(a)); // none at all ⇒ action-only ⇒ weak
 
+/** Cypress commands whose string argument is a CSS selector (an identity we
+ * can score for brittleness). `contains` takes TEXT, not a selector — never
+ * scored. */
+const SELECTOR_CALLS = new Set(['get', 'find']);
+
 /**
  * Review flags for a verified heal (recorded on the heal artifact, shown
- * by the CLI and report). Flags never block — they route human attention.
+ * by the CLI and report). Flags never block — they route human attention;
+ * the verdict is decided entirely by the ladder rungs.
+ *
+ * Two independent flags:
+ * - weak-assertions: every check on the healed test is existence/visibility
+ *   only — a rerun proves "passes", not "points at the intended element".
+ * - brittle-selector: the healed selector RESOLVES but leans on a positional
+ *   (`:nth-of-type`) or volatile (guid/auto-id, volatile `data-*`, JS-handler
+ *   attr) identity that will churn on the next render (`scoreSelector`).
  */
 export function reviewFlagsFor(
   specSource: string,
   edits: RepairEdit[],
   options?: { hookHeal?: boolean },
 ): string[] {
+  const flags: string[] = [];
   let located = 0;
   let allWeak = true;
   for (const edit of edits) {
@@ -356,11 +371,20 @@ export function reviewFlagsFor(
     if (!isWeaklyAsserted(assertionsAfter(healed.healedSource, healed.site.end, options?.hookHeal))) {
       allWeak = false;
     }
+    // Brittle-selector flag: only for calls whose argument is a selector.
+    if (healed.site.call && SELECTOR_CALLS.has(healed.site.call)) {
+      const score = scoreSelector(healed.site.value);
+      if (score.brittle) {
+        flags.push(
+          `brittle-selector: "${healed.site.value}" resolves but is positional/volatile (${score.reasons.join('; ')}) — prefer a stable id/data-testid; review the target`,
+        );
+      }
+    }
   }
   if (located > 0 && allWeak) {
-    return [
+    flags.push(
       'weak-assertions: every check on the healed test is existence/visibility-only — the rerun proves it passes, not that the selector points at the intended element; review the target manually',
-    ];
+    );
   }
-  return [];
+  return flags;
 }
