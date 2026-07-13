@@ -38,6 +38,28 @@ describe('parseRepairReply', () => {
     expect(() => parseRepairReply('I think the selector should be...')).toThrow(ReplyParseError);
   });
 
+  it('rescues a complete JSON object wrapped in model prose (trailing self-doubt)', () => {
+    // Opus intermittently appends a self-correcting sentence AFTER the object.
+    const trailing = parseRepairReply(
+      '{"edits":[{"file":"a","oldString":"b","newString":"c"}],"confidence":0.9}\n\nWait — let me double-check that selector is unique.',
+    );
+    expect(trailing.edits).toHaveLength(1);
+    // Leading prose too (scan starts at the first brace).
+    const leading = parseRepairReply(
+      'Here is the fix:\n{"giveUp":{"reason":"no target"},"reasoning":"r"}',
+    );
+    expect(leading.giveUp?.reason).toBe('no target');
+  });
+
+  it('still rejects a reply with no parseable object, and a `}` inside a string does not close early', () => {
+    expect(() => parseRepairReply('nothing structured here, sorry')).toThrow(ReplyParseError);
+    // A brace inside a string value must not truncate the object.
+    const r = parseRepairReply(
+      '{"edits":[{"file":"a","oldString":"x }","newString":"y }"}],"confidence":0.7} trailing',
+    );
+    expect(r.edits?.[0].oldString).toBe('x }');
+  });
+
   it('rejects out-of-range confidence', () => {
     expect(() =>
       parseRepairReply('{"edits":[{"file":"a","oldString":"b","newString":"c"}],"confidence":1.4}'),

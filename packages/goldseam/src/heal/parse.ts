@@ -5,6 +5,32 @@ import { RepairReply } from './types';
 
 export class ReplyParseError extends Error {}
 
+/** The first BALANCED `{…}` object in `text`, or null. Brace-depth scan that
+ * respects double-quoted strings and their escapes, so a `}` inside a string
+ * value never closes the object early. Handles prose on EITHER side of the
+ * object — leading prose is skipped (scan starts at the first `{`), trailing
+ * prose is ignored (scan stops at the matching `}`). */
+function firstBalancedObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (c === '\\') i++; // skip the escaped char
+      else if (c === '"') inStr = false;
+    } else if (c === '"') {
+      inStr = true;
+    } else if (c === '{') {
+      depth++;
+    } else if (c === '}') {
+      if (--depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 /** Fence-tolerant JSON-object parse — shared by every model reply path. */
 export function parseJsonBlock(raw: string): unknown {
   let text = raw.trim();
@@ -14,10 +40,25 @@ export function parseJsonBlock(raw: string): unknown {
   try {
     parsed = JSON.parse(text);
   } catch {
-    // The ellipsis matters: a truncated prefix of well-formed JSON looks
-    // valid and sends the reader hunting the wrong bug — the real problem
-    // is usually further into the reply (walkthrough finding).
-    throw new ReplyParseError(`reply is not valid JSON: ${text.slice(0, 200)}${text.length > 200 ? '…' : ''}`);
+    // A model may wrap a complete JSON object in prose — Opus intermittently
+    // appends a self-correcting sentence AFTER the object ("…{}\n\nWait, let me
+    // verify…"), which makes JSON.parse of the whole reply fail. Extract the
+    // first balanced {…} and parse THAT before giving up; the strict path still
+    // rejects a reply with no parseable object.
+    const obj = firstBalancedObject(text);
+    if (obj !== null) {
+      try {
+        parsed = JSON.parse(obj);
+      } catch {
+        parsed = undefined;
+      }
+    }
+    if (parsed === undefined) {
+      // The ellipsis matters: a truncated prefix of well-formed JSON looks
+      // valid and sends the reader hunting the wrong bug — the real problem
+      // is usually further into the reply (walkthrough finding).
+      throw new ReplyParseError(`reply is not valid JSON: ${text.slice(0, 200)}${text.length > 200 ? '…' : ''}`);
+    }
   }
   if (typeof parsed !== 'object' || parsed === null) {
     throw new ReplyParseError('reply is not a JSON object');
