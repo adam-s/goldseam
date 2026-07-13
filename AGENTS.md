@@ -24,7 +24,7 @@ Self-healing for existing Cypress suites: a failure becomes a rich capture
 (redacted DOM + aria tree + error), a self-hosted/BYO model proposes a
 minimal selector fix, the suite verifies it through a stage ladder, and it
 arrives as a reviewed commit. Plugin (`goldseam/support` +
-`goldseam/plugin`) + CLI (`goldseam init|heal|report|eject`; `pr` planned) in
+`goldseam/plugin`) + CLI (`goldseam init|heal|report|eject|import`; `pr` planned) in
 [packages/goldseam/](packages/goldseam/); living design references
 (usage catalog, competition, ladder) in [.agents/reference/](.agents/reference/).
 **This repo is a public portfolio artifact —
