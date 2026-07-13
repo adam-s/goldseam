@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { maskText, redactedOuterHtml } from '../src/support/redact';
+import { maskText, redactedOuterHtml, stripAriaControlValues } from '../src/support/redact';
 
 describe('maskText', () => {
   it('masks emails', () => {
@@ -43,6 +43,39 @@ describe('maskText', () => {
       'https://x.test/cb?access_token=[redacted]&state=ok',
     );
     expect(maskText('href="/reset?token=xyz789&lang=en"')).toBe('href="/reset?token=[redacted]&lang=en"');
+  });
+});
+
+describe('stripAriaControlValues', () => {
+  it('strips inline text-control values but keeps role, name, labels, structure', () => {
+    const aria = [
+      '- text: Full name',
+      '- textbox "Full name": John Q Secretson',
+      '- textbox "Pw": hunter2pw',
+      '- textbox: dear diary my secret plan',
+      '- searchbox "Query": my private search',
+      '- button "Buy now"',
+      '- combobox:',
+      '  - option "Bravo" [selected]',
+    ].join('\n');
+    const out = stripAriaControlValues(aria);
+    // typed values gone
+    expect(out).not.toContain('John Q Secretson');
+    expect(out).not.toContain('hunter2pw');
+    expect(out).not.toContain('secret plan');
+    expect(out).not.toContain('my private search');
+    // role + accessible name + surrounding structure kept
+    expect(out).toContain('- textbox "Full name"');
+    expect(out).toContain('- textbox "Pw"');
+    expect(out).toContain('- searchbox "Query"');
+    expect(out).toContain('- text: Full name'); // a label text node, not a form value — kept
+    expect(out).toContain('- button "Buy now"'); // button label — kept
+    expect(out).toContain('  - option "Bravo" [selected]'); // structural combobox children — kept
+  });
+
+  it('is a no-op on a snapshot with no inline control values', () => {
+    const aria = '- heading "Welcome" [level=1]\n- list:\n  - listitem: shop item';
+    expect(stripAriaControlValues(aria)).toBe(aria);
   });
 });
 

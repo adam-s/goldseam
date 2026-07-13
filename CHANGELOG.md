@@ -10,6 +10,14 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Capture (security): the **aria snapshot no longer leaks text-control
+  values**. The DOM path stripped text-entry/`textarea` values, but the aria
+  path went through `maskText` (pattern-masking) only, so a typed value
+  matching no pattern — a password, a name — shipped to the model as
+  `textbox "Pw": <value>`. `stripAriaControlValues` now removes the inline
+  value (keeping role + accessible name) before masking, restoring the
+  documented "text-entry values are never captured" guarantee on both
+  surfaces.
 - Heal `resolve` rung: **scoped `.find()` uniqueness**. A whole-document
   count is existence-only for scoped calls, so a heal to a look-alike sibling
   inside a parent scope could pass offline. Now, for the direct

@@ -119,9 +119,15 @@ of what else improves:
   attempt poisons the healer with a stale artifact from a flaky-then-green
   test.
 - **Redaction runs on a clone, never the live DOM**
-  ([support/redact.ts](packages/goldseam/src/support/redact.ts)), and
-  `maskText` also runs on the aria YAML. The capture is the model's input;
-  redaction is a capture concern, not polish.
+  ([support/redact.ts](packages/goldseam/src/support/redact.ts)). The DOM path
+  strips text-entry control values (`stripControlValues`) and masks patterns;
+  the aria path must do BOTH too — `stripAriaControlValues` removes a text
+  control's inline typed value (`textbox "Pw": <value>`) *before* `maskText`
+  pattern-masks the rest, or a value matching no pattern (a password, a name)
+  leaks through the aria YAML. "Text-entry values are never captured" is a
+  structural guarantee on both surfaces, distinct from the pattern-based
+  redaction of everything else. The capture is the model's input; redaction is
+  a capture concern, not polish.
 - **`CAPTURE_TASK` is namespaced** (`goldseam:capture`,
   [shared/types.ts](packages/goldseam/src/shared/types.ts)) and every
   artifact carries `schemaVersion` — the artifact schema is a public API;
