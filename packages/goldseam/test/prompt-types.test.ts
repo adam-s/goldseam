@@ -6,6 +6,28 @@ import {
   validateCommands,
 } from '../src/shared/prompt-types';
 import { renderEntry } from '../src/cli/eject';
+import { TRANSLATE_RULES } from '../src/plugin/translate-rules';
+
+describe('TRANSLATE_RULES', () => {
+  it('is a single exported string (the tuner rewrites one constant)', () => {
+    // bench/translate-tune.mjs rewrites this whole constant in place; if it
+    // ever became an array or an object the tuner and prompt assembly would
+    // both break. Cheap pin that it stays one flat string.
+    expect(typeof TRANSLATE_RULES).toBe('string');
+    expect(TRANSLATE_RULES.length).toBeGreaterThan(0);
+  });
+
+  it('carries the outcome-assert guidance (verify a named landed state; never invent one)', () => {
+    // The POSTCONDITION-ASSERT rule closes authoring's action-only false-green:
+    // a step that NAMES an outcome must emit a verifying assert, and a step that
+    // names none must NOT (an invented assertion is a guess). This pins that the
+    // rule was not silently dropped by a later tuning pass.
+    expect(TRANSLATE_RULES).toMatch(/NAMES AN OUTCOME/);
+    expect(TRANSLATE_RULES).toMatch(/should":"be\.visible"/); // appearance assert shape
+    expect(TRANSLATE_RULES).toMatch(/should":"not\.exist"/); // disappearance assert shape
+    expect(TRANSLATE_RULES).toMatch(/when a step names no outcome, emit no assert/i);
+  });
+});
 
 describe('promptKey', () => {
   it('is stable for identical steps and differs otherwise', () => {
