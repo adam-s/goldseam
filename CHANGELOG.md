@@ -10,6 +10,15 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring prompt: **emit a verifying assert when a step names an outcome**
+  (`translate-rules.ts`). When a step explicitly names a result — something
+  appears/opens, disappears/closes, or a message/toast shows — the translator
+  now emits a following `assert` that verifies that landed state, closing
+  authoring's action-only false-green at the source. It emits **no** assert for
+  a step that names no outcome (an invented assertion is a guess). Validated by
+  `bench/translate-eval` (real Sonnet): baseline held 23/23 + 4/4 must-refuse,
+  with perfect separation — the 3 outcome-naming cases each asserted once, all
+  16 outcome-free cases asserted zero.
 - Authoring: a bounded **DOM-stability settle** before the first-run
   translation capture (`support/settle.ts`). SPA/AJAX pages paint the target
   after load, so a snapshot taken the instant `cy.goldseam` runs sees stale
