@@ -206,7 +206,10 @@ export async function healArtifactFile(
   // memory is still valid.
   // Only single-edit heals feed heal memory: one occurrence, one clean
   // selector mapping. Multi-edit heals are applied but not cached.
-  if (options.cacheFile && finalEdits?.length === 1 && tier === 'model' && artifact.failedSelector) {
+  // Dry-run must mutate nothing on disk — and in dry-run the rerun rungs
+  // short-circuit to pass, so `healed` here is UNVERIFIED; caching it would
+  // seed heal memory with a mapping no rerun ever confirmed.
+  if (!options.dryRun && options.cacheFile && finalEdits?.length === 1 && tier === 'model' && artifact.failedSelector) {
     const replacement = deriveReplacement(finalEdits[0], artifact.failedSelector);
     if (replacement) {
       saveEntry(options.cacheFile, {
