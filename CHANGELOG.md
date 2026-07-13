@@ -10,6 +10,18 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Heal: **`heal.exclude` directive** — a committed, reviewed guarantee that
+  goldseam never heals a deliberately-red test (a security/negative assertion,
+  a regression the team is tracking, a quarantined flake). Config
+  (`heal.exclude`, a durable list) or `--exclude <substr>` (one-off). A bare
+  string substring-matches spec-or-title; an object ANDs `spec`/`title`/
+  `selector` with an optional `reason`. Unlike `--skip` (a silent drop), an
+  exclusion produces a first-class, REPORTED give-up (`tier: excluded`) with
+  the reason in the ladder — short-circuited in the engine before any model
+  call, so an excluded test is never sent to the model and its spec is never
+  touched. Incumbent parity (Healenium `@DisableHealing`; cy.prompt has no
+  opt-out), and beats their disable leaking through `findElements`.
+
 - Capture (security): the **aria snapshot no longer leaks text-control
   values**. The DOM path stripped text-entry/`textarea` values, but the aria
   path went through `maskText` (pattern-masking) only, so a typed value
