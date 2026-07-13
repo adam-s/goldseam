@@ -12,9 +12,11 @@ import {
 import { stepAnchors, windowTranslationDom } from '../src/plugin/translate-window';
 
 /** A page whose head-first slice is all chrome and whose target sits far
- * past `budget`, so a head cut would drop it. */
-function bigPage(target: string, filler = 6000): string {
-  const noise = '<div class="chrome"><span>nav</span><span>header stuff</span></div>'.repeat(400);
+ * past `budget`, so a head cut would drop it. Kept small enough (~60 KB) that
+ * jsdom parses it well under vitest's 5s timeout on a cold CI runner, while
+ * still exceeding every budget the tests use (max 20000). */
+function bigPage(target: string, filler = 700): string {
+  const noise = '<div class="chrome"><span>nav</span><span>header stuff</span></div>'.repeat(200);
   const bulk = `<section class="bulk"><p>lorem ipsum body content</p></section>`.repeat(filler);
   return `<html><head><title>t</title></head><body><nav>${noise}</nav><main>${bulk}${target}</main></body></html>`;
 }
