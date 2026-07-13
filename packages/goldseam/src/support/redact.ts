@@ -77,12 +77,19 @@ function stripControlValues(el: Element): void {
  */
 export function redactInPlace(root: Node): void {
   const doc = root.ownerDocument as Document;
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  // SHOW_COMMENT matters: a secret in an HTML comment (`<!-- card 4111... -->`)
+  // is serialized into domHtml by outerHTML and would otherwise ship to the
+  // model unmasked — its format matches the redaction patterns, only its node
+  // type was being skipped.
+  const walker = doc.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT | NodeFilter.SHOW_COMMENT,
+  );
   const elements: Element[] = root.nodeType === 1 ? [root as Element] : [];
-  const textNodes: Text[] = [];
+  const charData: CharacterData[] = []; // Text (3) and Comment (8) both expose .data
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeType === 1) elements.push(node as Element);
-    else textNodes.push(node as Text);
+    else charData.push(node as CharacterData);
   }
   for (const el of elements) {
     stripControlValues(el);
@@ -92,9 +99,9 @@ export function redactInPlace(root: Node): void {
     }
     if (el.tagName === 'TEMPLATE') redactInPlace((el as HTMLTemplateElement).content);
   }
-  for (const text of textNodes) {
-    const masked = maskText(text.data);
-    if (masked !== text.data) text.data = masked;
+  for (const node of charData) {
+    const masked = maskText(node.data);
+    if (masked !== node.data) node.data = masked;
   }
 }
 

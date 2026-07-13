@@ -104,6 +104,23 @@ describe('redactedOuterHtml', () => {
     expect(html).toContain('[redacted-number]');
   });
 
+  it('masks pattern-matching secrets inside HTML comment nodes (light DOM and shadow content)', () => {
+    // Comments serialize into domHtml via outerHTML and are sent to the model;
+    // their node type was being skipped by the redaction walker.
+    document.body.innerHTML =
+      '<div id="host">visible</div><!-- ops note: card 4111111111111111 / admin@corp.com -->';
+    document.getElementById('host')!.attachShadow({ mode: 'open' }).innerHTML =
+      '<!-- shadow secret token 9876543210 -->';
+    const html = redactedOuterHtml(document.body);
+    expect(html).not.toContain('4111111111111111');
+    expect(html).not.toContain('admin@corp.com');
+    expect(html).not.toContain('9876543210'); // masked inside the shadow template too
+    expect(html).toContain('[redacted-number]');
+    expect(html).toContain('[redacted-email]');
+    expect(html).toContain('<!--'); // the comment node is preserved (structure), only its data masked
+    expect(html).toContain('visible');
+  });
+
   it('never mutates the live DOM', () => {
     document.body.innerHTML = '<p>mail me: a@b.com</p><input value="keep">';
     redactedOuterHtml(document.body);

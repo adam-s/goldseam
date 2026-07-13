@@ -325,9 +325,16 @@ Tradeoffs, not oversights:
   assertion still heals — the weak-assertion flag is the fallback. The
   harvest is the ONE sanctioned exception to "green runs write nothing":
   it writes only `.goldseam/oracle.json`, never captures (E2E-pinned).
-- **Scoped calls (`.find()` etc.) get existence-only resolution** — a
-  whole-document count over-approximates within-parent uniqueness, so
-  ambiguity there is deferred to the rerun rungs.
+- **Scoped calls get existence-only resolution — except the direct
+  `.find()` shape.** A whole-document count over-approximates within-parent
+  uniqueness, so scoped ambiguity defaults to the rerun rungs. The one shape
+  now judged offline: `cy.get('P').find('C')` where `P` resolves to exactly
+  one element — the `resolve` rung counts `C` *within* that element and
+  rejects a look-alike-sibling ambiguity (`scopedChildCount` /
+  `directGetParentFor` in [heal/resolve.ts](packages/goldseam/src/heal/resolve.ts)).
+  Sound, not complete: a chained/scoped parent, `.within()`, a variable
+  subject, `.children()`/`.filter()`/etc., or a jQuery-pseudo child all return
+  null and defer — an over-approximation never rejects.
 - **Retry dedup is scoped to deterministic rungs.** An identical
   proposal failing twice at resolve/oracle aborts (provably futile);
   rerun-rung failures keep the full attempt budget because app flake is

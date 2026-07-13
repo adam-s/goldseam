@@ -161,6 +161,40 @@ describe('validateEdits', () => {
     );
   });
 
+  it("rejects rewriting a chai matcher's expected VALUE (enclosing call is the matcher, not expect)", () => {
+    // expect(x).to.equal('shipped') → innermost call is `equal`, not `expect`,
+    // so the ASSERTION_CALLS check alone missed it. This is the sacred
+    // "heals never weaken assertions" invariant — a value edit here masks a
+    // real regression through a green rerun.
+    const spec = `it('t', () => { expect(order.status).to.equal('shipped'); });\n`;
+    expect(() => validateEdits(reply(`'shipped'`, `'delivered'`), SPEC_PATH, spec)).toThrow(
+      /inside equal\(…\); heals never weaken assertions/,
+    );
+  });
+
+  it('rejects chai include/contain value edits and assert.equal(…) values', () => {
+    const cases: Array<[string, string, string]> = [
+      [`it('t',()=>{ expect(res.body).to.include('ok'); });\n`, `'ok'`, `'fail'`],
+      [`it('t',()=>{ expect(el).to.contain('Sold out'); });\n`, `'Sold out'`, `'In stock'`],
+      [`it('t',()=>{ assert.equal(total, '42'); });\n`, `'42'`, `'99'`],
+    ];
+    for (const [spec, oldS, newS] of cases) {
+      expect(() => validateEdits(reply(oldS, newS), SPEC_PATH, spec)).toThrow(/never weaken assertions/);
+    }
+  });
+
+  it('does NOT reject cy.contains() — same matcher name, but not an assertion chain', () => {
+    const spec = `it('t', () => { cy.contains('Add to cart').click(); });\n`;
+    const edits = validateEdits(reply(`'Add to cart'`, `'Add to bag'`), SPEC_PATH, spec);
+    expect(edits[0].newString).toContain('Add to bag');
+  });
+
+  it('does NOT reject a selector inside expect(Cypress.$(…)) — the subject, not a value', () => {
+    const spec = `it('t', () => { expect(Cypress.$('.cart')).to.have.length(1); });\n`;
+    const edits = validateEdits(reply(`'.cart'`, `'.basket'`), SPEC_PATH, spec);
+    expect(edits[0].newString).toContain('.basket');
+  });
+
   it("rejects an assertion-value edit whose snippet is cropped to hide the call name", () => {
     // A quoted snippet cropped to start after `should(` carries no call
     // context of its own — anchoring on the model's snippet would accept

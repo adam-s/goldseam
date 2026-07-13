@@ -18,7 +18,15 @@ Everything below is unreleased work toward it.
   value (keeping role + accessible name) before masking, restoring the
   documented "text-entry values are never captured" guarantee on both
   surfaces.
-
+- Heal `resolve` rung: **scoped `.find()` uniqueness**. A whole-document
+  count is existence-only for scoped calls, so a heal to a look-alike sibling
+  inside a parent scope could pass offline. Now, for the direct
+  `cy.get('P').find('C')` shape where `P` resolves to exactly one element, the
+  rung counts `C` *within* that element and rejects a within-parent ambiguity
+  — the incumbents' cardinal "heals to the next element of the same type"
+  failure, caught offline. Sound, not complete: any other shape (chained
+  parent, `.within()`, variable subject, jQuery-pseudo child) defers to the
+  rerun, so an over-approximation never rejects.
 - Heal prompt: an anchored **neighborhood window**
   (`heal/dom-window.ts`) so a deep target survives the ~40 K prompt budget.
   Style/script bodies are emptied; then, when the DOM still overflows and a
