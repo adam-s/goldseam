@@ -10,6 +10,17 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring: an **opt-in aria-outline translation representation**
+  (`author.representation: 'aria'`, `plugin/aria-outline.ts`). Instead of raw
+  page HTML, the model can be given a compact accessibility outline — one line
+  per interactive/landmark element carrying a `deriveSelector` locator verified
+  unique. In a session experiment it grounded 8/9 vs 6/9 raw at fewer tokens
+  and structurally dissolves the large-page cut (the whole interactive surface
+  fits the budget). **Default is unchanged** (`'dom'`, the raw-DOM window —
+  byte-identical); `'aria'` falls back to the raw-DOM window whenever the
+  outline can't be produced (parse error, closed-shadow-only, no groundable
+  node), so it is never worse. Composes with the selector-verify pass
+  (aria-derived selectors resolve by construction). Bench baseline held.
 - Authoring prompt: **emit a verifying assert when a step names an outcome**
   (`translate-rules.ts`). When a step explicitly names a result — something
   appears/opens, disappears/closes, or a message/toast shows — the translator
