@@ -333,6 +333,23 @@ Tradeoffs, not oversights:
   it) but never re-derived. All conservative: the honesty rule is "never ship a
   non-resolving selector, never guess an ambiguous one" — a deferred selector
   is one the model still answered for, not one we invented.
+- **The authoring settle is best-effort and capture-path-only.**
+  `waitForDomStable` ([support/settle.ts](packages/goldseam/src/support/settle.ts))
+  runs INSIDE `cy.goldseam` before the FIRST-run translation capture only —
+  never the cache-hit replay, never the general suite — so the transparency
+  invariant holds: a suite behaves identically with and without goldseam, the
+  settle affects only the command the author explicitly wrote. It never touches
+  global listeners, fully disconnects its MutationObserver on resolve, and never
+  throws (any failure degrades to capturing immediately). It is opt-out
+  (`settle: false`/`0`, per-call or via `Cypress.env('goldseam')`) and the cap
+  is tunable. Known limits (all no worse than the pre-settle eager capture):
+  (a) a page that NEVER quiesces (animations, polling) is captured at the
+  `maxMs` ceiling, possibly mid-paint — verify catches a hallucinated selector,
+  the author retries; (b) content that arrives LATER than the cap is still
+  missed — raise `settle` for a known-slow page; (c) quiescence is DOM-mutation
+  only, so a network fetch that hasn't painted yet reads as quiet. A fixed
+  `cy.wait` was rejected: too short misses slow content, too long taxes every
+  static page; watching mutations self-tunes.
 - **DOM truncation can cut mid-tag** at `maxDomBytes`. Harmless for the
   model; not worth an HTML-aware slicer yet.
 - **Prompt DOM windowing anchors on light-DOM/template content only, and

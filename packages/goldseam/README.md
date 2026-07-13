@@ -252,6 +252,13 @@ page and are refused.
   what breaks — and healing edits spec code, not caches. Delete that
   cache file (or edit the steps) to retranslate against the new page, or
   eject first and let the pasted code heal like any other spec.
+- On the **first run**, the page is given a moment to settle before it's
+  snapshotted — the DOM is watched and captured once it stops mutating (a
+  short quiet window, hard-capped), so content painted after load (SPA/AJAX)
+  is present when the model reads the page. It only affects the translate
+  capture, never the cached replay. Opt out or retune per call with
+  `cy.goldseam(steps, { settle })` (or plugin-wide via the `settle` option):
+  `settle: false` (or `0`) captures immediately; a number overrides the cap.
 - Translation model: the plugin's `promptModel` option (default `claude` →
   Sonnet), or the `GOLDSEAM_PROMPT_MODEL` env var.
 
@@ -270,6 +277,7 @@ import when you want to change a default):
 | `ariaSnapshot` | `true` | Include the accessibility-tree YAML in captures |
 | `maxDomBytes` | `1048576` | DOM size cap; truncated captures carry `domTruncated: true` |
 | `recordOracles` | `false` | Record passing tests' selector identities to `.goldseam/oracle.json` (feeds the oracle rung) |
+| `settle` | `true` | Bounded DOM-stability wait before the `cy.goldseam` first-run capture (late SPA/AJAX content). `false`/`0` disables; a number overrides the ~1500 ms cap. Per-call `cy.goldseam(steps, { settle })` wins. |
 
 `goldseam(on, config, options?)` — Node side:
 

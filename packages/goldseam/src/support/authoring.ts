@@ -18,9 +18,27 @@ import {
 } from '../shared/prompt-types';
 import { PROMPT_LOAD_TASK, PROMPT_TRANSLATE_TASK } from '../shared/types';
 import { maskText, redactedOuterHtml } from './redact';
+import { SETTLE_QUIET_MS, resolveSettleMs, waitForDomStable } from './settle';
 
 export interface GoldseamPromptOptions {
   placeholders?: Record<string, string>;
+  /** Bounded DOM-stability wait before the FIRST-run translation capture, so
+   * late SPA/AJAX content is present when the page is snapshotted for the
+   * model. `false` (or `0`) disables it; a positive number overrides the
+   * default ~1500 ms ceiling. The cache-hit replay never settles. Default on.
+   * Overrides the plugin-wide `settle` set via `Cypress.env('goldseam')`. */
+  settle?: boolean | number;
+}
+
+/** Read the plugin-wide `settle` default from `Cypress.env('goldseam')`.
+ * `allowCypressEnv: false` makes `Cypress.env()` throw — env options are
+ * optional sugar, never worth failing the author's test over. */
+function envSettle(): boolean | number | undefined {
+  try {
+    return (Cypress.env('goldseam') as { settle?: boolean | number } | undefined)?.settle;
+  } catch {
+    return undefined;
+  }
 }
 
 function execute(commands: StepCommand[], placeholders: Record<string, string>): void {
@@ -104,19 +122,34 @@ export function registerAuthoringCommand(): void {
         return;
       }
       // First run: translate against the live page. The DOM ships redacted,
-      // exactly like a failure capture.
-      cy.document({ log: false }).then((doc) => {
-        const payload = {
-          key,
-          steps,
-          url: maskText(doc.location.href),
-          domHtml: redactedOuterHtml(doc.documentElement),
-        };
-        cy.task<PromptCacheEntry>(PROMPT_TRANSLATE_TASK, payload, {
-          log: false,
-          timeout: 120_000,
-        }).then((entry) => execute(entry.commands, placeholders));
-      });
+      // exactly like a failure capture. Before snapshotting, settle the DOM so
+      // content painted after load (SPA/AJAX) is present — bounded, opt-out,
+      // and ONLY on this translate path (the cache-hit replay above never
+      // waits). The settle NEVER throws: it degrades to capturing immediately.
+      const settleMs = resolveSettleMs(options.settle ?? envSettle());
+      cy.document({ log: false })
+        // A native promise returned from `.then` makes Cypress await it before
+        // the next command — and this callback runs NO cy.* commands, so there
+        // is no async/sync mixing. `undefined` (settle disabled) is a no-op.
+        .then((doc) =>
+          settleMs > 0
+            ? waitForDomStable(doc.documentElement, { quietMs: SETTLE_QUIET_MS, maxMs: settleMs })
+            : undefined,
+        )
+        .then(() => {
+          cy.document({ log: false }).then((doc) => {
+            const payload = {
+              key,
+              steps,
+              url: maskText(doc.location.href),
+              domHtml: redactedOuterHtml(doc.documentElement),
+            };
+            cy.task<PromptCacheEntry>(PROMPT_TRANSLATE_TASK, payload, {
+              log: false,
+              timeout: 120_000,
+            }).then((entry) => execute(entry.commands, placeholders));
+          });
+        });
     });
   });
 }
