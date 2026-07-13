@@ -10,6 +10,13 @@ Everything below is unreleased work toward it.
 
 ## Unreleased
 
+- Authoring `eject` fidelity + trust fixes: ejected code now honors `shadow`
+  scoping (`cy.get(host).first().shadow().find(selector)`) exactly as replay
+  does — a bare `cy.get` silently targeted a different element; a cached
+  **refusal** (`giveUp`) ejects as a loud `throw`, not an empty
+  vacuously-passing block (give-up stays first-class through eject); and a
+  corrupt cache file is skipped with a note instead of aborting the whole
+  eject. Pinned in `test/prompt-types.test.ts`.
 - Heal internals: `parseDom` consumers (triage, resolve, oracle, the prompt
   window) now release their jsdom window through `closeWindow`/`withParsedDom`
   after the last read — correct lifecycle and a guard against a future
