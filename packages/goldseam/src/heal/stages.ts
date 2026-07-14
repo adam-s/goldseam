@@ -7,6 +7,7 @@ import { createRequire } from 'module';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getAllByAria, queryAllDeep } from 'aria-snapshot';
+import { trace } from '../debug/trace';
 import { buildCacheEdit, loadCache, lookup } from './cache';
 import { closeWindow, parseDom, withDomGlobals } from './dom-env';
 import { buildRepairPrompt } from './prompt';
@@ -28,7 +29,13 @@ const verdict = (
   v: StageVerdict['verdict'],
   evidence: string,
   started: number,
-): StageVerdict => ({ stage, verdict: v, evidence, durationMs: Date.now() - started });
+): StageVerdict => {
+  const r: StageVerdict = { stage, verdict: v, evidence, durationMs: Date.now() - started };
+  // Every rung's outcome lands on the trace timeline (ring 0) — the ladder as
+  // the debugger sees it. No-op unless GOLDSEAM_TRACE is set.
+  trace(`ladder:${stage}`, v, () => ({ evidence, ms: r.durationMs }));
+  return r;
+};
 
 // Pre-model triage (.agents/reference/disambiguation.md): not every "not found" is
 // selector drift. If the selector Cypress could never find STILL matches
@@ -133,12 +140,14 @@ export const proposeStage: HealStage = {
       feedback: ctx.feedback,
     });
 
+    trace('propose:prompt', 'sent', () => ({ runner: ctx.runner.id, chars: prompt.length }));
     let raw: string;
     try {
       raw = await ctx.runner.repair(prompt);
     } catch (e) {
       return verdict('propose', 'fail', `runner error: ${e instanceof Error ? e.message : e}`, started);
     }
+    trace('propose:reply', 'raw', () => ({ chars: raw.length, reply: raw.slice(0, 600) }));
 
     try {
       const reply = parseRepairReply(raw);

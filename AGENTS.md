@@ -150,10 +150,16 @@ of what else improves:
   `<!-- goldseam: DOM windowed … -->` marker names the anchor, and the live
   ladder still verifies. Output is hard-bounded by the budget. When NO anchor
   exists anywhere (e.g. an authoring spec with no `cy.contains` and a renamed
-  single-token selector), there is no region to center on, so the floor
-  widens to `NO_ANCHOR_FALLBACK_FACTOR × budget` — a content superset of the
-  old head-first slice that rescues a target sitting just past the budget and
-  can never break a heal that worked on the narrower slice.
+  single-token selector), there is no region to center on, so the no-anchor
+  slice widens all the way to `NO_ANCHOR_FALLBACK_CEILING` (200 K chars) — a
+  content superset of the old head-first slice that rescues a target sitting
+  deep behind un-strippable chrome (a Squarespace mega-nav pushes the blog list
+  to char ~144 K, past the old `2 × budget` floor; emptying style/script/svg/
+  comments moves it only ~4 K, so the depth is real DOM, not boilerplate) and
+  can never break a heal that worked on the narrower slice. The ceiling bounds
+  prompt tokens on a genuinely enormous page (and keeps a small-context
+  self-hosted model from being handed a prompt it can't fit); a target past it
+  still truncates honestly, just far later. Tunable.
 - **`--dry-run` mutates nothing on disk** — the heal-artifact write in
   [heal/engine.ts](packages/goldseam/src/heal/engine.ts) is guarded by
   `!dryRun`; a dry-run previews the full ladder to stdout but must never
@@ -469,6 +475,66 @@ Tradeoffs, not oversights:
   it would dominate the heal. No fix — the aria-walk cost is inherent, not a
   bug — but recorded so a future scaling pass has the number (measured,
   accepted).
+- **The no-anchor DOM slice can reach `NO_ANCHOR_FALLBACK_CEILING` (200 K
+  chars ≈ 50 K tokens), well past the ~40 K anchored budget.** Prompt-only and
+  bounded (never touches `artifact.domHtml` or match counts; a 234-case
+  main-vs-branch differential found zero regressions — every path is
+  byte-identical to the old `2 × budget` slice or an intended content superset),
+  so it cannot break a heal that worked on the narrower slice. Two costs are
+  accepted: a capable model pays the tokens, and a *small-context self-hosted*
+  model handed 200 K re-hits the silent-truncate-then-give-up it was meant to
+  avoid — mitigated on the ollama path (`ollamaNumCtx` sizes the window to the
+  prompt so the give-up is at least honest) and, properly, obsoleted by the
+  offline candidate-ranking rung
+  ([selector-repair-research.md](.agents/reference/selector-repair-research.md)),
+  which removes the need to send the deep DOM at all. Tune with
+  `NO_ANCHOR_FALLBACK_CEILING` / `GOLDSEAM_OLLAMA_NUM_CTX` (red-team, accepted).
+- **`ollamaNumCtx` trades a silent truncation for a possible OOM.** Sizing
+  `num_ctx` to the prompt (chars/3 + headroom, capped at 131 072) means a large
+  prompt now requests a large KV cache; most Ollama builds clamp to the model's
+  trained context, but one that honors it literally can OOM/stall on tight VRAM
+  where before it silently truncated. An honest failure beats a silent lie, so
+  this is the right default; a memory-tight host caps it with
+  `GOLDSEAM_OLLAMA_NUM_CTX`. The chars/3 estimate can still under-size very dense
+  markup at the edge (red-team, accepted).
+- **The `openai:` runner requests `response_format: json_schema`; an endpoint
+  that rejects it (older vLLM, llama.cpp, some proxies) is retried ONCE
+  unconstrained** ([heal/runners.ts](packages/goldseam/src/heal/runners.ts)) —
+  so json_schema's reliability (plain `json_object` sends vLLM's decoder into a
+  `finish_reason=length` runaway; measured) never costs compatibility. The
+  degrade is scoped to schema-shaped 400s, so a context-length 400 (which a
+  retry can't fix) still surfaces. A reply that overruns `max_tokens` (8 192)
+  fails safe (unparseable → give-up), not silently (red-team, resolved +
+  accepted).
+- **The candidate-ranking shortlist and its confident-shrink**
+  ([heal/rank.ts](packages/goldseam/src/heal/rank.ts),
+  [heal/prompt.ts](packages/goldseam/src/heal/prompt.ts)). `rankCandidates`
+  scores selectors in the post-break capture by fit to the heal intent (spec's
+  `have.length`/text assertions, aria, structural homogeneity, and a
+  proportional name-overlap with the broken selector) and `buildRepairPrompt`
+  embeds the top-K shortlist — a compact list the model disambiguates from. Two
+  distinct behaviors, distinct trust postures: (a) the shortlist is added to
+  EVERY prompt (small; helps every model; never replaces the DOM; the model
+  still grounds its edit in the capture and resolve/rerun verify — worst case
+  give-up, never a wrong heal). (b) When the capture OVERFLOWS the DOM budget AND
+  the top candidate is STRONGLY confident (score ≥ 0.7), the embedded DOM is
+  shrunk (24 K) and windowed on the candidates, dropping a deep prompt from ~50 K
+  to ~5 K tokens so a small self-hosted model heals it (proven: local
+  qwen2.5-14b and the openai runner → Modal both heal the epsilon3 deep case;
+  the Modal recipe dropped back from A100/64 K-YaRN to L40S/32 K as a result).
+  The shrink is NOT strictly additive — a confidently-WRONG ranking could window
+  away a target the full no-anchor slice would have shown, turning that heal into
+  a give-up (never a wrong heal; resolve/rerun still verify). It is gated on the
+  high confidence bar to make that rare, `windowDom`'s head gate ignores
+  `anchorSelectors` so an early candidate can never truncate the window to a head
+  slice that bypasses `NO_ANCHOR_FALLBACK_CEILING` (the red-team regression), and
+  the full shortlist is still present as the model's safety net. Two accepted
+  costs: ranking is O(unique-selectors × N) and DEFERS (returns `[]` → full DOM)
+  above `MAX_RANK_ELEMENTS` (20 K) rather than spend seconds on a pathological
+  capture; and by spotlighting a count-matching candidate under a count-only
+  (weak) assertion, the shrink makes the pre-existing weak-assertion hole
+  (`isWeaklyAsserted`/`reviewFlags`) marginally more reachable — flagged for
+  review, never blocking (red-team, accepted).
 
 ## Noise
 

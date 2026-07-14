@@ -150,10 +150,11 @@ That's it — your suite now heals on a model you host.
   request timeout. Warm it once with the `curl .../health` check, or hit
   `curl .../v1/models` and wait for a JSON reply before healing.
 - **JSON escaping errors on a heal** — smaller models occasionally mangle the
-  edit JSON. goldseam's validator rejects the bad edit and fails the heal
-  honestly rather than applying garbage; retry, or use a larger model. (The
-  `ollama:` runner constrains decoding to JSON; the `openai:` path currently
-  does not.)
+  edit JSON. Both runners now request constrained JSON decoding (the `ollama:`
+  runner via `format:'json'`, the `openai:` path via
+  `response_format: json_object`, which vLLM honors), so this is rare; when it
+  still happens goldseam's validator rejects the bad edit and fails the heal
+  honestly rather than applying garbage. Retry, or use a larger model.
 
 ---
 
