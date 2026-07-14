@@ -6,6 +6,7 @@
 
 import { FailureArtifact } from '../shared/types';
 import { deboilerplateDom, windowDom } from './dom-window';
+import { Candidate, rankCandidates } from './rank';
 
 // The prompt's DOM-slimming (style/script strip + anchored neighborhood
 // window) lives in dom-window.ts; re-exported here because it is part of the
@@ -15,6 +16,32 @@ export { deboilerplateDom };
 
 const MAX_PROMPT_DOM_CHARS = 40_000;
 
+// The offline candidate ranking (rank.ts) produces a small shortlist of
+// selectors that fit the failing test. When the capture OVERFLOWS the DOM budget
+// AND that shortlist is confident, we embed a SMALLER DOM window: the shortlist
+// already carries the plausible answers, so a compact DOM is enough for the
+// model to sanity-check, and the whole prompt drops from ~50K tokens to a few K
+// — which is what lets a small self-hosted model heal a deep page. A page that
+// fits the budget, or a low-confidence shortlist, keeps the full window
+// unchanged (zero change for the heals that work today). The shortlist is
+// ALWAYS shown when non-empty (it is tiny); it never replaces the DOM, and the
+// model must still ground its edit in the capture — resolve/rerun verify.
+const SHORTLIST_CONFIDENT = 0.5;
+const SHORTLIST_DOM_CHARS = 24_000;
+
+/** Render the ranked shortlist as a compact, model-readable block. */
+function renderShortlist(cands: Candidate[]): string {
+  const lines = cands.map((c, i) => {
+    const sample = c.sampleText ? ` — “${c.sampleText.replace(/\s+/g, ' ').slice(0, 60)}”` : '';
+    const why = c.why.length ? `  [${c.why.join('; ')}]` : '';
+    return `${i + 1}. ${c.selector} — ${c.count} match${c.count === 1 ? '' : 'es'}${sample}${why}`;
+  });
+  return `## Candidate selectors (ranked offline by fit to the failing test)
+Each already exists in the captured DOM, with its match count and a text sample. Prefer the candidate whose element is what the test targeted — read the samples to disambiguate (e.g. a title link vs its containing card). The DOM below is authoritative and may be trimmed; do NOT invent a selector that is neither listed here nor visible in the DOM.
+${lines.join('\n')}
+`;
+}
+
 export interface PromptInput {
   artifact: FailureArtifact;
   specSource: string;
@@ -23,11 +50,29 @@ export interface PromptInput {
 }
 
 export function buildRepairPrompt({ artifact, specSource, selectorPriority, feedback }: PromptInput): string {
+  const candidates = rankCandidates({
+    failedSelector: artifact.failedSelector,
+    specSource,
+    domHtml: artifact.domHtml,
+    ariaSnapshot: artifact.ariaSnapshot,
+  });
+  const overflows = deboilerplateDom(artifact.domHtml).length > MAX_PROMPT_DOM_CHARS;
+  const confident = candidates.length > 0 && candidates[0].score >= SHORTLIST_CONFIDENT;
+  const budget = overflows && confident ? SHORTLIST_DOM_CHARS : MAX_PROMPT_DOM_CHARS;
   const { html: dom } = windowDom(artifact.domHtml, {
     failedSelector: artifact.failedSelector,
     specSource,
-    budget: MAX_PROMPT_DOM_CHARS,
+    budget,
+    // With a confident shortlist, let the DOM window center on those candidates
+    // so the small budget yields the content region (not the deep no-anchor
+    // nav dump). Only CONFIDENT candidates anchor — a low-scoring filler class
+    // (repeated nav chrome) could otherwise sit in the head slice and pin the
+    // window on the chrome instead of the content.
+    anchorSelectors: confident
+      ? candidates.filter((c) => c.score >= SHORTLIST_CONFIDENT).slice(0, 3).map((c) => c.selector)
+      : undefined,
   });
+  const shortlist = candidates.length ? `\n${renderShortlist(candidates)}` : '';
 
   return `You repair broken selectors in Cypress tests. A test failed because a selector no longer matches the page. Propose the minimal edit to the spec file that points the selector at the intended element.
 
@@ -59,7 +104,7 @@ ${specSource}
 \`\`\`yaml
 ${artifact.ariaSnapshot || '(unavailable)'}
 \`\`\`
-
+${shortlist}
 ## DOM at failure (redacted)
 \`\`\`html
 ${dom}

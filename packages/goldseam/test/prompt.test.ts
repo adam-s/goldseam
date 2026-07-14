@@ -124,3 +124,36 @@ describe('buildRepairPrompt DOM window', () => {
     expect(countSelectorMatches(artifact.domHtml, '[data-testid=post-9]', 'all')?.count).toBe(1);
   });
 });
+
+describe('buildRepairPrompt — shortlist shrinks a deep no-anchor prompt (14B/self-host path)', () => {
+  // A deep page: overflowing nav chrome, then a match-many card list whose class
+  // was renamed. No spec text anchor, broken selector absent from the capture —
+  // the case that fell back to a ~50K-token DOM. The ranked shortlist now
+  // carries the renamed target, so the prompt shrinks to a content-windowed few K.
+  const nav = '<a class="nav-link">Menu</a>'.repeat(60);
+  const filler = '<div class="chrome-block">spacer text here</div>'.repeat(1400); // overflow the budget
+  const cards = Array.from({ length: 12 }, (_, i) =>
+    `<article class="post-card-next"><h2 class="post-title-next">Story Headline ${i} Words</h2></article>`,
+  ).join('');
+  const dom = `<html><body><nav>${nav}${filler}</nav><main>${cards}</main></body></html>`;
+  const specSource = "cy.get('.post-card').should('have.length.at.least', 5);";
+
+  it('shrinks the prompt vs the raw DOM and names the renamed target', () => {
+    expect(deboilerplateDom(dom).length).toBeGreaterThan(40_000); // genuinely overflows
+    const prompt = buildRepairPrompt({ artifact: artifactWith(dom), specSource, selectorPriority: ['data-testid', 'class'] });
+    // the shortlist section is present and surfaces the renamed match-many class
+    expect(prompt).toContain('## Candidate selectors (ranked');
+    expect(prompt).toContain('.post-card-next');
+    // the whole prompt is far smaller than a full-DOM prompt would be
+    expect(prompt.length).toBeLessThan(dom.length / 2);
+    // and the embedded DOM is the CONTENT region (windowed on the candidate), not nav
+    expect(prompt.slice(prompt.indexOf('## DOM'))).toContain('Story Headline');
+  });
+
+  it('does not mutate the capture (resolution still reads the full DOM)', () => {
+    const artifact = artifactWith(dom);
+    buildRepairPrompt({ artifact, specSource, selectorPriority: ['class'] });
+    expect(artifact.domHtml).toBe(dom);
+    expect(countSelectorMatches(artifact.domHtml, '.post-card-next', 'all')?.count).toBe(12);
+  });
+});

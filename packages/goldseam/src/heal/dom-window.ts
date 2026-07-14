@@ -87,6 +87,12 @@ export interface WindowInput {
   specSource?: string;
   /** char budget for the DOM the prompt embeds. */
   budget: number;
+  /** Extra selectors to anchor on — e.g. the offline ranker's top candidate.
+   * When one resolves in the capture, the window centers on its region and the
+   * budget is honored (no NO_ANCHOR ceiling), so a confident shortlist yields a
+   * small, content-bearing DOM instead of the deep no-anchor fallback. Tried
+   * AFTER the spec-text and surviving-sub-selector anchors. */
+  anchorSelectors?: string[];
 }
 
 export interface WindowResult {
@@ -208,6 +214,18 @@ function findAnchor(doc: Document, input: WindowInput): Anchor | null {
         } catch {
           // an isolated piece may not be valid CSS on its own — skip it
         }
+      }
+    }
+  }
+  for (const sel of input.anchorSelectors ?? []) {
+    for (const { scope, host } of scopes) {
+      try {
+        const el = scope.querySelector(sel);
+        if (el) {
+          return { el: host ?? el, why: `ranked candidate ${JSON.stringify(sel)}${host ? ' (shadow/frame)' : ''}` };
+        }
+      } catch {
+        // not evaluable in this parser — skip
       }
     }
   }
