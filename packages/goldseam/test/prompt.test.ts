@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildRepairPrompt, deboilerplateDom } from '../src/heal/prompt';
+import { NO_ANCHOR_FALLBACK_CEILING } from '../src/heal/dom-window';
 import { countSelectorMatches, countTextMatches } from '../src/heal/resolve';
 import { FailureArtifact } from '../src/shared/types';
 
@@ -88,7 +89,9 @@ describe('buildRepairPrompt DOM window', () => {
   it('keeps prompt truncation honest when content still overflows after stripping', () => {
     // >200K after stripping (no style/script here), no anchor -> the no-anchor
     // fallback shows up to the ceiling, then truncates honestly past it.
-    const huge = `<body>${'<div class="card">card</div>'.repeat(8000)}</body>`; // ~224K, past the ceiling
+    const unit = '<div class="card">card</div>';
+    const reps = Math.ceil(NO_ANCHOR_FALLBACK_CEILING / unit.length) + 500; // past the ceiling, tracks the source constant
+    const huge = `<body>${unit.repeat(reps)}</body>`;
     const prompt = buildRepairPrompt({ artifact: artifactWith(huge), ...base });
     expect(prompt).toContain('<!-- truncated for prompt -->');
   });

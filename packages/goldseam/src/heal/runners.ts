@@ -116,10 +116,16 @@ const OLLAMA_DEFAULT_HOST = 'http://127.0.0.1:11434';
  * Estimate tokens by chars/3 (deliberately generous vs the ~chars/4 English
  * average, because HTML/JSON tokenizes denser and UNDER-sizing re-introduces
  * the silent truncation) plus output headroom, floored so small prompts still
- * get a sane window and capped so we never request an absurd allocation. Ollama
- * itself clamps the request to the model's trained maximum, so a short-context
- * model is no worse off than before; a long-context model now works. Override
- * the cap with GOLDSEAM_OLLAMA_NUM_CTX for unusual hardware. */
+ * get a sane window and capped so we never request an absurd allocation.
+ *
+ * The tradeoff this deliberately makes: a large num_ctx allocates a large KV
+ * cache. Most Ollama builds clamp the request to the model's trained context,
+ * but some honor it literally — so on constrained VRAM a deep-page prompt can
+ * now OOM/stall where before it silently truncated and gave up. That is the
+ * right default (an honest failure beats a silent lie), but a memory-tight host
+ * should cap it: set GOLDSEAM_OLLAMA_NUM_CTX to the largest context the machine
+ * can serve. The chars/3 estimate can still under-size genuinely dense markup;
+ * raising the divisor toward the true token count only widens the window. */
 export function ollamaNumCtx(prompt: string): number {
   const override = Number(process.env.GOLDSEAM_OLLAMA_NUM_CTX);
   if (Number.isFinite(override) && override > 0) return Math.floor(override);
@@ -200,38 +206,49 @@ function openaiRunner(model: string): RepairRunner {
   return {
     id: `openai:${model}`,
     async repair(prompt: string): Promise<string> {
+      const headers: Record<string, string> = key ? { authorization: `Bearer ${key}` } : {};
+      const url = `${base}/chat/completions`;
+      const baseBody = {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        // Bounded so an endpoint that defaults max_tokens to a tiny value
+        // (some do) can't truncate a multi-occurrence edit reply mid-JSON;
+        // generous enough for the largest heal (8 edits, each with long
+        // verbatim oldString/newString context, + a reasoning paragraph).
+        max_tokens: 8192,
+      };
+      // Constrained decoding to goldseam's reply schema (see
+      // REPAIR_REPLY_SCHEMA) — the openai-path analog of the ollama runner's
+      // format:'json', but schema-shaped because plain json_object makes vLLM's
+      // decoder run away. vLLM/OpenAI/LM Studio honor json_schema.
+      const schemaBody = {
+        ...baseBody,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'goldseam_repair', schema: REPAIR_REPLY_SCHEMA },
+        },
+      };
+      const post = (body: unknown) =>
+        postJson(url, body, headers) as Promise<{ choices?: Array<{ message?: { content?: string } }> }>;
       let reply: { choices?: Array<{ message?: { content?: string } }> };
       try {
-        reply = (await postJson(
-          `${base}/chat/completions`,
-          {
-            model,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0,
-            // Bounded so an endpoint that defaults max_tokens to a tiny value
-            // (some do) can't truncate a multi-occurrence edit reply mid-JSON;
-            // generous enough for the largest heal (8 edits + a reasoning
-            // paragraph) with room to spare.
-            max_tokens: 4096,
-            // Constrained decoding to goldseam's reply schema (see
-            // REPAIR_REPLY_SCHEMA) — the openai-path analog of the ollama
-            // runner's format:'json', but schema-shaped because plain
-            // json_object makes vLLM's decoder run away. vLLM/OpenAI/LM Studio
-            // honor json_schema; an endpoint that doesn't answers with a clear
-            // HTTP 400 rather than silent garbage.
-            response_format: {
-              type: 'json_schema',
-              json_schema: { name: 'goldseam_repair', schema: REPAIR_REPLY_SCHEMA },
-            },
-          },
-          key ? { authorization: `Bearer ${key}` } : {},
-        )) as { choices?: Array<{ message?: { content?: string } }> };
+        reply = await post(schemaBody);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (/HTTP 401|HTTP 403/.test(msg)) {
+        // An endpoint that does not support response_format json_schema (older
+        // vLLM, llama.cpp's server, some proxies) rejects it with HTTP 400.
+        // Degrade ONCE to an unconstrained request rather than fail every
+        // capture — goldseam's parser + retry loop still handle a weaker model's
+        // JSON slips. Scoped to schema-shaped 400s so a context-length 400
+        // (which a retry can't fix) still surfaces.
+        if (/HTTP 400/.test(msg) && /response_format|json_schema|schema/i.test(msg)) {
+          reply = await post(baseBody);
+        } else if (/HTTP 401|HTTP 403/.test(msg)) {
           throw new RunnerError(`${base} rejected the API key — check OPENAI_API_KEY${key ? '' : ' (it is unset)'}`);
+        } else {
+          throw connectionHint(e, `could not reach the OpenAI-compatible endpoint at ${base} — check OPENAI_BASE_URL, or ${OTHER_MODELS}`);
         }
-        throw connectionHint(e, `could not reach the OpenAI-compatible endpoint at ${base} — check OPENAI_BASE_URL, or ${OTHER_MODELS}`);
       }
       const content = reply.choices?.[0]?.message?.content;
       if (typeof content !== 'string') {

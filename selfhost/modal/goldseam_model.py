@@ -87,9 +87,12 @@ app = modal.App("goldseam-model")
 @modal.concurrent(max_inputs=32)  # one container serves many heals at once
 @modal.web_server(port=VLLM_PORT, startup_timeout=10 * MINUTES)
 def serve():
-    # `--api-key` makes the endpoint private: clients must send
-    # `Authorization: Bearer <key>`, which is exactly what goldseam's openai:
-    # runner does with OPENAI_API_KEY.
+    # The endpoint is private: clients must send `Authorization: Bearer <key>`,
+    # which is exactly what goldseam's openai: runner does with OPENAI_API_KEY.
+    # Pass the key through the VLLM_API_KEY ENV var, not the --api-key flag:
+    # vLLM logs its parsed argument Namespace at startup, so an --api-key argv
+    # element lands in the container logs in cleartext. The env var reaches vLLM
+    # the same way but never appears in argv or that startup log.
     api_key = os.environ["GOLDSEAM_VLLM_API_KEY"]
     import json
 
@@ -99,7 +102,6 @@ def serve():
         "--served-model-name", MODEL_NAME,
         "--host", "0.0.0.0",
         "--port", str(VLLM_PORT),
-        "--api-key", api_key,
         # Long context for goldseam's deep-page prompts (see MAX_MODEL_LEN).
         # --hf-overrides injects the YaRN rope config Qwen2.5 needs above 32K
         # (the version-robust form; the older --rope-scaling flag was removed).
@@ -111,10 +113,11 @@ def serve():
                 "original_max_position_embeddings": 32768,
             }
         }),
-        "--uvicorn-log-level", "info",
+        # warning, not info: the info-level startup log echoes the parsed args;
+        # keeping it quiet is defense-in-depth for the key now in the env.
+        "--uvicorn-log-level", "warning",
     ]
-    # Popen (not run): return immediately so Modal's web_server health-check
-    # can start polling the port while vLLM finishes loading weights. List
-    # form, no shell: the API key is an argv element, never spliced into a
-    # shell string where a space or `$`/`;` could break or execute it.
-    subprocess.Popen(cmd)
+    # Popen (not run): return immediately so Modal's web_server health-check can
+    # start polling the port while vLLM finishes loading weights. List form, no
+    # shell. The key rides in the environment, never in argv.
+    subprocess.Popen(cmd, env={**os.environ, "VLLM_API_KEY": api_key})

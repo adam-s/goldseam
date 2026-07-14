@@ -121,7 +121,7 @@ const TRUNC_MARKER = '\n<!-- truncated for prompt -->';
  * deboilerplated DOM). A page whose target sits past the ceiling still truncates
  * honestly, exactly as before — just far later. Tunable; lower it for a
  * small-context model, raise it if a real target is ever seen deeper. */
-const NO_ANCHOR_FALLBACK_CEILING = 200_000;
+export const NO_ANCHOR_FALLBACK_CEILING = 200_000;
 
 /** Slice the head, honestly marked — today's behavior and the safe floor. */
 function headFirst(slim: string, budget: number): WindowResult {

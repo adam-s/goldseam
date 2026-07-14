@@ -94,7 +94,7 @@ describe('openai-compatible runner', () => {
         model: 'qwen-14b',
         temperature: 0,
         messages: [{ role: 'user', content: 'PROMPT' }],
-        max_tokens: 4096, // bounded so a tiny-default endpoint can't truncate the edit JSON
+        max_tokens: 8192, // bounded so a tiny-default endpoint can't truncate the edit JSON
         // schema-constrained JSON (json_object makes vLLM's decoder run away)
         response_format: {
           type: 'json_schema',
@@ -104,6 +104,55 @@ describe('openai-compatible runner', () => {
     } finally {
       delete process.env.OPENAI_BASE_URL;
       delete process.env.OPENAI_API_KEY;
+    }
+  });
+
+  it('degrades to an unconstrained request when the endpoint rejects json_schema', async () => {
+    // An endpoint that does not support response_format json_schema 400s; the
+    // runner must retry ONCE without it rather than fail every capture.
+    const bodies: Array<Record<string, unknown>> = [];
+    const url = await stub((_req, body, res) => {
+      const json = JSON.parse(body);
+      bodies.push(json);
+      if (json.response_format) {
+        res.statusCode = 400;
+        res.end('response_format json_schema is not supported by this model');
+      } else {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ choices: [{ message: { content: 'DEGRADED' } }] }));
+      }
+    });
+    process.env.OPENAI_BASE_URL = `${url}/v1`;
+    try {
+      const out = await resolveRunner('openai:x').repair('PROMPT');
+      expect(out).toBe('DEGRADED'); // second (unconstrained) attempt succeeded
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0].response_format).toBeTruthy(); // first tried the schema
+      expect(bodies[1].response_format).toBeUndefined(); // retry dropped it
+      // everything else preserved on the retry — crucially the prompt bytes,
+      // so a degrade that silently dropped/altered the prompt would fail here
+      expect(bodies[1].messages).toEqual(bodies[0].messages);
+      expect(bodies[1].model).toBe(bodies[0].model);
+      expect(bodies[1].temperature).toBe(0);
+      expect(bodies[1].max_tokens).toBe(8192);
+    } finally {
+      delete process.env.OPENAI_BASE_URL;
+    }
+  });
+
+  it('does NOT degrade on a non-schema 400 (e.g. context length) — surfaces it', async () => {
+    let calls = 0;
+    const url = await stub((_req, _body, res) => {
+      calls++;
+      res.statusCode = 400;
+      res.end("This model's maximum context length is 8192 tokens");
+    });
+    process.env.OPENAI_BASE_URL = `${url}/v1`;
+    try {
+      await expect(resolveRunner('openai:x').repair('PROMPT')).rejects.toThrow(/HTTP 400/);
+      expect(calls).toBe(1); // no pointless retry a context-length error can't fix
+    } finally {
+      delete process.env.OPENAI_BASE_URL;
     }
   });
 });
@@ -126,6 +175,19 @@ describe('ollamaNumCtx — sizes the context to the prompt (no silent truncation
       expect(ollamaNumCtx('x'.repeat(200_000))).toBe(16_384); // override wins
     } finally {
       delete process.env.GOLDSEAM_OLLAMA_NUM_CTX;
+    }
+  });
+
+  it('ignores an invalid env override (0 / negative / non-numeric) and sizes normally', () => {
+    // A `> 0`-to-`>= 0` slip would let GOLDSEAM_OLLAMA_NUM_CTX=0 return num_ctx:0
+    // — catastrophic silent truncation, the exact failure this function prevents.
+    for (const bad of ['0', '-5', 'abc', '']) {
+      process.env.GOLDSEAM_OLLAMA_NUM_CTX = bad;
+      try {
+        expect(ollamaNumCtx('x'.repeat(1000))).toBe(8_192); // fell through to sizing, never 0/NaN
+      } finally {
+        delete process.env.GOLDSEAM_OLLAMA_NUM_CTX;
+      }
     }
   });
 });

@@ -475,6 +475,37 @@ Tradeoffs, not oversights:
   it would dominate the heal. No fix — the aria-walk cost is inherent, not a
   bug — but recorded so a future scaling pass has the number (measured,
   accepted).
+- **The no-anchor DOM slice can reach `NO_ANCHOR_FALLBACK_CEILING` (200 K
+  chars ≈ 50 K tokens), well past the ~40 K anchored budget.** Prompt-only and
+  bounded (never touches `artifact.domHtml` or match counts; a 234-case
+  main-vs-branch differential found zero regressions — every path is
+  byte-identical to the old `2 × budget` slice or an intended content superset),
+  so it cannot break a heal that worked on the narrower slice. Two costs are
+  accepted: a capable model pays the tokens, and a *small-context self-hosted*
+  model handed 200 K re-hits the silent-truncate-then-give-up it was meant to
+  avoid — mitigated on the ollama path (`ollamaNumCtx` sizes the window to the
+  prompt so the give-up is at least honest) and, properly, obsoleted by the
+  offline candidate-ranking rung
+  ([selector-repair-research.md](.agents/reference/selector-repair-research.md)),
+  which removes the need to send the deep DOM at all. Tune with
+  `NO_ANCHOR_FALLBACK_CEILING` / `GOLDSEAM_OLLAMA_NUM_CTX` (red-team, accepted).
+- **`ollamaNumCtx` trades a silent truncation for a possible OOM.** Sizing
+  `num_ctx` to the prompt (chars/3 + headroom, capped at 131 072) means a large
+  prompt now requests a large KV cache; most Ollama builds clamp to the model's
+  trained context, but one that honors it literally can OOM/stall on tight VRAM
+  where before it silently truncated. An honest failure beats a silent lie, so
+  this is the right default; a memory-tight host caps it with
+  `GOLDSEAM_OLLAMA_NUM_CTX`. The chars/3 estimate can still under-size very dense
+  markup at the edge (red-team, accepted).
+- **The `openai:` runner requests `response_format: json_schema`; an endpoint
+  that rejects it (older vLLM, llama.cpp, some proxies) is retried ONCE
+  unconstrained** ([heal/runners.ts](packages/goldseam/src/heal/runners.ts)) —
+  so json_schema's reliability (plain `json_object` sends vLLM's decoder into a
+  `finish_reason=length` runaway; measured) never costs compatibility. The
+  degrade is scoped to schema-shaped 400s, so a context-length 400 (which a
+  retry can't fix) still surfaces. A reply that overruns `max_tokens` (8 192)
+  fails safe (unparseable → give-up), not silently (red-team, resolved +
+  accepted).
 
 ## Noise
 

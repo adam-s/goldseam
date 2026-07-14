@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { deboilerplateDom, extractAnchorTexts, windowDom } from '../src/heal/dom-window';
+import { deboilerplateDom, extractAnchorTexts, NO_ANCHOR_FALLBACK_CEILING, windowDom } from '../src/heal/dom-window';
 import { countSelectorMatches, countTextMatches } from '../src/heal/resolve';
 
 const BUDGET = 40_000;
@@ -188,11 +188,12 @@ describe('windowDom — the zero-regression gate', () => {
     expect(r.html).toBe(deboilerplateDom(dom));
   });
 
-  // The no-anchor fallback ceiling (mirrors NO_ANCHOR_FALLBACK_CEILING in
-  // dom-window.ts). A no-anchor page shows the WHOLE deboilerplated DOM up to
-  // this bound, then truncates honestly — the fix for a heal target sitting
-  // deep behind un-strippable chrome (Squarespace's ~144K blog list).
-  const NO_ANCHOR_CEILING = 200_000;
+  // The no-anchor fallback ceiling — imported from source, NOT re-declared, so
+  // lowering the source constant makes these tests fail (not silently pass a
+  // wrong value). A no-anchor page shows the WHOLE deboilerplated DOM up to this
+  // bound, then truncates honestly — the fix for a heal target sitting deep
+  // behind un-strippable chrome (Squarespace's ~144K blog list).
+  const NO_ANCHOR_CEILING = NO_ANCHOR_FALLBACK_CEILING;
 
   it('no anchor + moderately over budget: shows the whole page so a just-past-budget target survives', () => {
     // target sits just past the base budget; no spec anchor, broken single-token selector.
@@ -223,14 +224,19 @@ describe('windowDom — the zero-regression gate', () => {
   });
 
   it('no anchor + past the CEILING: head-first slice, truncated and bounded at the ceiling', () => {
-    const dom = `<html><body>${'<div class="row">x</div>'.repeat(9000)}<main><div class="way-late">z</div></main></body></html>`; // ~216K, past the ceiling
+    const unit = '<div class="row">x</div>';
+    const reps = Math.ceil(NO_ANCHOR_CEILING / unit.length) + 500; // guaranteed past the ceiling, whatever the constant
+    const dom = `<html><body>${unit.repeat(reps)}<main><div class="way-late">z</div></main></body></html>`;
     const slim = deboilerplateDom(dom);
     expect(slim.length).toBeGreaterThan(NO_ANCHOR_CEILING);
     const r = windowDom(dom, { budget: BUDGET });
     expect(r.strategy).toBe('head-first');
     expect(r.truncated).toBe(true);
     expect(r.html).toContain('<!-- truncated for prompt -->');
-    expect(r.html.length).toBeLessThanOrEqual(NO_ANCHOR_CEILING + 100); // bounded at the ceiling, not 2x budget
+    expect(r.html.length).toBeLessThanOrEqual(NO_ANCHOR_CEILING + 100); // bounded at the ceiling
+    // ...and APPROACHES the ceiling — a 2x-budget (80K) revert would emit ~80K
+    // and fail this lower bound, so the ceiling is pinned in BOTH directions.
+    expect(r.html.length).toBeGreaterThan(NO_ANCHOR_CEILING - 2000);
   });
 });
 
