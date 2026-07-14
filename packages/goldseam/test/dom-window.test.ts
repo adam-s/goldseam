@@ -401,3 +401,29 @@ describe('windowDom — deterministic + drift-pinned', () => {
     `);
   });
 });
+
+describe('windowDom — anchorSelectors (ranked-candidate anchoring for the confident shrink)', () => {
+  it('a candidate in the head slice does NOT trip the head gate — it still WINDOWS', () => {
+    // `.cand` appears both early (inside the head slice) and deep. With
+    // anchorSelectors the window must center on it (strategy 'windowed'), NOT
+    // return a head-first slice — the regression where an early candidate
+    // truncated the window to the head and bypassed NO_ANCHOR_FALLBACK_CEILING.
+    const early = '<b class="cand">early copy</b>';
+    const filler = '<p class="pad">pad line here</p>'.repeat(2000); // overflow the budget
+    const deep = '<main><b class="cand" data-testid="deep">deep target heading</b></main>';
+    const dom = `<html><body><nav>${early}${filler}</nav>${deep}</body></html>`;
+    expect(deboilerplateDom(dom).slice(0, BUDGET)).toContain('class="cand"'); // candidate IS in the head
+    const r = windowDom(dom, { failedSelector: '.gone', specSource: '', budget: BUDGET, anchorSelectors: ['.cand'] });
+    expect(r.strategy).toBe('windowed'); // fails as 'head-first' if candidates trip the head gate
+    expect(r.anchor).toContain('ranked candidate');
+  });
+
+  it('anchorSelectors are tried only AFTER spec-text / surviving-sub-selector anchors', () => {
+    // a real spec-text anchor wins over a candidate, preserving existing behavior
+    const filler = '<div class="row"><span>filler</span></div>'.repeat(1500);
+    const dom = `<html><body><nav>n</nav>${filler}<main><h2>Real Spec Anchor Heading</h2><b class="cand">x</b></main></body></html>`;
+    const r = windowDom(dom, { specSource: `cy.contains(${JSON.stringify('Real Spec Anchor Heading')})`, budget: BUDGET, anchorSelectors: ['.cand'] });
+    expect(r.strategy).toBe('windowed');
+    expect(r.anchor).toContain('spec-text'); // spec-text anchor, not the candidate
+  });
+});

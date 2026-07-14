@@ -326,11 +326,19 @@ export function windowDom(domHtml: string, input: WindowInput): WindowResult {
 
     // Cheap gate: does a usable anchor already appear in the head-first slice?
     // Parse only the head (not the whole page) — if it does, keep today's
-    // behavior verbatim.
+    // behavior verbatim. IMPORTANT: the gate ignores `anchorSelectors` (the
+    // ranked-candidate anchors). Those are a DELIBERATE windowing signal for the
+    // confident-shrink path — an early-appearing candidate (even a decoy) must
+    // NOT trip the head gate and return a truncated head slice that bypasses the
+    // NO_ANCHOR_FALLBACK_CEILING; candidate anchors only ever drive emitWindow
+    // below, so the window centers on the candidate's actual region (which may
+    // be deep) instead of the head.
     const head = slim.slice(0, input.budget);
     const headParsed = parseDom(head);
     headWindow = headParsed.window;
-    if (findAnchor(headParsed.document, input)) return headFirst(slim, input.budget);
+    if (findAnchor(headParsed.document, { ...input, anchorSelectors: undefined })) {
+      return headFirst(slim, input.budget);
+    }
 
     // Head-first would give up. Try to window around an anchor in the full DOM.
     const slimParsed = parseDom(slim);

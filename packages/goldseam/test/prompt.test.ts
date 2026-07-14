@@ -19,16 +19,16 @@ const BIG_STYLE = `<style>${'.cmp-x{color:red;background:blue}'.repeat(2000)}</s
 const TARGET = '<div data-component-name="Title" data-testid="blog-card">Blog Card</div>';
 const HEAVY_DOM = `<html><head>${BIG_STYLE}</head><body><main>${TARGET}</main></body></html>`;
 
-const artifactWith = (domHtml: string): FailureArtifact => ({
+const artifactWith = (domHtml: string, failedSelector = '[data-testid="blog-card"]'): FailureArtifact => ({
   schemaVersion: 1,
   title: 'blog renders cards',
   specPath: 'cypress/e2e/blog.cy.ts',
-  errorMessage: 'Expected to find element: [data-testid="blog-card"], but never found it.',
+  errorMessage: `Expected to find element: ${failedSelector}, but never found it.`,
   url: 'https://example.test/blog',
   domHtml,
   ariaSnapshot: '',
   redacted: true,
-  failedSelector: '[data-testid="blog-card"]',
+  failedSelector,
 });
 
 describe('deboilerplateDom', () => {
@@ -127,32 +127,59 @@ describe('buildRepairPrompt DOM window', () => {
 
 describe('buildRepairPrompt — shortlist shrinks a deep no-anchor prompt (14B/self-host path)', () => {
   // A deep page: overflowing nav chrome, then a match-many card list whose class
-  // was renamed. No spec text anchor, broken selector absent from the capture —
-  // the case that fell back to a ~50K-token DOM. The ranked shortlist now
-  // carries the renamed target, so the prompt shrinks to a content-windowed few K.
+  // was renamed. The content region is deliberately LARGE (~2.5K of text per
+  // card) so the shrink BUDGET has to cap it — anchoring alone would emit the
+  // whole region and the budget's job would be untested. Broken selector .post-card
+  // renamed to .post-card-next (a clean, intentional name overlap -> confident).
   const nav = '<a class="nav-link">Menu</a>'.repeat(60);
   const filler = '<div class="chrome-block">spacer text here</div>'.repeat(1400); // overflow the budget
+  const cardText = 'Story Headline Words '.repeat(120); // ~2.5K per card -> ~30K content region
   const cards = Array.from({ length: 12 }, (_, i) =>
-    `<article class="post-card-next"><h2 class="post-title-next">Story Headline ${i} Words</h2></article>`,
+    `<article class="post-card-next"><h2 class="post-title-next">${cardText}${i}</h2></article>`,
   ).join('');
   const dom = `<html><body><nav>${nav}${filler}</nav><main>${cards}</main></body></html>`;
-  const specSource = "cy.get('.post-card').should('have.length.at.least', 5);";
+  const spec = "cy.get('.post-card').should('have.length.at.least', 5);";
+  const build = (d = dom, sel = '.post-card', s = spec) =>
+    buildRepairPrompt({ artifact: artifactWith(d, sel), specSource: s, selectorPriority: ['class'] });
 
-  it('shrinks the prompt vs the raw DOM and names the renamed target', () => {
+  it('shrinks the prompt and names the renamed target', () => {
     expect(deboilerplateDom(dom).length).toBeGreaterThan(40_000); // genuinely overflows
-    const prompt = buildRepairPrompt({ artifact: artifactWith(dom), specSource, selectorPriority: ['data-testid', 'class'] });
-    // the shortlist section is present and surfaces the renamed match-many class
+    const prompt = build();
     expect(prompt).toContain('## Candidate selectors (ranked');
     expect(prompt).toContain('.post-card-next');
-    // the whole prompt is far smaller than a full-DOM prompt would be
     expect(prompt.length).toBeLessThan(dom.length / 2);
-    // and the embedded DOM is the CONTENT region (windowed on the candidate), not nav
-    expect(prompt.slice(prompt.indexOf('## DOM'))).toContain('Story Headline');
+  });
+
+  it('the shrink BUDGET caps the content region (DOM window near 24K, not the full ~30K)', () => {
+    const p = build();
+    const sec = p.slice(p.indexOf('## DOM'));
+    expect(sec).toContain('Story Headline'); // content reached...
+    expect(sec.length).toBeLessThan(27_000); // ...but budget-capped. No-shrink (budget 40K/ceiling) would emit ~30K+ and fail this.
+  });
+
+  it('windows on the real deep target, not an early decoy of a different class', () => {
+    // An unrelated class appears early (nav). The confident target .post-card-next
+    // is deep-only, so the shrink windows on it -> the DOM reaches the deep
+    // content, not the early decoy region. (The head-gate unit test in
+    // dom-window.test.ts pins the same-class early-copy case at the windowDom level.)
+    const decoy = '<div class="promo-banner">Sale ends soon</div>'.repeat(6);
+    const dom2 = `<html><body><nav>${decoy}${nav}${filler}</nav><main>${cards}</main></body></html>`;
+    const p = build(dom2);
+    const sec = p.slice(p.indexOf('## DOM'));
+    expect(sec).toContain('Story Headline'); // deep content windowed
+  });
+
+  it('does NOT shrink when the shortlist is not strongly confident (full DOM kept)', () => {
+    // A broken selector with no name overlap and a spec with no count/text signal
+    // -> the top candidate stays below the shrink bar -> full windowDom behavior.
+    const sec = build(dom, '.xyzzy', "cy.get('.xyzzy').click();");
+    const domSec = sec.slice(sec.indexOf('## DOM'));
+    expect(domSec.length).toBeGreaterThan(30_000); // the full no-anchor fallback, not the 24K shrink
   });
 
   it('does not mutate the capture (resolution still reads the full DOM)', () => {
-    const artifact = artifactWith(dom);
-    buildRepairPrompt({ artifact, specSource, selectorPriority: ['class'] });
+    const artifact = artifactWith(dom, '.post-card');
+    buildRepairPrompt({ artifact, specSource: spec, selectorPriority: ['class'] });
     expect(artifact.domHtml).toBe(dom);
     expect(countSelectorMatches(artifact.domHtml, '.post-card-next', 'all')?.count).toBe(12);
   });

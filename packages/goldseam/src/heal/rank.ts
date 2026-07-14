@@ -72,6 +72,12 @@ const GENERIC =
 const isMeaningful = (tok: string): boolean =>
   /^[a-z][a-z0-9_-]{2,40}$/i.test(tok) && !HASHY.test(tok) && !UTILITY.test(tok) && /[a-z]{3}/i.test(tok);
 
+// Cost bound: candidate scoring runs one querySelectorAll per distinct
+// meaningful token — O(unique-selectors x N). Above this element count the
+// ranker defers (returns []) rather than spend seconds; the heal falls back to
+// the normal DOM window. Same measured-deferral posture as the oracle aria-walk.
+const MAX_RANK_ELEMENTS = 20_000;
+
 // Tags that carry no selectable heal target — a Cypress test never asserts on a
 // <style>/<script> body, but Squarespace inlines dozens of them IN the body and
 // their CSS/JS text matches loose assertions like /\w+/, so they must not be
@@ -145,9 +151,11 @@ export function rankCandidates(input: RankInput, topK = 8): Candidate[] {
 
     // Candidate selectors: meaningful class tokens (match-many lists) and every
     // testid/id/data-* culture value (unique anchors). Deduped.
+    const allEls = Array.from(root.querySelectorAll('*'));
+    if (allEls.length > MAX_RANK_ELEMENTS) return []; // too big to rank cheaply — defer to the DOM window
     const selectors = new Set<string>();
     const classCount = new Map<string, number>();
-    for (const el of Array.from(root.querySelectorAll('*'))) {
+    for (const el of allEls) {
       if (!isContent(el)) continue;
       for (const c of Array.from(el.classList)) {
         if (isMeaningful(c)) classCount.set(c, (classCount.get(c) ?? 0) + 1);

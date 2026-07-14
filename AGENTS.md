@@ -506,6 +506,35 @@ Tradeoffs, not oversights:
   retry can't fix) still surfaces. A reply that overruns `max_tokens` (8 192)
   fails safe (unparseable → give-up), not silently (red-team, resolved +
   accepted).
+- **The candidate-ranking shortlist and its confident-shrink**
+  ([heal/rank.ts](packages/goldseam/src/heal/rank.ts),
+  [heal/prompt.ts](packages/goldseam/src/heal/prompt.ts)). `rankCandidates`
+  scores selectors in the post-break capture by fit to the heal intent (spec's
+  `have.length`/text assertions, aria, structural homogeneity, and a
+  proportional name-overlap with the broken selector) and `buildRepairPrompt`
+  embeds the top-K shortlist — a compact list the model disambiguates from. Two
+  distinct behaviors, distinct trust postures: (a) the shortlist is added to
+  EVERY prompt (small; helps every model; never replaces the DOM; the model
+  still grounds its edit in the capture and resolve/rerun verify — worst case
+  give-up, never a wrong heal). (b) When the capture OVERFLOWS the DOM budget AND
+  the top candidate is STRONGLY confident (score ≥ 0.7), the embedded DOM is
+  shrunk (24 K) and windowed on the candidates, dropping a deep prompt from ~50 K
+  to ~5 K tokens so a small self-hosted model heals it (proven: local
+  qwen2.5-14b and the openai runner → Modal both heal the epsilon3 deep case;
+  the Modal recipe dropped back from A100/64 K-YaRN to L40S/32 K as a result).
+  The shrink is NOT strictly additive — a confidently-WRONG ranking could window
+  away a target the full no-anchor slice would have shown, turning that heal into
+  a give-up (never a wrong heal; resolve/rerun still verify). It is gated on the
+  high confidence bar to make that rare, `windowDom`'s head gate ignores
+  `anchorSelectors` so an early candidate can never truncate the window to a head
+  slice that bypasses `NO_ANCHOR_FALLBACK_CEILING` (the red-team regression), and
+  the full shortlist is still present as the model's safety net. Two accepted
+  costs: ranking is O(unique-selectors × N) and DEFERS (returns `[]` → full DOM)
+  above `MAX_RANK_ELEMENTS` (20 K) rather than spend seconds on a pathological
+  capture; and by spotlighting a count-matching candidate under a count-only
+  (weak) assertion, the shrink makes the pre-existing weak-assertion hole
+  (`isWeaklyAsserted`/`reviewFlags`) marginally more reachable — flagged for
+  review, never blocking (red-team, accepted).
 
 ## Noise
 

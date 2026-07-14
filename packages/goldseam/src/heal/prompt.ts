@@ -17,16 +17,23 @@ export { deboilerplateDom };
 const MAX_PROMPT_DOM_CHARS = 40_000;
 
 // The offline candidate ranking (rank.ts) produces a small shortlist of
-// selectors that fit the failing test. When the capture OVERFLOWS the DOM budget
-// AND that shortlist is confident, we embed a SMALLER DOM window: the shortlist
-// already carries the plausible answers, so a compact DOM is enough for the
-// model to sanity-check, and the whole prompt drops from ~50K tokens to a few K
-// — which is what lets a small self-hosted model heal a deep page. A page that
-// fits the budget, or a low-confidence shortlist, keeps the full window
-// unchanged (zero change for the heals that work today). The shortlist is
-// ALWAYS shown when non-empty (it is tiny); it never replaces the DOM, and the
-// model must still ground its edit in the capture — resolve/rerun verify.
-const SHORTLIST_CONFIDENT = 0.5;
+// selectors that fit the failing test. The shortlist is ALWAYS added when
+// non-empty (it is tiny, and helps every model) — so the prompt input DOES
+// change for every heal, but it never replaces the DOM and the model must still
+// ground its edit in the capture (resolve/rerun verify; worst case is give-up,
+// never a wrong heal).
+//
+// Separately, when the capture OVERFLOWS the DOM budget AND the top candidate is
+// STRONGLY confident, we shrink the embedded DOM and window it on the candidate:
+// the whole prompt drops from ~50K tokens to a few K, which is what lets a small
+// self-hosted model heal a deep page. This shrink is NOT strictly additive — a
+// confidently-wrong ranking could window away a target the full no-anchor slice
+// would have shown, turning that heal into a give-up (not a wrong heal). So it
+// is gated on a HIGH confidence bar (only fires when the ranker is quite sure),
+// and the full shortlist is still present for the model to pick from. A page
+// that fits the budget, or a shortlist below the shrink bar, keeps the full
+// windowDom behavior unchanged. See AGENTS.md for the accepted tradeoff.
+const SHORTLIST_SHRINK_CONFIDENT = 0.7;
 const SHORTLIST_DOM_CHARS = 24_000;
 
 /** Render the ranked shortlist as a compact, model-readable block. */
@@ -57,19 +64,18 @@ export function buildRepairPrompt({ artifact, specSource, selectorPriority, feed
     ariaSnapshot: artifact.ariaSnapshot,
   });
   const overflows = deboilerplateDom(artifact.domHtml).length > MAX_PROMPT_DOM_CHARS;
-  const confident = candidates.length > 0 && candidates[0].score >= SHORTLIST_CONFIDENT;
-  const budget = overflows && confident ? SHORTLIST_DOM_CHARS : MAX_PROMPT_DOM_CHARS;
+  const shrink = overflows && candidates.length > 0 && candidates[0].score >= SHORTLIST_SHRINK_CONFIDENT;
   const { html: dom } = windowDom(artifact.domHtml, {
     failedSelector: artifact.failedSelector,
     specSource,
-    budget,
-    // With a confident shortlist, let the DOM window center on those candidates
-    // so the small budget yields the content region (not the deep no-anchor
-    // nav dump). Only CONFIDENT candidates anchor — a low-scoring filler class
-    // (repeated nav chrome) could otherwise sit in the head slice and pin the
-    // window on the chrome instead of the content.
-    anchorSelectors: confident
-      ? candidates.filter((c) => c.score >= SHORTLIST_CONFIDENT).slice(0, 3).map((c) => c.selector)
+    budget: shrink ? SHORTLIST_DOM_CHARS : MAX_PROMPT_DOM_CHARS,
+    // On shrink, window the DOM on the strongly-confident candidates so the small
+    // budget yields the content region (not the deep no-anchor nav dump). Only
+    // above-bar candidates anchor — a low-scoring filler/nav class could
+    // otherwise pin the window on chrome. dom-window's head gate ignores these,
+    // so an early candidate can never truncate the window to a head slice.
+    anchorSelectors: shrink
+      ? candidates.filter((c) => c.score >= SHORTLIST_SHRINK_CONFIDENT).slice(0, 3).map((c) => c.selector)
       : undefined,
   });
   const shortlist = candidates.length ? `\n${renderShortlist(candidates)}` : '';

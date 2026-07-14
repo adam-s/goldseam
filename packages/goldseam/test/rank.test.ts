@@ -11,7 +11,9 @@ import { rankCandidates, readIntent } from '../src/heal/rank';
 // `.summary-title-link-next` — the cards carry many sibling classes too.
 function blogCapture(): string {
   const nav = Array.from({ length: 8 }, (_, i) => `<a class="header-nav-item">Nav ${i}</a>`).join('');
-  const styleNoise = '<style>.x{color:red} .summary-title-link-next{font:bold}</style>'.repeat(6);
+  // .theme-config lives ONLY on the <style> elements — a class the non-content
+  // exclusion must drop (else it becomes a repeated candidate).
+  const styleNoise = '<style class="theme-config">.x{color:red} .summary-title-link-next{font:bold}</style>'.repeat(6);
   const cards = Array.from({ length: 21 }, (_, i) =>
     `<div class="summary-item summary-item-has-thumbnail">` +
     `<time class="summary-metadata">June 2, 2026</time>` +
@@ -61,16 +63,18 @@ describe('rankCandidates — match-many rename', () => {
     expect(target.score).toBeGreaterThan(0.8);
   });
 
-  it('NEVER makes <style>/<script> a candidate even though its text matches /\\w+/', () => {
-    // the style blob contains ".summary-title-link-next" as CSS text — must not
-    // become a candidate element, and no candidate may be a <style> match.
-    for (const c of cands) {
-      const els = c.selector; // sanity: selectors are class/attr/id, never a tag
-      expect(els).toMatch(/^[.#[]/);
-    }
-    // the nav's repeated class is allowed as a candidate but ranks below the target
+  it('NEVER makes a <style>/<script>-only class a candidate (isContent exclusion has teeth)', () => {
+    // .theme-config is present on 12 <style> elements and NOWHERE else. Without
+    // the non-content exclusion it would be a repeated candidate; removing
+    // isContent (making it return true) must make this assertion fail.
+    expect(cands.some((c) => c.selector === '.theme-config')).toBe(false);
+    for (const c of cands) expect(c.selector).toMatch(/^[.#[]/); // never a bare tag
+  });
+
+  it('ranks the real title link above the nav chrome', () => {
     const navIdx = cands.findIndex((c) => c.selector === '.header-nav-item');
     const tgtIdx = cands.findIndex((c) => c.selector === '.summary-title-link-next');
+    expect(tgtIdx).toBeGreaterThanOrEqual(0);
     if (navIdx >= 0) expect(tgtIdx).toBeLessThan(navIdx);
   });
 
