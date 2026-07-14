@@ -30,18 +30,14 @@ MODEL_REVISION = "main"
 VLLM_PORT = 8000
 MINUTES = 60  # seconds
 
-# goldseam's heal prompt embeds the page's DOM. On a deep page whose heal
-# target sits behind un-strippable chrome (a Squarespace mega-nav pushes the
-# blog list to char ~144K), the no-anchor DOM window runs ~50K tokens — past
-# Qwen2.5's native 32K context. Serve a 64K window via YaRN rope scaling so the
-# endpoint accepts those prompts instead of rejecting them with HTTP 400
-# ("maximum context length exceeded"), which goldseam surfaces as a failed
-# heal. YaRN is Qwen's own recommended long-context method; factor 2.0 doubles
-# 32768 -> 65536. Proven end-to-end: a 51K-token epsilon3 heal prompt lands the
-# correct edit at this context on an L40S. Raise MAX_MODEL_LEN (and the GPU) if
-# you push goldseam's prompt ceiling higher.
-MAX_MODEL_LEN = 65536
-YARN_FACTOR = 2.0  # 32768 * 2 = 65536
+# Qwen2.5's native 32K context is enough for goldseam. Deep pages USED to send a
+# ~50K-token no-anchor DOM window (a Squarespace mega-nav pushes the blog list to
+# char ~144K), which needed YaRN rope scaling to 64K and an A100. goldseam's
+# offline candidate-ranking now hands the model a compact shortlist and windows
+# the DOM on the ranked candidate, so that same deep heal is a ~5K-token prompt —
+# it fits native 32K with room to spare, on a cheaper L40S, no rope scaling.
+# Proven: the local 14B heals the epsilon3 case from the ~5K-token prompt.
+MAX_MODEL_LEN = 32768
 
 # ── Container image: CUDA + vLLM ───────────────────────────────────────────
 # Versions proven end-to-end (a goldseam heal landed the correct edit on this
@@ -64,14 +60,11 @@ app = modal.App("goldseam-model")
 
 @app.function(
     image=vllm_image,
-    # A100-80GB, not L40S: goldseam's long-context prompts (MAX_MODEL_LEN=64K,
-    # for a deep page's DOM window) need ~12 GiB of KV cache on top of the 14B
-    # weights, and an L40S (48 GB) leaves only ~11 GiB free at the default
-    # utilization — it caps out around 59K tokens and refuses to start at 64K.
-    # The 80 GB card fits 64K with tens of GiB to spare. If you only heal
-    # shallow pages (prompts under ~30K tokens), drop MAX_MODEL_LEN to 32768 and
-    # this fits an L40S again — cheaper, and no rope scaling needed.
-    gpu="A100-80GB",
+    # L40S (48 GB) is ample for a 14B at native 32K context and cheaper than an
+    # A100 — goldseam's ranking rung keeps prompts small (~5K tokens even for a
+    # deep page), so there is no need for the 64K/A100 setup a raw deep DOM
+    # window used to require. Bump to A100-80GB only for a larger model.
+    gpu="L40S",
     # Stay warm 15 min after the last request, then stop. You pay $0 while
     # idle; the next request cold-starts (fast, thanks to the cache volumes).
     scaledown_window=15 * MINUTES,
@@ -94,7 +87,6 @@ def serve():
     # element lands in the container logs in cleartext. The env var reaches vLLM
     # the same way but never appears in argv or that startup log.
     api_key = os.environ["GOLDSEAM_VLLM_API_KEY"]
-    import json
 
     cmd = [
         "vllm", "serve", MODEL_NAME,
@@ -102,17 +94,9 @@ def serve():
         "--served-model-name", MODEL_NAME,
         "--host", "0.0.0.0",
         "--port", str(VLLM_PORT),
-        # Long context for goldseam's deep-page prompts (see MAX_MODEL_LEN).
-        # --hf-overrides injects the YaRN rope config Qwen2.5 needs above 32K
-        # (the version-robust form; the older --rope-scaling flag was removed).
+        # Native 32K context is enough — goldseam's ranking rung keeps prompts
+        # small, so no YaRN rope scaling is needed (see MAX_MODEL_LEN).
         "--max-model-len", str(MAX_MODEL_LEN),
-        "--hf-overrides", json.dumps({
-            "rope_scaling": {
-                "rope_type": "yarn",
-                "factor": YARN_FACTOR,
-                "original_max_position_embeddings": 32768,
-            }
-        }),
         # warning, not info: the info-level startup log echoes the parsed args;
         # keeping it quiet is defense-in-depth for the key now in the env.
         "--uvicorn-log-level", "warning",
