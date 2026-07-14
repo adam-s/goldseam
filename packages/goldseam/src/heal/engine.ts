@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, join, resolve, sep } from 'path';
 import { FAILURE_SCHEMA_VERSION, FailureArtifact } from '../shared/types';
+import { trace } from '../debug/trace';
 import { deriveReplacement, saveEntry } from './cache';
 import { matchExclusion } from './exclude';
 import { HOOK_TITLE_RE, reviewFlagsFor, selectorOccursInCode } from './resolve';
@@ -34,6 +35,14 @@ export async function healArtifactFile(
 ): Promise<HealArtifact> {
   const startedAt = Date.now();
   const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as FailureArtifact;
+  trace('heal:start', basename(artifactPath), () => ({
+    failedSelector: artifact.failedSelector,
+    title: artifact.title,
+    spec: artifact.specPath,
+    url: artifact.url,
+    domChars: artifact.domHtml?.length,
+    ariaChars: artifact.ariaSnapshot?.length,
+  }));
   // The artifact schema is a public API with major-bump-on-breaking
   // semantics; refuse a capture from a newer major rather than misparse it
   // into confusing downstream verdicts.

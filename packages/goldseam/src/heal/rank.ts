@@ -26,6 +26,7 @@
 // window to fall back on. Like the other offline rungs, it defers rather than
 // forces.
 
+import { trace } from '../debug/trace';
 import { closeWindow, parseDom } from './dom-env';
 import { extractAnchorTexts } from './dom-window';
 
@@ -247,9 +248,18 @@ export function rankCandidates(input: RankInput, topK = 8): Candidate[] {
       cands.push({ selector, count, sampleText, score: Math.min(1, score), why });
     }
 
-    return cands
-      .sort((a, b) => b.score - a.score || b.count - a.count)
-      .slice(0, topK);
+    const ranked = cands.sort((a, b) => b.score - a.score || b.count - a.count).slice(0, topK);
+    trace(
+      'rank:candidates',
+      'ranked',
+      () => ({
+        broken: input.failedSelector,
+        considered: cands.length,
+        top: ranked.slice(0, 6).map((c) => ({ sel: c.selector, n: c.count, score: Number(c.score.toFixed(2)) })),
+      }),
+      1,
+    );
+    return ranked;
   } catch {
     return [];
   } finally {

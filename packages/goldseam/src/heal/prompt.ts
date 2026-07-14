@@ -5,6 +5,7 @@
 // and the spec source. Never application source.
 
 import { FailureArtifact } from '../shared/types';
+import { trace } from '../debug/trace';
 import { deboilerplateDom, windowDom } from './dom-window';
 import { Candidate, rankCandidates } from './rank';
 
@@ -80,7 +81,7 @@ export function buildRepairPrompt({ artifact, specSource, selectorPriority, feed
   });
   const shortlist = candidates.length ? `\n${renderShortlist(candidates)}` : '';
 
-  return `You repair broken selectors in Cypress tests. A test failed because a selector no longer matches the page. Propose the minimal edit to the spec file that points the selector at the intended element.
+  const prompt = `You repair broken selectors in Cypress tests. A test failed because a selector no longer matches the page. Propose the minimal edit to the spec file that points the selector at the intended element.
 
 Rules (non-negotiable):
 - Selector-only: change nothing but the selector string. Never touch assertions, timeouts, test logic, or add/remove lines.
@@ -116,4 +117,19 @@ ${shortlist}
 ${dom}
 \`\`\`
 `;
+
+  trace('prompt:build', shrink ? 'built (shrunk)' : 'built', () => ({
+    promptChars: prompt.length,
+    domChars: dom.length,
+    overflows,
+    shrink,
+    candidateCount: candidates.length,
+    topCandidate: candidates[0]?.selector,
+    topScore: candidates[0]?.score,
+    targetInDom: candidates[0] ? dom.includes(candidates[0].selector.replace(/^[.#]|^\[[\w-]+=|\]$/g, '')) : undefined,
+  }));
+  // Ring 2 (wide field): the full prompt bytes, for hunting a redaction leak in
+  // exactly what reaches the model. Only emitted under GOLDSEAM_TRACE_RING>=2.
+  trace('prompt:full', 'prompt', () => ({ prompt }), 2);
+  return prompt;
 }
