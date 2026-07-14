@@ -157,6 +157,40 @@ function ollamaRunner(model: string): RepairRunner {
   };
 }
 
+/** The reply contract goldseam's parser accepts (parse.ts): either an edits[]
+ * proposal with a confidence, or a giveUp. Handed to the endpoint as a
+ * response_format json_schema so a weaker model emits VALID, correctly-shaped
+ * JSON instead of prose-wrapped or mis-escaped text. Both branches are optional
+ * so the model picks one; goldseam validates strictly afterward. Measured on
+ * vLLM + Qwen2.5-14B: bare decoding mis-escapes the edit JSON, and — worse —
+ * `response_format: json_object` sends the constrained decoder into a runaway
+ * that fills max_tokens with whitespace (finish_reason=length, unparseable).
+ * The explicit schema fixes both: fast, valid, and the correct edit. */
+const REPAIR_REPLY_SCHEMA = {
+  type: 'object',
+  properties: {
+    edits: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          file: { type: 'string' },
+          oldString: { type: 'string' },
+          newString: { type: 'string' },
+        },
+        required: ['file', 'oldString', 'newString'],
+      },
+    },
+    giveUp: {
+      type: 'object',
+      properties: { reason: { type: 'string' } },
+      required: ['reason'],
+    },
+    confidence: { type: 'number' },
+    reasoning: { type: 'string' },
+  },
+} as const;
+
 /** `openai:<model>` — any OpenAI-compatible chat endpoint (OpenAI proper,
  * a self-hosted vLLM/Modal `serve` deployment, LM Studio, …). Base URL via
  * OPENAI_BASE_URL (default api.openai.com), key via OPENAI_API_KEY. */
@@ -179,13 +213,16 @@ function openaiRunner(model: string): RepairRunner {
             // generous enough for the largest heal (8 edits + a reasoning
             // paragraph) with room to spare.
             max_tokens: 4096,
-            // Constrained JSON decoding — the openai-path analog of the ollama
-            // runner's format:'json'. Weaker self-hosted models otherwise mangle
-            // the edit JSON; the prompt already demands a JSON object (the word
-            // "JSON" is present, which OpenAI requires for this mode). vLLM,
-            // OpenAI, LM Studio, and TGI all honor it; an endpoint that doesn't
-            // answers with a clear HTTP 400 rather than silent garbage.
-            response_format: { type: 'json_object' },
+            // Constrained decoding to goldseam's reply schema (see
+            // REPAIR_REPLY_SCHEMA) — the openai-path analog of the ollama
+            // runner's format:'json', but schema-shaped because plain
+            // json_object makes vLLM's decoder run away. vLLM/OpenAI/LM Studio
+            // honor json_schema; an endpoint that doesn't answers with a clear
+            // HTTP 400 rather than silent garbage.
+            response_format: {
+              type: 'json_schema',
+              json_schema: { name: 'goldseam_repair', schema: REPAIR_REPLY_SCHEMA },
+            },
           },
           key ? { authorization: `Bearer ${key}` } : {},
         )) as { choices?: Array<{ message?: { content?: string } }> };

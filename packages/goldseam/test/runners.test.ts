@@ -95,7 +95,11 @@ describe('openai-compatible runner', () => {
         temperature: 0,
         messages: [{ role: 'user', content: 'PROMPT' }],
         max_tokens: 4096, // bounded so a tiny-default endpoint can't truncate the edit JSON
-        response_format: { type: 'json_object' }, // constrained JSON, like the ollama path
+        // schema-constrained JSON (json_object makes vLLM's decoder run away)
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'goldseam_repair', schema: { type: 'object' } },
+        },
       });
     } finally {
       delete process.env.OPENAI_BASE_URL;
