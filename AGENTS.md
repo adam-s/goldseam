@@ -150,10 +150,16 @@ of what else improves:
   `<!-- goldseam: DOM windowed … -->` marker names the anchor, and the live
   ladder still verifies. Output is hard-bounded by the budget. When NO anchor
   exists anywhere (e.g. an authoring spec with no `cy.contains` and a renamed
-  single-token selector), there is no region to center on, so the floor
-  widens to `NO_ANCHOR_FALLBACK_FACTOR × budget` — a content superset of the
-  old head-first slice that rescues a target sitting just past the budget and
-  can never break a heal that worked on the narrower slice.
+  single-token selector), there is no region to center on, so the no-anchor
+  slice widens all the way to `NO_ANCHOR_FALLBACK_CEILING` (200 K chars) — a
+  content superset of the old head-first slice that rescues a target sitting
+  deep behind un-strippable chrome (a Squarespace mega-nav pushes the blog list
+  to char ~144 K, past the old `2 × budget` floor; emptying style/script/svg/
+  comments moves it only ~4 K, so the depth is real DOM, not boilerplate) and
+  can never break a heal that worked on the narrower slice. The ceiling bounds
+  prompt tokens on a genuinely enormous page (and keeps a small-context
+  self-hosted model from being handed a prompt it can't fit); a target past it
+  still truncates honestly, just far later. Tunable.
 - **`--dry-run` mutates nothing on disk** — the heal-artifact write in
   [heal/engine.ts](packages/goldseam/src/heal/engine.ts) is guarded by
   `!dryRun`; a dry-run previews the full ladder to stdout but must never

@@ -86,7 +86,9 @@ describe('buildRepairPrompt DOM window', () => {
   });
 
   it('keeps prompt truncation honest when content still overflows after stripping', () => {
-    const huge = `<body>${'<div class="card">card</div>'.repeat(3000)}</body>`; // no style/script to strip
+    // >200K after stripping (no style/script here), no anchor -> the no-anchor
+    // fallback shows up to the ceiling, then truncates honestly past it.
+    const huge = `<body>${'<div class="card">card</div>'.repeat(8000)}</body>`; // ~224K, past the ceiling
     const prompt = buildRepairPrompt({ artifact: artifactWith(huge), ...base });
     expect(prompt).toContain('<!-- truncated for prompt -->');
   });

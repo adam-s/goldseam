@@ -188,26 +188,49 @@ describe('windowDom — the zero-regression gate', () => {
     expect(r.html).toBe(deboilerplateDom(dom));
   });
 
-  it('no anchor + moderately over budget: widens the slice so a just-past-budget target survives', () => {
+  // The no-anchor fallback ceiling (mirrors NO_ANCHOR_FALLBACK_CEILING in
+  // dom-window.ts). A no-anchor page shows the WHOLE deboilerplated DOM up to
+  // this bound, then truncates honestly — the fix for a heal target sitting
+  // deep behind un-strippable chrome (Squarespace's ~144K blog list).
+  const NO_ANCHOR_CEILING = 200_000;
+
+  it('no anchor + moderately over budget: shows the whole page so a just-past-budget target survives', () => {
     // target sits just past the base budget; no spec anchor, broken single-token selector.
     const filler = '<div class="row">x</div>'.repeat(2000); // ~48K, over the base budget
     const dom = `<html><body>${filler}<main><div class="article-title">Late Target Title</div></main></body></html>`;
     const slim = deboilerplateDom(dom);
     expect(slim.length).toBeGreaterThan(BUDGET); // over the base budget...
-    expect(slim.length).toBeLessThanOrEqual(2 * BUDGET); // ...but within the widened fallback
+    expect(slim.length).toBeLessThanOrEqual(NO_ANCHOR_CEILING); // ...but within the ceiling
     expect(slim.slice(0, BUDGET)).not.toContain('article-title'); // a base head-first slice WOULD miss it
     const r = windowDom(dom, { failedSelector: '.gone', specSource: '', budget: BUDGET });
     expect(r.strategy).not.toBe('windowed'); // no anchor -> not windowed
-    expect(r.html).toContain('article-title'); // ...but the wider no-anchor fallback rescued the target
+    expect(r.html).toContain('article-title'); // ...but the no-anchor fallback rescued the target
   });
 
-  it('no anchor + hugely over budget: head-first slice, truncated and bounded at the fallback', () => {
-    const dom = `<html><body>${'<div class="row">x</div>'.repeat(4500)}</body></html>`; // ~108K, past 2x budget
+  it('G1: no anchor + target far past the OLD 2x floor (Squarespace ~144K depth) is rescued', () => {
+    // The regression this fix exists for: a heal target sits ~100K deep behind
+    // un-strippable nav markup, no spec text anchor, a fully-renamed single-token
+    // selector (no surviving sub-part). The old 2x=80K fallback missed it; the
+    // ceiling shows the whole page (still under the ceiling) so the model sees it.
+    const filler = '<div class="row">x</div>'.repeat(4200); // ~100K of chrome, well past the old 80K floor
+    const dom = `<html><body><nav>menu</nav>${filler}<main><a class="summary-title-link-next">Announcing Our Series B</a></main></body></html>`;
+    const slim = deboilerplateDom(dom);
+    expect(slim.indexOf('summary-title-link-next')).toBeGreaterThan(2 * BUDGET); // deeper than the OLD fallback
+    expect(slim.length).toBeLessThanOrEqual(NO_ANCHOR_CEILING);
+    const r = windowDom(dom, { failedSelector: '.summary-title-link', specSource: '', budget: BUDGET });
+    expect(r.strategy).not.toBe('windowed'); // no anchor
+    expect(r.html).toContain('summary-title-link-next'); // the renamed target the model must now find
+  });
+
+  it('no anchor + past the CEILING: head-first slice, truncated and bounded at the ceiling', () => {
+    const dom = `<html><body>${'<div class="row">x</div>'.repeat(9000)}<main><div class="way-late">z</div></main></body></html>`; // ~216K, past the ceiling
+    const slim = deboilerplateDom(dom);
+    expect(slim.length).toBeGreaterThan(NO_ANCHOR_CEILING);
     const r = windowDom(dom, { budget: BUDGET });
     expect(r.strategy).toBe('head-first');
     expect(r.truncated).toBe(true);
     expect(r.html).toContain('<!-- truncated for prompt -->');
-    expect(r.html.length).toBeLessThanOrEqual(2 * BUDGET + 100);
+    expect(r.html.length).toBeLessThanOrEqual(NO_ANCHOR_CEILING + 100); // bounded at the ceiling, not 2x budget
   });
 });
 

@@ -103,15 +103,25 @@ export interface WindowResult {
 const TRUNC_MARKER = '\n<!-- truncated for prompt -->';
 
 /** When no anchor can be found at all, we cannot center a window — but a hard
- * head-first cut at the budget silently drops a target that sits just past it
- * (a heal target ~2K past the budget in a moderately-heavy page, with an
- * authoring spec that offers no text anchor and a renamed single-token
- * selector that offers no surviving sub-part — the video-factory case). With
- * no region to aim at, showing the model MORE of the page is strictly better:
- * it is a content superset, so it can only add context, never break a heal
- * that worked on the narrower slice. Bounded so a genuinely huge page still
- * truncates. Tunable. */
-const NO_ANCHOR_FALLBACK_FACTOR = 2;
+ * head-first cut at the budget silently drops a target that sits deeper than it
+ * (a renamed single-token selector that offers no surviving sub-part, and an
+ * assertion spec that offers no text anchor — the video-factory case, and the
+ * Squarespace-blog case where the heal target sits ~144K deep behind a mega-nav
+ * that no amount of style/script/svg emptying shrinks). With no region to aim
+ * at, showing the model MORE of the page is strictly better: it is a content
+ * superset, so it can only add context, never break a heal that worked on the
+ * narrower slice. So the no-anchor slice widens all the way to a ceiling that
+ * covers real page depth, not a small multiple of the budget.
+ *
+ * The ceiling exists only to bound prompt tokens on a genuinely enormous page
+ * (and to keep a small-context self-hosted model from being handed a prompt it
+ * cannot fit) — it is NOT a content judgment, so it is set well past where real
+ * content sits on heavy real-world pages (measured: the deepest observed heal
+ * target, Squarespace's `.summary-title-link` list, lands at char ~144K in the
+ * deboilerplated DOM). A page whose target sits past the ceiling still truncates
+ * honestly, exactly as before — just far later. Tunable; lower it for a
+ * small-context model, raise it if a real target is ever seen deeper. */
+const NO_ANCHOR_FALLBACK_CEILING = 200_000;
 
 /** Slice the head, honestly marked — today's behavior and the safe floor. */
 function headFirst(slim: string, budget: number): WindowResult {
@@ -280,9 +290,10 @@ function emitWindow(anchor: Anchor, budget: number): WindowResult {
  * up today. It is strictly additive.
  *
  * When NO anchor exists anywhere, there is no region to center on, so we fall
- * back to a wider head-first slice (NO_ANCHOR_FALLBACK_FACTOR × budget) — a
- * content superset of the old floor that rescues a target sitting just past
- * the budget, and can never break a heal that worked on the narrower slice.
+ * back to a wider head-first slice (up to NO_ANCHOR_FALLBACK_CEILING) — a
+ * content superset of the old floor that rescues a target sitting deep behind
+ * un-strippable chrome (a Squarespace mega-nav pushes the blog list to char
+ * ~144K), and can never break a heal that worked on the narrower slice.
  */
 export function windowDom(domHtml: string, input: WindowInput): WindowResult {
   // Own the two parse windows and close them once the result string is built.
@@ -307,7 +318,7 @@ export function windowDom(domHtml: string, input: WindowInput): WindowResult {
     const slimParsed = parseDom(slim);
     slimWindow = slimParsed.window;
     const anchor = findAnchor(slimParsed.document, input);
-    if (!anchor) return headFirst(slim, input.budget * NO_ANCHOR_FALLBACK_FACTOR);
+    if (!anchor) return headFirst(slim, Math.min(slim.length, NO_ANCHOR_FALLBACK_CEILING));
     return emitWindow(anchor, input.budget);
   } catch {
     // Robustness over cleverness: a malformed DOM or jsdom hiccup must never
