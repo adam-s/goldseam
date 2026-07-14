@@ -105,6 +105,28 @@ async function postJson(url: string, body: unknown, headers: Record<string, stri
 
 const OLLAMA_DEFAULT_HOST = 'http://127.0.0.1:11434';
 
+/** Size Ollama's context window to the prompt. Ollama defaults `num_ctx` to
+ * ~4K (2K on some builds) and SILENTLY truncates anything longer — so a
+ * deep-page heal prompt (a Squarespace blog's DOM window runs ~50K tokens) is
+ * cut to the first few thousand tokens and the model never sees the heal
+ * target, then "gives up". That is a silent lie: the pipeline reports give-up
+ * for a target it never showed the model. Sizing the context to the prompt
+ * makes the give-up honest — the model saw everything we sent.
+ *
+ * Estimate tokens by chars/3 (deliberately generous vs the ~chars/4 English
+ * average, because HTML/JSON tokenizes denser and UNDER-sizing re-introduces
+ * the silent truncation) plus output headroom, floored so small prompts still
+ * get a sane window and capped so we never request an absurd allocation. Ollama
+ * itself clamps the request to the model's trained maximum, so a short-context
+ * model is no worse off than before; a long-context model now works. Override
+ * the cap with GOLDSEAM_OLLAMA_NUM_CTX for unusual hardware. */
+export function ollamaNumCtx(prompt: string): number {
+  const override = Number(process.env.GOLDSEAM_OLLAMA_NUM_CTX);
+  if (Number.isFinite(override) && override > 0) return Math.floor(override);
+  const estTokens = Math.ceil(prompt.length / 3) + 2048;
+  return Math.min(131_072, Math.max(8_192, estTokens));
+}
+
 /** `ollama:<model>` — local HTTP, zero egress: the air-gapped story
  * (cypress#33927 / #32673). Host via OLLAMA_HOST (default localhost). */
 function ollamaRunner(model: string): RepairRunner {
@@ -119,8 +141,9 @@ function ollamaRunner(model: string): RepairRunner {
           // format:'json' = ollama's constrained decoding — local models
           // reliably pick the right edit but flub JSON escaping without it
           // (probed: qwen2.5-14b escaped oldString's quotes, not newString's,
-          // three attempts straight).
-          { model, prompt, stream: false, format: 'json', options: { temperature: 0 } },
+          // three attempts straight). num_ctx sized to the prompt so a deep
+          // capture is never silently truncated below the heal target.
+          { model, prompt, stream: false, format: 'json', options: { temperature: 0, num_ctx: ollamaNumCtx(prompt) } },
           {},
         )) as { response?: string };
       } catch (e) {
@@ -147,7 +170,23 @@ function openaiRunner(model: string): RepairRunner {
       try {
         reply = (await postJson(
           `${base}/chat/completions`,
-          { model, messages: [{ role: 'user', content: prompt }], temperature: 0 },
+          {
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0,
+            // Bounded so an endpoint that defaults max_tokens to a tiny value
+            // (some do) can't truncate a multi-occurrence edit reply mid-JSON;
+            // generous enough for the largest heal (8 edits + a reasoning
+            // paragraph) with room to spare.
+            max_tokens: 4096,
+            // Constrained JSON decoding — the openai-path analog of the ollama
+            // runner's format:'json'. Weaker self-hosted models otherwise mangle
+            // the edit JSON; the prompt already demands a JSON object (the word
+            // "JSON" is present, which OpenAI requires for this mode). vLLM,
+            // OpenAI, LM Studio, and TGI all honor it; an endpoint that doesn't
+            // answers with a clear HTTP 400 rather than silent garbage.
+            response_format: { type: 'json_object' },
+          },
           key ? { authorization: `Bearer ${key}` } : {},
         )) as { choices?: Array<{ message?: { content?: string } }> };
       } catch (e) {

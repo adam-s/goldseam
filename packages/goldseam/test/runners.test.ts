@@ -4,7 +4,7 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveRunner, RunnerError } from '../src/heal/runners';
+import { ollamaNumCtx, resolveRunner, RunnerError } from '../src/heal/runners';
 
 let server: Server | undefined;
 afterEach(() => new Promise<void>((r) => (server ? server.close(() => r()) : r())));
@@ -51,6 +51,9 @@ describe('ollama runner', () => {
         format: 'json',
         options: { temperature: 0 },
       });
+      // num_ctx is sized to the prompt (never left at ollama's silently-
+      // truncating ~4K default) — a short prompt gets the floor.
+      expect((seen.options as { num_ctx?: number }).num_ctx).toBe(8_192);
     } finally {
       delete process.env.OLLAMA_HOST;
     }
@@ -91,10 +94,34 @@ describe('openai-compatible runner', () => {
         model: 'qwen-14b',
         temperature: 0,
         messages: [{ role: 'user', content: 'PROMPT' }],
+        max_tokens: 4096, // bounded so a tiny-default endpoint can't truncate the edit JSON
+        response_format: { type: 'json_object' }, // constrained JSON, like the ollama path
       });
     } finally {
       delete process.env.OPENAI_BASE_URL;
       delete process.env.OPENAI_API_KEY;
+    }
+  });
+});
+
+describe('ollamaNumCtx — sizes the context to the prompt (no silent truncation)', () => {
+  it('floors small prompts and never returns ollama\'s truncating default', () => {
+    expect(ollamaNumCtx('x')).toBe(8_192);
+    expect(ollamaNumCtx('x'.repeat(1000))).toBe(8_192);
+  });
+  it('grows past the floor for a deep-page prompt so the target is never cut', () => {
+    // ~200K chars (a Squarespace-depth DOM window) -> well past the 4K default.
+    const ctx = ollamaNumCtx('x'.repeat(200_000));
+    expect(ctx).toBeGreaterThan(60_000);
+    expect(ctx).toBeLessThanOrEqual(131_072);
+  });
+  it('caps an enormous prompt and honors the env override', () => {
+    expect(ollamaNumCtx('x'.repeat(10_000_000))).toBe(131_072); // hard cap
+    process.env.GOLDSEAM_OLLAMA_NUM_CTX = '16384';
+    try {
+      expect(ollamaNumCtx('x'.repeat(200_000))).toBe(16_384); // override wins
+    } finally {
+      delete process.env.GOLDSEAM_OLLAMA_NUM_CTX;
     }
   });
 });
