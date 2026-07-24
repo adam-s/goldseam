@@ -173,7 +173,8 @@ with a stub that forces the code path to execute.
   50% is dangerous.
 - **Surviving mutations by invariant** = the prioritized list of missing
   tests. Every SURVIVED maps to one regression test to add (or one
-  AGENTS.md deferred-finding entry if legitimately unobservable).
+  ledger entry in `.agents/reference/invariants-and-tradeoffs.md` if
+  legitimately unobservable).
 - **Compare to prior runs** — a mutation CAUGHT last cycle that now
   SURVIVES means a recent change weakened coverage.
 - A build-error CAUGHT (type error, not a test) is weak evidence — note

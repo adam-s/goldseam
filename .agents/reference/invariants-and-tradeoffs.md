@@ -6,9 +6,12 @@ cost that was accepted. Both are load-bearing — the principle is what a
 new agent must not break, the specifics here are what a maintainer needs
 when deciding whether a change is that break.
 
-Rule of placement: when a specific finding turns out to state something
-general, promote the general form into AGENTS.md and leave the instance
-here. Specifics rot; principles don't.
+Rule of placement: when a finding turns out to state something general,
+promote the general form into AGENTS.md — which is capped, so the
+promotion has to displace a rule it subsumes — and leave the instance
+here. This file is pruned too: an entry whose code changed is deleted, not
+amended, and a finding that only re-proves a class already listed in
+AGENTS.md doesn't get one. Specifics rot; principles don't.
 
 ## Capture and redaction
 

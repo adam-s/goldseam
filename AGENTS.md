@@ -7,7 +7,7 @@ file. Shared agent resources (skills, reference docs) live under
 
 This file holds rules, not mechanisms. A specific — a file, a constant, a
 past bug — earns a place here only as the example that makes a rule
-concrete. The instance behind each rule lives in the ledger,
+concrete; the instance behind each rule lives in the ledger,
 [invariants-and-tradeoffs.md](.agents/reference/invariants-and-tradeoffs.md).
 
 ## Language (mandatory)
@@ -18,10 +18,9 @@ Prose style: [.agents/reference/anti-slop.md](.agents/reference/anti-slop.md).
 
 Voice anchor for explanatory prose: Raymond Chen (*The Old New Thing*)
 crossed with CD-era MSDN reference docs — constraint first, then why the
-naive approach fails, then the actual mechanism, in plain declarative
-sentences. Borrow the reasoning-first structure, not anecdotes or
-folksiness. Reference-shaped content (API notes, schemas) leans MSDN:
-rigid, predictable sections, zero enthusiasm.
+naive approach fails, then the mechanism, in plain declarative sentences.
+Borrow the reasoning-first structure, not the anecdotes. Reference-shaped
+content (API notes, schemas) leans MSDN: rigid sections, zero enthusiasm.
 
 ## What this is
 
@@ -47,9 +46,11 @@ open-source bar.**
 4. **Red-team at checkpoints.** After a milestone or a large batch of new
    code, run the skills below — review the prod code, review the tests,
    then mutate to see if the suite actually bites.
-5. **Record, generalized.** The tradeoff goes in the reference ledger; the
-   rule it implies comes here. If you can name the specific failing
-   instance in the rule, rewrite it as a principle. Specifics rot.
+5. **Fix it or drop it; recording is the last resort.** Write a finding
+   down only when a future change could silently undo the tradeoff — the
+   instance in the ledger, the principle here, and **nothing enters this
+   file without something leaving** (hard cap: 250 lines). Rules that only
+   accumulate stop being read, and unread rules enforce nothing.
 
 ### Autonomous iteration campaigns
 
@@ -64,9 +65,10 @@ iterating while I'm out"), run this loop, one commit per iteration:
    coverage gaps (usage-catalog scenario without a fixture), DX gaps.
 3. **Implement with pinned tests**, run the full gauntlet, commit
    conventional, push.
-4. **Record learnings in the same commit** — deferred findings, reference
-   doc updates, and fixes to these instructions when an iteration exposes
-   a gap in them. The improvement loop applies to the loop itself.
+4. **Leave the docs no longer than you found them.** Learnings land in the
+   same commit as the code, under the rule above — and an iteration that
+   grows a doc must prune it too, starting with the entry its own change
+   just made obsolete. The improvement loop applies to the loop itself.
 5. **Every few iterations, self-red-team** with the skills below and fix
    what survives scrutiny.
 
@@ -193,9 +195,8 @@ Gotchas that will burn you:
 - Stray demo servers hold port 4173: `lsof -ti:4173 | xargs kill`.
 - Packages use `moduleResolution: node16` (TS 6 removed `"node"`).
 - `setupNodeEvents` runs with cwd = the config file's directory, so paths
-  anchor to `config.projectRoot`, not `process.cwd()`. A per-app config in
-  a monorepo needs `goldseam heal --config-file <path>` so the rerun rungs
-  load that app's config.
+  anchor to `config.projectRoot`, not `process.cwd()`; a per-app config in
+  a monorepo needs `goldseam heal --config-file <path>`.
 - Cypress `--spec` only accepts files matching `specPattern`; specs
   outside it run via a `--config specPattern=...` override, as the npm
   scripts do.
@@ -223,20 +224,20 @@ place. Format conventions:
 
 Full ledger:
 [invariants-and-tradeoffs.md](.agents/reference/invariants-and-tradeoffs.md).
-They are tradeoffs, not oversights. Recognize the class before adding an
-entry, and record the new one there in the same commit as the code that
-earned it:
+They are tradeoffs, not oversights — and the ledger is pruned, not
+appended to: delete an entry when the code behind it changes, and don't
+add one whose only content is that its class applies again. The class is
+the record; a new entry has to say something the class doesn't.
 
-- **Documented walls** — unreachable by construction (closed shadow roots,
-  cross-origin documents, canvas). An honest wall beats a silent gap;
-  catalog in [hazard-catalog.md](.agents/reference/hazard-catalog.md).
+- **Documented walls** — unreachable by construction; an honest wall beats
+  a silent gap ([hazard-catalog.md](.agents/reference/hazard-catalog.md)).
 - **Best-effort guarantees with named holes** — say exactly what is
   guaranteed; never let the doc imply the stronger claim.
 - **Deferral over guessing** — a rung that can't decide soundly hands off.
 - **Exact-key caches** — a near-miss redoes the work, a reconfiguration
   reuses a reviewed result. Intended, both directions.
-- **Measured slowness** — profiled, bounded, deprioritized. Record the
-  number so a future scaling pass starts with data.
+- **Measured slowness** — profiled and bounded; record the number so a
+  future scaling pass starts with data.
 - **Reach bought with tokens or a narrower view** — helps one class of
   model, costs another; gated so the worst case is a give-up.
 

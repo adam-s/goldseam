@@ -104,6 +104,7 @@ read-only by design and should not create files.
   it to a `.md` file in the repo unless requested.
 - Final `git status` check before returning control.
 
-Findings that are accepted rather than fixed go into AGENTS.md "Known
-deferred findings" — with the reasoning, so the next agent doesn't "fix"
-them.
+Findings accepted rather than fixed go into the ledger
+([invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md))
+with the reasoning, so the next agent doesn't "fix" them — and only when
+the reasoning says something its class in AGENTS.md doesn't already.

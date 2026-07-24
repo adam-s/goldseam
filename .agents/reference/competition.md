@@ -72,7 +72,8 @@ auditable redacted-DOM + aria capture, arriving as a reviewed commit — and
 it *does* solve the large-page problem the others punt, deterministically
 and prompt-only, via the anchored neighborhood window
 ([heal/dom-window.ts](../../packages/goldseam/src/heal/dom-window.ts);
-invariant in [AGENTS.md](../../AGENTS.md)). The window rescues deep targets
+invariant in [invariants-and-tradeoffs.md](invariants-and-tradeoffs.md)).
+The window rescues deep targets
 on real page-builder output (Framer/Webflow/Wix) and huge server-rendered
 pages (Wikipedia) that a head-first slice — and CodeceptJS's `maxLength:
 50000` head cut, which has this exact bug — give up on.

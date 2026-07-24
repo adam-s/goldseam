@@ -43,10 +43,11 @@ code. Rank findings CRITICAL / HIGH / MEDIUM / LOW.
 ## Setup
 
 Project: the goldseam repo root (`git rev-parse --show-toplevel`).
-Read AGENTS.md §"Tests + build" for the four suites:
+Read AGENTS.md §"Tests + build" for the suites:
 - packages/goldseam/test/*.test.ts (vitest; jsdom for browser-side)
 - scripts/system-test.mjs, scripts/hardening-test.mjs,
-  scripts/heal-e2e-test.mjs (Module-API system suites; check() helpers)
+  scripts/heal-e2e-test.mjs, scripts/prompt-e2e-test.mjs (Module-API
+  system suites; check() helpers)
 You may run them (npm run build:packages first; suites start their own
 demo server on 4173).
 
