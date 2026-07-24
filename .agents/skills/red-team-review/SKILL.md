@@ -45,7 +45,9 @@ support entry (Cypress fail-event capture, redaction, aria snapshot) and
 a Node-side plugin + CLI (artifact writer; heal engine that prompts a
 model, validates the proposed edit mechanically, applies it, and reruns
 Cypress via the Module API). Read AGENTS.md first — "Hard rules" and
-"Load-bearing invariants" define what counts as broken.
+"Load-bearing invariants" define what counts as broken; the mechanism
+behind each invariant, and every tradeoff already accepted, is in
+[invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md).
 
 ## What changed since last review (if applicable)
 

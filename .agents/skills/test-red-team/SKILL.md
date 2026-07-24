@@ -99,5 +99,6 @@ No scripts today. Coverage helpers, if ever needed, live in this folder.
 
 Same rules as [red-team-review](../red-team-review/SKILL.md): the agent
 is read-only; no repo files; response inline; final `git status` check.
-Confirmed gaps become tests (preferred) or AGENTS.md "Known deferred
-findings" entries (accepted tradeoffs) — never silent knowledge.
+Confirmed gaps become tests (preferred) or entries in the deferred-findings
+ledger ([invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md))
+when they are accepted tradeoffs — never silent knowledge.
