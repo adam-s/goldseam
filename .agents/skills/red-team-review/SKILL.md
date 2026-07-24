@@ -45,7 +45,9 @@ support entry (Cypress fail-event capture, redaction, aria snapshot) and
 a Node-side plugin + CLI (artifact writer; heal engine that prompts a
 model, validates the proposed edit mechanically, applies it, and reruns
 Cypress via the Module API). Read AGENTS.md first — "Hard rules" and
-"Load-bearing invariants" define what counts as broken.
+"Load-bearing invariants" define what counts as broken; the mechanism
+behind each invariant, and every tradeoff already accepted, is in
+[invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md).
 
 ## What changed since last review (if applicable)
 
@@ -102,6 +104,7 @@ read-only by design and should not create files.
   it to a `.md` file in the repo unless requested.
 - Final `git status` check before returning control.
 
-Findings that are accepted rather than fixed go into AGENTS.md "Known
-deferred findings" — with the reasoning, so the next agent doesn't "fix"
-them.
+Findings accepted rather than fixed go into the ledger
+([invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md))
+with the reasoning, so the next agent doesn't "fix" them — and only when
+the reasoning says something its class in AGENTS.md doesn't already.

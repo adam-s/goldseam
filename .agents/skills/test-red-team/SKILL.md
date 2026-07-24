@@ -43,10 +43,11 @@ code. Rank findings CRITICAL / HIGH / MEDIUM / LOW.
 ## Setup
 
 Project: the goldseam repo root (`git rev-parse --show-toplevel`).
-Read AGENTS.md §"Tests + build" for the four suites:
+Read AGENTS.md §"Tests + build" for the suites:
 - packages/goldseam/test/*.test.ts (vitest; jsdom for browser-side)
 - scripts/system-test.mjs, scripts/hardening-test.mjs,
-  scripts/heal-e2e-test.mjs (Module-API system suites; check() helpers)
+  scripts/heal-e2e-test.mjs, scripts/prompt-e2e-test.mjs (Module-API
+  system suites; check() helpers)
 You may run them (npm run build:packages first; suites start their own
 demo server on 4173).
 
@@ -99,5 +100,6 @@ No scripts today. Coverage helpers, if ever needed, live in this folder.
 
 Same rules as [red-team-review](../red-team-review/SKILL.md): the agent
 is read-only; no repo files; response inline; final `git status` check.
-Confirmed gaps become tests (preferred) or AGENTS.md "Known deferred
-findings" entries (accepted tradeoffs) — never silent knowledge.
+Confirmed gaps become tests (preferred) or entries in the deferred-findings
+ledger ([invariants-and-tradeoffs.md](../../reference/invariants-and-tradeoffs.md))
+when they are accepted tradeoffs — never silent knowledge.
